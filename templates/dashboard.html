@@ -1,0 +1,2125 @@
+<!doctype html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover" />
+  <style>
+    :root{
+      --bg:#000000;
+      --card:#b8b8b8;
+      --ink:#1f1f1f;
+      --sticky-top-offset:10px;
+      --sticky-gap:10px;
+      --sticky-notes-top:160px;
+      --pink:{{theme.pink}};
+      --pink-dark:{{theme.pink_dark}};
+      --line:{{theme.line}};
+      --tint-soft:{{theme.tint_soft}};
+      --tint-mid:{{theme.tint_mid}};
+      --panel-bg:{{theme.panel_bg}};
+      --ok:#137a3a;
+      --warn:#a65b00;
+      --bad:#b00020;
+    }
+    *{box-sizing:border-box}
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;margin:0;background:var(--bg);color:var(--ink);-webkit-text-size-adjust:100%;text-size-adjust:100%;overflow-x:hidden}
+    .wrap{max-width:1600px;margin:16px auto;padding:0 12px}
+    .layout{display:grid;grid-template-columns:220px 1fr;gap:12px;align-items:start}
+    .sidebar{position:sticky;top:10px}
+    .sidebar.card,#top{background:var(--panel-bg)}
+    #top{position:sticky;top:var(--sticky-top-offset);z-index:30}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px;box-shadow:0 2px 8px rgba(214,51,132,.08)}
+    h2,h3{margin:6px 0 10px 0;color:var(--pink-dark)}
+    .topline{font-size:14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .app-brand{display:flex;align-items:center;gap:10px}
+    .app-brand img{width:28px;height:28px;display:block}
+    .household-badge{display:inline-block;background:var(--tint-soft);border:1px solid var(--line);color:var(--pink-dark);padding:4px 10px;border-radius:999px;font-weight:700}
+    .pill{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--tint-soft);margin-right:6px}
+    .sidebar .pill{display:block;margin:0;background:var(--tint-mid)}
+    .sidebar .pill.active{background:var(--pink);color:#111 !important;font-weight:800}
+    .good{color:var(--ok);font-weight:600}
+    .warn{color:var(--warn);font-weight:600}
+    .bad{color:var(--bad);font-weight:700}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700}
+    .badge-due{background:#ffe3e3;color:#b00020}
+    .badge-paid{background:#dcfce7;color:#166534}
+    .badge-bill{background:#ffe8cc;color:#7a3e00}
+    .badge-promo{background:#ffe3e3;color:#b00020}
+    .badge-trip{background:#efe3ff;color:#5a2d91}
+    .badge-paycheck{background:#dcfce7;color:#166534}
+    .section-title{display:inline-block;font-size:15px;font-weight:800;letter-spacing:.2px;color:var(--pink-dark);background:linear-gradient(90deg,var(--tint-soft),var(--panel-bg));border:1px solid var(--line);border-radius:999px;padding:4px 10px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+    .top-pill-btn{font-size:14px !important;padding:4px 8px !important;min-height:auto !important;font-weight:600 !important}
+    .overview-value{font-size:24px}
+    .calc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .calc-box{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff}
+    .calc-box .field-row{margin-bottom:6px}
+    .calc-box .actions{justify-content:center}
+    .calc-result{margin-top:8px;font-size:16px;line-height:1.45;text-align:center}
+    .promo-inline{display:flex;align-items:center;gap:8px}
+    .promo-inline label{font-weight:600;white-space:nowrap;min-width:115px;text-align:right}
+    .promo-inline label.promo-label-promotion{min-width:90px;text-align:right}
+    .promo-inline label.promo-label-enddate{min-width:90px;text-align:right}
+    .promo-inline label.promo-label-note{min-width:90px;text-align:right}
+    .promo-inline input{width:100%}
+    .top-controls{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+    .top-controls-left,.top-controls-right-top,.top-controls-right-bottom{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .top-controls-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+    .top-title-row,.top-month-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+    .planner-table,.adaptive-table{width:100%;table-layout:fixed}
+    .planner-table th,.planner-table td,.adaptive-table th,.adaptive-table td{white-space:nowrap;word-break:normal;overflow:hidden;text-overflow:ellipsis}
+    .planner-table th,.adaptive-table th{font-size:clamp(11px,1vw,14px);white-space:normal;overflow:visible;text-overflow:clip;line-height:1.15}
+    .planner-table td,.adaptive-table td{font-size:clamp(11px,1vw,14px)}
+    .planner-table td:nth-child(1), .planner-table th:nth-child(1){
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .planner-table td:nth-child(2), .planner-table th:nth-child(2){
+      white-space:normal;
+      overflow:visible;
+      text-overflow:clip;
+      overflow-wrap:anywhere;
+      word-break:break-word;
+      min-width:170px;
+    }
+    .planner-table .plan-pill{display:inline-flex;align-items:center;max-width:100%;margin-left:4px;font-size:clamp(9px,.75vw,12px);background:#fff3b0;color:#7a5a00;padding:1px 6px;border-radius:999px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+    .planner-table td form,.adaptive-table td form{display:block;margin:0}
+    .planner-table td .badge,.adaptive-table td .badge{display:inline-flex;align-items:center;justify-content:center;max-width:100%;font-size:clamp(9px,.8vw,12px);padding:2px 6px;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .planner-table td .badge.badge-paid-on{display:inline-block;white-space:normal;overflow:visible;text-overflow:clip;line-height:1.2;word-break:normal;overflow-wrap:normal}
+    .planner-table td .badge.badge-paid-on .paid-date-line{display:block;white-space:nowrap;word-break:normal;overflow-wrap:normal}
+    .planner-table td button,.adaptive-table td button{width:100%;max-width:100%;padding:6px 8px;min-height:32px;font-size:clamp(11px,.95vw,14px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .planner-table tr:nth-child(even):not([style*="background:#e9f9ee"]):not(:first-child){background:#e8e8e8}
+    .planner-table tr:nth-child(odd):not([style*="background:#e9f9ee"]):not(:first-child){background:#fff}
+    .calendar-grid{table-layout:fixed}
+    .calendar-cell{vertical-align:top;height:140px;width:14.285%;overflow:hidden}
+    .calendar-events{display:flex;flex-direction:column;gap:1px;align-items:stretch;max-height:108px;overflow:auto}
+    .calendar-events .badge{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:11px;line-height:1.1;padding:2px 6px;margin:0;border-radius:4px}
+    .cal-event-btn{border:none;padding:0;margin:0;background:transparent;text-align:left;cursor:pointer;width:100%;line-height:1}
+    .calendar-events .cal-event-btn + .cal-event-btn{margin-top:-1px}
+    .calendar-more-btn{border:1px solid var(--line);background:#fff;color:#111;padding:1px 6px;margin-top:1px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;text-align:left;white-space:nowrap}
+    .calendar-day-num{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:999px;padding:0 6px}
+    .calendar-day-num.today{background:var(--pink-dark);color:#fff;font-weight:800;box-shadow:0 0 0 2px var(--tint-soft)}
+    .date-hint-wrap{position:relative;display:inline-flex;align-items:center;min-width:170px}
+    .date-hint-wrap input[type="date"],.date-hint-wrap input[type="month"]{padding-left:8px;padding-right:8px;position:relative;z-index:1;background:#fff;text-align:left}
+    .date-hint-wrap .date-hint{position:absolute;left:8px;right:auto;top:50%;transform:translateY(-50%);color:#8a8a8a;font-size:16px;pointer-events:none;line-height:1;white-space:nowrap;z-index:2;background:transparent}
+    .date-hint-wrap.has-value .date-hint{display:none}
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th,td{border:1px solid var(--line);padding:7px;text-align:center}
+    th{background:var(--tint-soft)}
+    input,select,button{padding:9px;border-radius:10px;border:1px solid var(--line);font-size:16px}
+    input::placeholder, textarea::placeholder{color:#8a8a8a;opacity:1}
+    input[type="date"],input[type="month"]{height:42px;min-height:42px;min-width:170px;line-height:1.2;-webkit-appearance:none;appearance:none;background:#fff;text-align:left;padding-left:8px;padding-right:8px}
+    button{background:var(--pink);color:#fff;border:none;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;min-height:36px;line-height:1;white-space:nowrap}
+    button:hover{filter:brightness(.96)}
+    form{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .stack-form{display:block !important}
+    .field-row{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center;margin-bottom:8px}
+    .field-row label{text-align:left;font-weight:600}
+    .stack-form input[type="text"], .stack-form input[type="number"], .stack-form input[type="date"], .stack-form select{width:100%;max-width:100%}
+    .stack-form .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    ul{margin:10px 0 0 18px;padding:0}
+    li{margin-bottom:6px}
+    a{color:var(--pink-dark);font-weight:700}
+    .row{display:grid;grid-template-columns:1fr;gap:12px}
+    .layout > *{min-width:0}
+    main{min-width:0}
+    @media(max-width:980px){.layout{grid-template-columns:1fr}.sidebar{position:static}#top{position:static}}
+    @media(max-width:700px){
+      .wrap{margin:8px auto;padding:0 8px;max-width:100%}
+      .card{padding:10px;max-width:100%;overflow:hidden}
+      .field-row{grid-template-columns:1fr;gap:6px}
+      input,select,button{font-size:16px;max-width:100%}
+      button{white-space:normal}
+
+      table{display:block;overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}
+      th,td{white-space:nowrap;word-break:normal;overflow-wrap:normal;font-size:12px;padding:6px}
+
+      .calendar-grid{display:table !important;table-layout:fixed;width:100%}
+      .calendar-grid th,.calendar-grid td{font-size:11px;padding:4px;white-space:normal;word-break:break-word;overflow-wrap:anywhere}
+      .calendar-cell{height:112px}
+      .calendar-events{max-height:72px}
+      .calendar-day-num{min-width:20px;height:20px;font-size:11px}
+
+      .topline{gap:6px}
+      .topline .pill{margin-right:0;white-space:normal}
+      .overview-value{font-size:18px}
+      .top-controls{flex-direction:column}
+      .top-controls-right{align-items:flex-start}
+      .top-title-row,.top-month-row{flex-direction:column;align-items:flex-start}
+      .calc-grid{grid-template-columns:1fr}
+
+      #trips [style*='grid-template-columns:repeat(3,minmax(120px,1fr))']{grid-template-columns:1fr !important}
+      #settings-tab-recurringBills form[style*='grid-template-columns']{grid-template-columns:1fr !important}
+      #settingsModal > div > div{grid-template-columns:1fr !important}
+      .promo-top-row{grid-template-columns:1fr !important}
+    }
+    @media(min-width:900px){.row{grid-template-columns:1fr 1fr}}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="layout">
+    <aside class="sidebar card">
+      <h3>Sections</h3>
+      <div style="display:grid;gap:8px">
+        <a class="pill {% if page=='dashboard' %}active{% endif %}" href="/?month={{month}}&view={{view}}&page=dashboard">Dashboard</a>
+        <a class="pill {% if page in ['entries','planner'] %}active{% endif %}" href="/?month={{month}}&view={{view}}&page=entries">Bills</a>
+        <a class="pill {% if page=='trips' %}active{% endif %}" href="/?month={{month}}&view={{view}}&page=trips">Trips/Savings</a>
+        <a class="pill {% if page=='promotions' %}active{% endif %}" href="/?month={{month}}&view={{view}}&page=promotions">Debt Tracker</a>
+        <a class="pill {% if page=='subscriptions' %}active{% endif %}" href="/?month={{month}}&view={{view}}&page=subscriptions">Subscriptions</a>
+        <a class="pill {% if page=='calendar' %}active{% endif %}" href="/?month={{month}}&view={{view}}&page=calendar">Calendar</a>
+        <a class="pill {% if page=='checkbook' %}active{% endif %}" href="/?month={{month}}&view={{view}}&page=checkbook">History</a>
+      </div>
+
+      <div class="card" id="sidebar-calculator" style="margin-top:12px">
+        <h3 style="margin-top:0">Calculator</h3>
+        <input id="rcDisplay" type="text" readonly value="0" style="width:100%;margin-bottom:8px;text-align:right;font-size:14px;font-weight:600;line-height:1.25;white-space:nowrap;overflow-x:auto">
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(34px,1fr));gap:6px">
+          <button type="button" onclick="rcClear()">C</button>
+          <button type="button" onclick="rcBack()">⌫</button>
+          <button type="button" onclick="rcAppend('%')">%</button>
+          <button type="button" onclick="rcAppend('/')">÷</button>
+          <button type="button" onclick="rcAppend('7')">7</button>
+          <button type="button" onclick="rcAppend('8')">8</button>
+          <button type="button" onclick="rcAppend('9')">9</button>
+          <button type="button" onclick="rcAppend('*')">×</button>
+          <button type="button" onclick="rcAppend('4')">4</button>
+          <button type="button" onclick="rcAppend('5')">5</button>
+          <button type="button" onclick="rcAppend('6')">6</button>
+          <button type="button" onclick="rcAppend('-')">−</button>
+          <button type="button" onclick="rcAppend('1')">1</button>
+          <button type="button" onclick="rcAppend('2')">2</button>
+          <button type="button" onclick="rcAppend('3')">3</button>
+          <button type="button" onclick="rcAppend('+')">+</button>
+          <button type="button" onclick="rcAppend('0')" style="grid-column:span 2">0</button>
+          <button type="button" onclick="rcAppend('.')">.</button>
+          <button type="button" onclick="rcEval()">=</button>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+  <div class="card" id="top">
+    <div class="topline top-title-row" style="margin-bottom:8px">
+      <h2 class="app-brand" style="margin:0"><img src="/static/northstar-logo.svg" alt="NorthStar logo"><span>NorthStar Ledger — {{fmt_month_label(month)}}</span></h2>
+      <div class="top-controls-right-top">
+        <button type="button" class="pill top-pill-btn" style="color:#1f1f1f" onclick="openSettings()">⚙ Settings</button>
+        <a class="pill" style="color:#1f1f1f" href="/logout" onclick="clearCalculatorState()">Logout</a>
+      </div>
+    </div>
+    <div class="topline top-month-row" style="margin-bottom:8px">
+      <div class="top-controls-left">
+        <a class="pill" style="color:#1f1f1f" href="/?month={{prev_month}}&view={{view}}&page={{page}}">← {{fmt_month_label(prev_month)}}</a>
+        <a class="pill" style="color:#1f1f1f" href="/?month={{next_month}}&view={{view}}&page={{page}}">{{fmt_month_label(next_month)}} →</a>
+      </div>
+      <div class="top-controls-right-bottom">
+        <form id="applyRecurringForm" method="post" action="/rollover" style="display:inline">
+          <input type="hidden" name="month" value="{{month}}">
+          <input type="hidden" name="view" value="{{view}}">
+          <input type="hidden" name="page" value="{{page}}">
+          <button type="submit" class="pill top-pill-btn" style="color:#1f1f1f">🔁 Add Recurring Bills/Income</button>
+        </form>
+        <span class="household-badge">🏠 Default Household: {{household_name}}</span>
+      </div>
+    </div>
+
+    <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)">
+      <h3 style="margin:0 0 8px 0">Notes</h3>
+      <form method="post" action="/dashboard-note/update" class="stack-form">
+        <input type="hidden" name="month" value="{{month}}">
+        <input type="hidden" name="view" value="{{view}}">
+        <input type="hidden" name="page" value="{{page}}">
+        <textarea name="dashboard_note_text" rows="4" placeholder="Write notes here..." style="width:100%;resize:vertical">{{dashboard_note_text}}</textarea>
+        <div class="actions"><button type="submit">Save Notes</button></div>
+      </form>
+    </div>
+  </div>
+
+  {% if page == 'promotions' %}
+  <div class="card" id="credit-loan-calculator">
+    <div class="calc-grid" style="grid-template-columns:1fr">
+      <div class="calc-box">
+        <h3 style="margin-top:0">Debt Calculator/Payoff</h3>
+        <div class="field-row"><label>Current Balance</label><input id="ccBalance" type="number" step="0.01" placeholder="0.00"></div>
+        <div class="field-row"><label>APR (%)</label><input id="ccApr" type="number" step="0.01" placeholder="0.00"></div>
+        <div class="field-row"><label>Payoff Timeline (months)</label><input id="ccMonths" type="number" step="1" placeholder="24"></div>
+        <div class="field-row"><label>Or Monthly Payment</label><input id="ccMonthlyPay" type="number" step="0.01" placeholder="0.00"></div>
+        <div class="actions"><button type="button" onclick="calcCreditCard()">Calculate Debt</button><button type="button" onclick="resetCreditCalc()" style="background:#666">Reset</button></div>
+        <div class="calc-result" id="ccResult">Enter values and click Calculate Debt.</div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if page == 'dashboard' %}
+  <div class="card">
+    <h3>Overview</h3>
+    <div class="row" style="grid-template-columns:1fr 1fr 1fr;">
+      <div class="card" style="margin:0">
+        <div><b>Current Balance</b></div>
+        <div class="overview-value">${{fmt_money(balance)}}</div>
+      </div>
+      <div class="card" style="margin:0">
+        <div><b>Planned Income</b></div>
+        <div class="overview-value">${{fmt_money(income)}}</div>
+      </div>
+      <div class="card" style="margin:0">
+        <div><b>Planned Bills</b></div>
+        <div class="overview-value">${{fmt_money(planned_bills_total)}}</div>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      {% if current_risk_balance < 0 %}
+        <span class="badge badge-due">Risk: Current Balance may go negative after unpaid bills (${{fmt_money(current_risk_balance)}})</span>
+      {% else %}
+        <span class="badge badge-paid">Status: Current Balance covers bills</span>
+      {% endif %}
+    </div>
+    <div style="margin-top:18px;padding-top:10px;border-top:1px dashed var(--line)">
+      <span class="section-title">Trip/Savings Progress</span>
+      <div style="display:grid;gap:8px;margin-top:8px">
+        {% for t in trips %}
+          {% set pct = 0 if t.target <= 0 else (t.saved / t.target * 100) %}
+          <div>
+            <div style="font-size:15px;font-weight:700">{{t.name}} · ${{fmt_money(t.saved)}} / ${{fmt_money(t.target)}} ({{'%.0f'|format([pct,100]|min)}}%)</div>
+            <div style="height:10px;background:var(--tint-soft);border-radius:10px;overflow:hidden"><div style="height:100%;background:var(--pink-dark);width:{{ [pct,100]|min }}%"></div></div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div style="margin-top:20px;padding-top:12px;border-top:1px dashed var(--line)">
+      <span class="section-title">Promotions ending soon (60 days)</span>
+      {% if promotions_ending_soon|length == 0 %}
+        <div style="font-size:13px;margin-top:6px" class="good">No promotions in the danger window.</div>
+      {% else %}
+        <ul>
+          {% for p in promotions_ending_soon %}
+            <li>
+              <b>{{p.card_name}}</b> — {{p.promo_name}} · ${{fmt_money(p.balance)}}
+              {% if p.days_left < 0 %}
+                <span class="badge badge-due">Expired {{-p.days_left}}d ago</span>
+              {% elif p.days_left == 0 %}
+                <span class="badge badge-due">Ends today</span>
+              {% else %}
+                <span class="badge {% if p.days_left <= 14 %}badge-due{% else %}badge-paid{% endif %}">{{p.days_left}}d left</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  </div>
+
+{% endif %}
+
+{% if page == 'calendar' %}
+  <div class="card" id="calendar">
+    <h3>Monthly Calendar</h3>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <label><input type="checkbox" id="tgBill" checked onchange="applyCalendarFilters()"> Bills</label>
+      <label><input type="checkbox" id="tgPromotion" checked onchange="applyCalendarFilters()"> Promotions</label>
+      <label><input type="checkbox" id="tgTrip" checked onchange="applyCalendarFilters()"> Trips</label>
+      <label><input type="checkbox" id="tgPaycheck" checked onchange="applyCalendarFilters()"> Paychecks</label>
+      <label><input type="checkbox" id="tgSubscription" checked onchange="applyCalendarFilters()"> Subscriptions</label>
+    </div>
+    <table class="calendar-grid">
+      <tr><th>Sun</th><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th></tr>
+      {% for wk in calendar_weeks %}
+      <tr>
+        {% for day in wk %}
+          {% if day == 0 %}
+            <td class="calendar-cell" style="background:#f7f7f7"></td>
+          {% else %}
+            {% set dkey = month ~ '-' ~ ('%02d'|format(day)) %}
+            {% set evs = events_by_date.get(dkey, []) %}
+            <td class="calendar-cell">
+              <div style="margin-bottom:6px"><span class="calendar-day-num {% if day == today_day %}today{% endif %}">{{day}}</span></div>
+              <div class="calendar-events">
+                {% for ev in evs %}
+                  {% if ev.type == 'bill' %}
+                    <button type="button" class="cal-event-btn cal-event" data-type="bill" onclick="openEdit('{{ev.id}}','{{ev.due_date}}','{{ev.planned_pay_date}}','{{fmt_money(ev.amount)}}',{{1 if ev.recurring else 0}},'{{ev.recurring_timeframe or "monthly"}}','{{ev.recurring_every_months or ""}}','{{ev.recurring_end_date or ""}}',{{ev.autopay}},'{{ev.title|replace("'","\\'")}}','{{ev.paycheck_bucket}}',{{ev.paid}},'{{ev.paid_date}}')" title="Edit bill: {{ev.title}}"><span class="badge badge-bill">Bill: {{ev.title}}</span></button>
+                  {% elif ev.type == 'promotion' %}
+                    <button type="button" class="cal-event-btn cal-event" data-type="promotion" onclick="openPromotionEdit('{{ev.id}}','{{ev.card_name|replace("'","\\'")}}','{{ev.promo_name|replace("'","\\'")}}','{{ev.start_date}}','{{ev.end_date}}','{{fmt_money(ev.balance)}}','{{ev.note|replace("'","\\'")}}')" title="Edit promotion: {{ev.title}}"><span class="badge badge-promo">Promo End: {{ev.title}}</span></button>
+                  {% elif ev.type == 'trip' %}
+                    <button type="button" class="cal-event-btn cal-event" data-type="trip" onclick="openTripEdit('{{ev.id}}','{{ev.name|replace("'","\\'")}}','{{ev.due_month}}','{{fmt_money(ev.target)}}','{{fmt_money(ev.saved)}}')" title="Edit trip: {{ev.title}}"><span class="badge badge-trip">Trip Due: {{ev.title}}</span></button>
+                  {% elif ev.type == 'paycheck' %}
+                    <button type="button" class="cal-event-btn cal-event" data-type="paycheck" onclick="openPaycheckEdit('{{ev.id}}','{{ev.title|replace("'","\\'")}}','{{ev.pay_date}}','{{fmt_money(ev.amount)}}','{{ev.income_type}}')" title="Edit paycheck: {{ev.title}}"><span class="badge badge-paycheck">Paycheck: {{ev.title}}</span></button>
+                  {% elif ev.type == 'subscription' %}
+                    <button type="button" class="cal-event-btn cal-event" data-type="subscription" onclick="openSubscriptionEdit('{{ev.id}}','{{ev.name|replace("'","\\'")}}','{{ev.day_due}}','{{fmt_money(ev.payment)}}',{{1 if ev.recurring else 0}},'{{ev.recurring_timeframe}}','{{ev.recurring_every_months}}','{{ev.yearly_month}}')" title="Edit subscription: {{ev.title}}"><span class="badge badge-bill">Sub: {{ev.title}}</span></button>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            </td>
+          {% endif %}
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+{% endif %}
+
+{% if page == 'entries' %}
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px">
+    <div class="card" id="promotion-alerts" style="margin:0">
+      <h3 style="text-align:center">Promotion Alerts</h3>
+      {% if promotions_ending_soon|length == 0 %}
+        <p class="good">✅ No promotion expirations in the next 60 days.</p>
+      {% else %}
+        <ul>
+          {% for p in promotions_ending_soon %}
+            <li>
+              <b>{{p.card_name}}</b> — {{p.promo_name}}
+              {% if p.days_left < 0 %}
+                <span class="badge badge-due">Expired {{-p.days_left}}d ago</span>
+              {% elif p.days_left == 0 %}
+                <span class="badge badge-due">Ends today</span>
+              {% else %}
+                <span class="badge {% if p.days_left <= 14 %}badge-due{% else %}badge-paid{% endif %}">{{p.days_left}}d left</span>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    <div class="card" id="due-now" style="margin:0">
+      <h3 style="text-align:center">Due Now</h3>
+      <div style="margin-bottom:8px"><span class="badge badge-due">Due Now: {{due_now_bills|length}}</span></div>
+      {% if due_now_bills|length == 0 %}
+        <div class="good" style="font-size:13px">No bills due today.</div>
+      {% else %}
+        <ul>
+          {% for b in due_now_bills %}
+            <li><b>{{b.name}}</b> · {{fmt_date(b.due_date)}} · ${{fmt_money(b.amount)}}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    <div class="card" id="past-due" style="margin:0">
+      <h3 style="text-align:center">Past Due</h3>
+      <div style="margin-bottom:8px"><span class="badge badge-due">Past Due: {{past_due_bills|length}}</span></div>
+      {% if past_due_bills|length == 0 %}
+        <div class="good" style="font-size:13px">No past-due bills.</div>
+      {% else %}
+        <ul>
+          {% for b in past_due_bills %}
+            <li><b>{{b.name}}</b> · {{fmt_date(b.due_date)}} · ${{fmt_money(b.amount)}} <span class="badge badge-due">{{b.days_past_due}}d late</span></li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+  </div>
+
+  <div style="height:10px"></div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px">
+    <div class="card" id="projection" style="margin:0">
+      <h3>No-Negative Projection</h3>
+      <p><b>Starting:</b> ${{fmt_money(projection.starting)}} | <b>Min Buffer:</b> ${{fmt_money(projection.min_buffer)}}</p>
+      {% if projection.first_negative %}
+        <p class="bad">⚠ Goes negative on {{fmt_date(projection.first_negative[0])}} at {{projection.first_negative[1]}} ({{fmt_money(projection.first_negative[2])}})</p>
+      {% elif projection.first_below_buffer %}
+        <p class="warn">⚠ Drops below buffer on {{fmt_date(projection.first_below_buffer[0])}} at {{projection.first_below_buffer[1]}} ({{fmt_money(projection.first_below_buffer[2])}})</p>
+      {% else %}
+        <p class="good">✅ Stays above buffer with current plan.</p>
+      {% endif %}
+      <details><summary>Show projected timeline</summary>
+        <ul>{% for t in projection.timeline %}<li>{{fmt_date(t[0])}} — {{t[1]}} — {{'%+.2f'|format(t[2])}} => <b>{{fmt_money(t[3])}}</b></li>{% endfor %}</ul>
+      </details>
+    </div>
+
+    <div class="card" id="savings-needed" style="margin:0">
+      <h3>Savings Needed / Month</h3>
+      {% if savings_goal_monthly|length == 0 %}
+        <div class="good" style="font-size:13px">No trips/activities targets set.</div>
+      {% else %}
+        <ul>
+          {% for t in savings_goal_monthly %}
+            <li><b>{{t.name}}</b> · Remaining ${{fmt_money(t.remaining)}} · {{t.months_left}} mo left · <span class="badge badge-paid">${{fmt_money(t.monthly_needed)}} /mo</span></li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+  </div>
+{% endif %}
+
+  
+
+  {% if page == 'trips' %}
+    <div class="card" id="trips">
+      <h3>Trips/Activities</h3>
+      <form method="post" action="/trips/add" class="stack-form">
+        <input type="hidden" name="month" value="{{month}}">
+        <input type="hidden" name="view" value="{{view}}">
+        <input type="hidden" name="page" value="{{page}}">
+        <div class="field-row"><label>Trips/Activities Name</label><input name="name" placeholder="e.g. Summer Trip" required></div>
+        <div class="field-row"><label>Due Date</label><input type="date" name="due_month" required></div>
+        <div class="field-row"><label>Target Amount</label><input type="number" step="0.01" name="target" placeholder="0.00" required></div>
+        <div class="field-row"><label>Already Saved</label><input type="number" step="0.01" name="saved" placeholder="0.00" value="0"></div>
+        <div class="actions"><button>Add</button></div>
+      </form>
+      <div style="margin-top:12px;display:grid;gap:12px;">
+        {% for t in trips %}
+          {% set pct = 0 if t.target <= 0 else (t.saved / t.target * 100) %}
+          <div style="border:1px solid var(--line);border-radius:12px;padding:12px;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,.04)">
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+              <div style="font-weight:700;font-size:16px">{{t.name}}</div>
+              <div style="font-size:13px;color:var(--pink-dark)">Due {{fmt_date(t.due_month)}}</div>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:8px;margin-top:10px;font-size:13px">
+              <div><div style="color:var(--pink-dark)">Target</div><div style="font-weight:700">${{fmt_money(t.target)}}</div></div>
+              <div><div style="color:var(--pink-dark)">Saved</div><div style="font-weight:700">${{fmt_money(t.saved)}}</div></div>
+              <div><div style="color:var(--pink-dark)">Remaining</div><div style="font-weight:700">${{fmt_money(t.target-t.saved)}}</div></div>
+            </div>
+            <div style="margin-top:10px">
+              <div style="height:8px;background:var(--tint-soft);border-radius:999px;overflow:hidden"><div style="height:100%;background:var(--pink-dark);width:{{ [pct,100]|min }}%"></div></div>
+              <div style="margin-top:6px;font-size:12px;color:var(--pink-dark)">{{'%.0f'|format([pct,100]|min)}}% funded</div>
+            </div>
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" onclick="openTripEdit('{{t.id}}','{{t.name|replace("'","\\'")}}','{{ t.due_month if (t.due_month|length > 7) else (t.due_month ~ "-01") }}','{{fmt_money(t.target)}}','{{fmt_money(t.saved)}}')">Edit</button>
+              <button type="button" onclick="openTripContrib('{{t.id}}','{{t.name|replace("'","\\'")}}')">Add Contribution</button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card" id="savings-widget">
+      <h3>Savings</h3>
+      <p><b>Saved this month (paid savings bills):</b> ${{fmt_money(savings_paid_month)}}</p>
+      <p><b>Planned savings bills this month:</b> ${{fmt_money(savings_planned_month)}}</p>
+      <p style="font-size:12px;color:#555">Tip: In Bills/Paycheck Planner, add or edit a bill and choose category <b>savings</b> to track savings contributions here.</p>
+    </div>
+  {% endif %}
+
+  {% if page == 'promotions' %}
+    <div class="card" id="promotions">
+      <h3>Promotions Tracker</h3>
+      <form method="post" action="/promotions/add" class="stack-form">
+        <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
+        <div class="promo-top-row" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="promo-inline">
+            <label>Card / Account</label>
+            <input name="card_name" placeholder="Card / Account" required>
+          </div>
+          <div class="promo-inline">
+            <label class="promo-label-promotion">Promotion</label>
+            <input name="promo_name" placeholder="e.g. 12 month no interest" required>
+          </div>
+        </div>
+        <div class="promo-top-row" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="promo-inline">
+            <label>Start Date</label>
+            <input type="date" name="start_date">
+          </div>
+          <div class="promo-inline">
+            <label class="promo-label-enddate">End Date</label>
+            <input type="date" name="end_date" required>
+          </div>
+        </div>
+        <div class="promo-top-row" style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="promo-inline">
+            <label>Promo Balance</label>
+            <input type="number" step="0.01" name="balance" placeholder="0.00" required>
+          </div>
+          <div class="promo-inline">
+            <label class="promo-label-note">Note</label>
+            <input name="note" placeholder="optional">
+          </div>
+        </div>
+        <div class="actions"><button>Add Promotion</button></div>
+      </form>
+
+      <table class="adaptive-table" style="margin-top:10px">
+        <colgroup><col><col><col><col><col><col><col style="width:72px"><col style="width:88px"></colgroup>
+        <tr><th>Account</th><th>Promotion</th><th>Start</th><th>End</th><th>Total</th><th>Status</th><th>Edit</th><th>Complete</th></tr>
+        {% for p in promotions %}
+        {% set ns = namespace(days='n/a') %}
+        {% for w in promotions_ending_soon %}{% if w.id == p.id %}{% set ns.days = w.days_left %}{% endif %}{% endfor %}
+        <tr>
+          <td>{{p.card_name}}</td>
+          <td>{{p.promo_name}}{% if p.note %}<div style="font-size:12px;color:var(--pink-dark)">{{p.note}}</div>{% endif %}</td>
+          <td>{{fmt_date(p.start_date)}}</td>
+          <td>{{fmt_date(p.end_date)}}</td>
+          <td>${{fmt_money(p.balance)}}</td>
+          <td>
+            {% if p.completed %}
+              <span class="badge badge-paid">Completed</span>
+            {% elif ns.days == 'n/a' %}
+              <span class="badge badge-paid">On track</span>
+            {% elif ns.days < 0 %}
+              <span class="badge badge-due">Expired {{-ns.days}}d ago</span>
+            {% elif ns.days == 0 %}
+              <span class="badge badge-due">Ends today</span>
+            {% elif ns.days <= 14 %}
+              <span class="badge badge-due">{{ns.days}}d left</span>
+            {% elif ns.days <= 30 %}
+              <span class="badge badge-paid">{{ns.days}}d left</span>
+            {% else %}
+              <span class="badge badge-paid">{{ns.days}}d left</span>
+            {% endif %}
+          </td>
+          <td><button type="button" onclick="openPromotionEdit('{{p.id}}','{{p.card_name|replace("'","\\'")}}','{{p.promo_name|replace("'","\\'")}}','{{p.start_date or ''}}','{{p.end_date}}','{{fmt_money(p.balance)}}','{{(p.note or '')|replace("'","\\'")}}')">Edit</button></td>
+          <td>
+            {% if p.completed %}
+              <form method="post" action="/promotions/reopen/{{p.id}}"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><button type="submit" style="background:#666;padding:4px 7px;min-height:28px;font-size:12px">Reopen</button></form>
+            {% else %}
+              <form method="post" action="/promotions/complete/{{p.id}}"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><button type="submit" style="padding:4px 7px;min-height:28px;font-size:12px">Complete</button></form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+
+      <div id="credit-card-tracker" style="margin-top:16px;padding-top:10px;border-top:1px dashed var(--line)">
+        <h3>Credit Card Tracker</h3>
+        <form method="post" action="/credit/add" class="stack-form">
+          <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="anchor" value="credit-card-tracker">
+          <div class="field-row"><label>Credit Card Name</label><input name="card_name" required></div>
+          <div class="field-row"><label>Interest Rate (%)</label><input type="number" step="0.01" name="interest_rate" placeholder="0.00"></div>
+          <div class="field-row"><label>Credit Limit</label><input type="number" step="0.01" name="credit_limit" placeholder="0.00"></div>
+          <div class="actions"><button>Add Credit Account</button></div>
+        </form>
+        <table class="adaptive-table" style="margin-top:10px">
+          <colgroup><col><col><col><col><col style="width:72px"><col style="width:88px"></colgroup>
+          <tr><th>Credit Card Name</th><th>Interest Rate</th><th>Credit Limit</th><th>Status</th><th>Edit</th><th>Action</th></tr>
+          {% for cc in credit_accounts %}
+          <tr>
+            <td>{{cc.card_name}}</td>
+            <td>{{fmt_money(cc.interest_rate)}}%</td>
+            <td>${{fmt_money(cc.credit_limit)}}</td>
+            <td>{% if cc.paid_off %}<span class="badge badge-paid">No Balance</span>{% else %}<span class="badge badge-due">Open</span>{% endif %}</td>
+            <td><button type="button" onclick="openCreditEdit('{{cc.id}}','{{cc.card_name|replace("'","\\'")}}','{{'%.2f'|format(cc.interest_rate or 0)}}','{{'%.2f'|format(cc.credit_limit or 0)}}',{{1 if cc.paid_off else 0}})" style="padding:4px 7px;min-height:28px;font-size:12px">Edit</button></td>
+            <td>
+              <form method="post" action="/credit/toggle-paid/{{cc.id}}" style="display:inline">
+                <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="anchor" value="credit-card-tracker">
+                <button type="submit" style="padding:4px 7px;min-height:28px;font-size:12px">{% if cc.paid_off %}Reopen{% else %}Paid Off{% endif %}</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+
+      <div id="loans-tracker" style="margin-top:16px;padding-top:10px;border-top:1px dashed var(--line)">
+        <h3>Loans Tracker</h3>
+        <form method="post" action="/loans/add" class="stack-form">
+          <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="anchor" value="loans-tracker">
+          <div class="field-row"><label>Loan Name</label><input name="loan_name" required></div>
+          <div class="field-row"><label>Interest Rate (%)</label><input type="number" step="0.01" name="interest_rate" placeholder="0.00"></div>
+          <div class="field-row"><label>Loan Amount</label><input type="number" step="0.01" name="loan_amount" placeholder="0.00"></div>
+          <div class="field-row"><label>End Date</label><input type="date" name="end_date"></div>
+          <div class="field-row"><label>Note</label><input type="text" name="note" maxlength="24" placeholder="Optional note (24 max)"></div>
+          <div class="actions"><button>Add Loan</button></div>
+        </form>
+        <table class="adaptive-table" style="margin-top:10px">
+          <colgroup>
+            <col><col><col><col><col><col><col style="width:72px"><col style="width:88px">
+          </colgroup>
+          <tr><th>Loan Name</th><th>Interest Rate</th><th>Loan Amount</th><th>End Date</th><th>Note</th><th>Status</th><th>Edit</th><th>Action</th></tr>
+          {% for ln in loans %}
+          {% if not ln.paid_off %}
+          <tr {% if ln.end_date and ln.end_date <= month_last_day %}style="background:#e9f9ee"{% endif %}>
+            <td>{{ln.loan_name}}</td>
+            <td>{{fmt_money(ln.interest_rate)}}%</td>
+            <td>${{fmt_money(ln.loan_amount)}}</td>
+            <td>{{fmt_date(ln.end_date) if ln.end_date else '—'}}</td>
+            <td>{{ln.note or '—'}}</td>
+            <td><span class="badge badge-due">Open</span></td>
+            <td><button type="button" onclick="openLoanEdit('{{ln.id}}','{{ln.loan_name|replace("'","\\'")}}','{{'%.2f'|format(ln.interest_rate or 0)}}','{{'%.2f'|format(ln.loan_amount or 0)}}','{{(ln.note or '')|replace("'","\\'")}}','{{ln.end_date or ''}}')" style="padding:3px 6px;min-height:24px;font-size:11px">Edit</button></td>
+            <td>
+              <form method="post" action="/loans/toggle-paid/{{ln.id}}">
+                <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="anchor" value="loans-tracker">
+                <button type="submit" style="padding:4px 7px;min-height:28px;font-size:12px">Paid Off</button>
+              </form>
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </table>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if page == 'subscriptions' %}
+    <div class="card" id="subscriptions">
+      <h3>Subscriptions</h3>
+      <form method="post" action="/subscriptions/add" class="stack-form">
+        <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+        <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
+        <div class="field-row"><label>Subscription Name</label><input name="name" required></div>
+        <div class="field-row"><label>Day Due</label><input type="number" min="1" max="31" name="day_due" required></div>
+        <div class="field-row"><label>Payment</label><input type="number" step="0.01" name="payment" required></div>
+        <div class="field-row"><label>Recurring</label><div><input type="checkbox" name="recurring" checked onchange="toggleSubscriptionRecurring(this)"> recurring</div></div>
+        <div class="field-row sub-recurring-fields"><label>Timeframe</label><select name="recurring_timeframe" onchange="toggleSubscriptionTimeframe(this)"><option value="monthly" selected>Monthly</option><option value="yearly">Yearly</option><option value="specified_months">Specified # months</option></select></div>
+        <div class="field-row sub-yearly-month" style="display:none"><label>Yearly Month</label><select name="yearly_month" style="width:100%;min-height:40px;background:#fff;color:#111;border:1px solid var(--line);-webkit-appearance:menulist;appearance:menulist"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
+        <div class="field-row sub-recurring-months" style="display:none"><label>Every # Months</label><input type="number" min="1" step="1" name="recurring_every_months" placeholder="e.g. 3"></div>
+        <div class="actions"><button>Add Subscription</button></div>
+      </form>
+
+      <table class="adaptive-table" style="margin-top:10px">
+        <tr><th>Subscription Name</th><th>Day Due</th><th>Payment</th><th>Recurring</th><th>Type</th><th>Edit</th></tr>
+        {% for s in subscriptions %}
+        <tr>
+          <td>{{s.name}}</td>
+          <td>{{s.day_due}}</td>
+          <td>${{'%.2f'|format(s.payment or 0)}}</td>
+          <td>{% if (s.recurring or 0) %}<span class="badge badge-paid">YES</span>{% else %}<span class="badge badge-due">NO</span>{% endif %}</td>
+          <td>
+            {% if not (s.recurring or 0) %}
+              —
+            {% elif (s.recurring_timeframe or 'monthly') == 'yearly' %}
+              Yearly ({% set ym = (s.yearly_month or 0)|int %}{% if ym==1 %}January{% elif ym==2 %}February{% elif ym==3 %}March{% elif ym==4 %}April{% elif ym==5 %}May{% elif ym==6 %}June{% elif ym==7 %}July{% elif ym==8 %}August{% elif ym==9 %}September{% elif ym==10 %}October{% elif ym==11 %}November{% elif ym==12 %}December{% else %}—{% endif %})
+            {% elif (s.recurring_timeframe or 'monthly') == 'specified_months' %}
+              Every {{s.recurring_every_months or 1}} month(s)
+            {% else %}
+              Monthly
+            {% endif %}
+          </td>
+          <td><button type="button" onclick="openSubscriptionEdit('{{s.id}}','{{s.name|replace("'","\\'")}}','{{s.day_due}}','{{'%.2f'|format(s.payment or 0)}}',{{1 if (s.recurring or 0) else 0}},'{{s.recurring_timeframe or "monthly"}}','{{s.recurring_every_months or ""}}','{{s.yearly_month or ""}}')">Edit</button></td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  {% endif %}
+
+  {% if page == 'entries' %}
+
+  {% if view == 'paycheck' %}
+  <div class="card" id="planner">
+    <h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span>Paycheck Planner (Accounts-style)</span>
+        <a class="pill" href="/?month={{month}}&view=paycheck&page={{page}}">Per Paycheck</a>
+        <a class="pill" href="/?month={{month}}&view=checklist&page={{page}}">Checklist</a>
+      </span>
+      <button type="button" onclick="openPaycheckManager()">Edit Paychecks/Income</button>
+    </h3>
+    <p style="margin:6px 0 18px 0"><span class="badge badge-paid">Rollover from {{fmt_month_label(prev_month)}}: ${{fmt_money(month_start)}}</span></p>
+    <h3 style="margin:8px 0 8px 0">Add Income/Debt</h3>
+    <form method="post" action="/entries/add" style="margin-bottom:12px">
+      <input type="hidden" name="month" value="{{month}}">
+      <input type="hidden" name="view" value="{{view}}">
+      <input type="hidden" name="page" value="{{page}}">
+
+      <select id="entryType" name="entry_type" onchange="onEntryTypeChange()">
+        <option value="income">Income</option>
+        <option value="bill" selected>Bill/Debt</option>
+        <option value="trip_contribution">Trip Contribution</option>
+      </select>
+
+      <div id="incomeFields" style="display:none">
+        <select name="income_kind" id="incomeKind" onchange="onIncomeKindChange()">
+          <option value="paycheck">Paycheck</option>
+          <option value="other">Other Income</option>
+        </select>
+        <input name="owner" id="incomeOwner" placeholder="Owner">
+        <span class="date-hint-wrap" id="incomePayDateWrap"><input type="date" id="incomePayDate" name="pay_date"><span class="date-hint"></span></span>
+        <input type="number" step="0.01" name="income_amount" placeholder="Amount">
+      </div>
+
+      <div id="billFields" style="display:none">
+        <input name="name" placeholder="Name">
+        <input type="date" name="due_date">
+        <input type="number" step="0.01" name="bill_amount" placeholder="Amount">
+        <label><input type="checkbox" name="recurring" onchange="toggleEntryRecurringEnd(this)"> recurring</label>
+        <span class="entry-recurring-end" style="display:none"><input type="date" name="recurring_end_date" title="Optional recurring end date"></span>
+        <label><input type="checkbox" name="autopay"> autopay</label>
+      </div>
+
+      <div id="tripContributionFields" style="display:none">
+        <select name="contrib_trip_id">{% for t in trips %}<option value="{{t.id}}">{{t.name}}</option>{% endfor %}</select>
+        <input type="date" name="contrib_date">
+        <input type="number" step="0.01" name="contrib_amount" placeholder="Contribution Amount">
+      </div>
+
+      <button>Add</button>
+    </form>
+    {% for pk in paycheck_plan %}
+      <div style="border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:#fffafb">
+        <p><b>{{pk['display_label']}}</b>{% if pk['date'] %} — {{fmt_date(pk['date'])}} ({{pk['owner']}}){% endif %} | Amount: <b>${{fmt_money(pk['paycheck_amount'])}}</b> | {% if pk['income_type']=='last_month' %}Starting Balance{% else %}Available at start{% endif %}: <b>${{fmt_money(pk['starting_available'])}}</b>{% if pk['income_type']=='last_month' %} <button type="button" onclick="openStartOverride('{{month}}','{{fmt_money(pk['starting_available'])}}')">Edit</button>{% endif %}</p>
+        <table class="planner-table">
+          <tr><th>Due / Planned</th><th>Name</th><th>Category</th><th>Amount</th><th>Running Balance</th><th>Recurring</th><th>Status</th><th>AutoPay</th><th>Edit</th><th>Action</th></tr>
+          {% for pass_paid in [1,0] %}
+          {% for it in pk['items'] %}
+          {% if (pass_paid == 1 and it['is_paid']) or (pass_paid == 0 and not it['is_paid']) %}
+          <tr {% if it['is_paid'] %}style="background:#e9f9ee"{% elif it['is_postponed'] %}style="background:#fffde7"{% endif %}>
+            <td>
+              <div>{{fmt_date(it['bill']['due_date'])}}</div>
+              {% if it['bill']['planned_pay_date'] and it['bill']['planned_pay_date'] != it['bill']['due_date'] %}
+                <div style="font-size:12px;color:#7a5a00">Planned: {{fmt_date(it['bill']['planned_pay_date'])}}</div>
+              {% endif %}
+            </td>
+            <td>{{it['bill']['name']}}{% if it['is_prior_month_carry'] %}<div style="font-size:11px;color:#1f5d1f;margin-top:2px">↳ Deducted from prior month pay</div>{% endif %}{% if it['bill']['note'] %}<div style="font-size:11px;color:#7a5a00;margin-top:2px">📝 {{it['bill']['note']}}</div>{% endif %}</td>
+            <td>{{it['bill']['category']}}</td>
+            <td>${{fmt_money(it['amount'])}}</td>
+            <td>${{fmt_money(it['running_after'])}}</td>
+            <td>{% if it['bill']['recurring'] %}YES{% else %}NO{% endif %}</td>
+            <td>{% if it['is_paid'] %}<span class="badge badge-paid">PAID</span>{% elif it['is_postponed'] %}<span class="badge" style="background:#fff1a8;color:#7a5a00">POSTPONED</span>{% elif it['is_prior_month_carry'] %}<span class="badge badge-paid">PRIOR PAY</span>{% elif it['can_pay'] %}<span class="badge badge-paid">OK</span>{% else %}<span class="badge badge-due">NEGATIVE</span>{% endif %}</td>
+            <td>{% if it['bill']['autopay'] %}<span class="badge badge-paid">AUTO</span>{% else %}<span class="badge badge-due">MANUAL</span>{% endif %}</td>
+            <td>
+              {% if (it['bill']['id']|int) >= 1000000 %}
+              <button type="button" onclick="openLedgerEdit('{{ (it['bill']['id']|int) - 1000000 }}','{{it['bill']['due_date']}}','{{it['bill']['name']|replace("'","\\'")}}','-{{"%.2f"|format(it['amount'])}}','trip contribution')">Edit</button>
+              {% else %}
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                <button type="button" onclick="openEdit('{{it['bill']['id']}}','{{it['bill']['due_date']}}','{{it['bill']['planned_pay_date'] or it['bill']['due_date']}}','{{"%.2f"|format(it['amount'])}}',{{1 if it['bill']['recurring'] else 0}},'{{it['bill']['recurring_timeframe'] or "monthly"}}','{{it['bill']['recurring_every_months'] or ""}}','{{it['bill']['recurring_end_date'] or ""}}',{{1 if it['bill']['autopay'] else 0}},'{{it['bill']['name']|replace("'","\\'")}}','{{it['bill']['paycheck_bucket'] if it['bill']['paycheck_bucket'] is not none else ''}}',{{1 if it['bill']['paid'] else 0}},'{{it['bill']['paid_date'] or ''}}')">Edit</button>
+              </div>
+              {% endif %}
+            </td>
+            <td>
+              {% if (it['bill']['id']|int) >= 1000000 %}
+              <span class="badge badge-paid">✓</span>
+              {% elif not it['is_paid'] %}
+              <div style="display:grid;grid-template-columns:110px;gap:6px;align-items:start;justify-content:start">
+                <form method="post" action="/bills/toggle/{{it['bill']['id']}}" style="margin:0;width:110px">
+                  <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
+                  <button type="submit" style="background:#dff6df;color:#1f5d1f;border:1px solid #bde7bd;width:110px;display:inline-flex;justify-content:center;box-sizing:border-box">☑ Paid</button>
+                </form>
+                <button type="button" onclick="openPostponeModal('{{it['bill']['id']}}','{{it['bill']['planned_pay_date'] or it['bill']['due_date']}}')" style="background:#fff9d9;color:#7a5a00;border:1px solid #f2e4a3;width:110px;display:inline-flex;justify-content:center;box-sizing:border-box">Postpone</button>
+              </div>
+              {% else %}
+              <span class="badge badge-paid badge-paid-on">Paid on:<span class="paid-date-line">{{fmt_date(it['bill']['paid_date']) if it['bill']['paid_date'] else '—'}}</span></span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+          {% endfor %}
+        </table>
+        <p><b>End of {{pk['display_label']|lower}} projected:</b> ${{fmt_money(pk['ending_balance'])}} {% if pk['goes_negative'] %}<span class="badge badge-due">Needs adjustment</span>{% else %}<span class="badge badge-paid">Good</span>{% endif %}</p>
+      </div>
+    {% endfor %}
+
+    <div class="card" id="prior-pay-carry-widget" style="margin-top:10px">
+      <h3 style="margin-top:0">Next Month Bills Due This Last Check</h3>
+      {% if next_month_carry_bills|length == 0 %}
+        <div class="good" style="font-size:13px">No next-month bills currently assigned to this last check.</div>
+      {% else %}
+        <ul>
+          {% for b in next_month_carry_bills %}
+            <li><b>{{b.name}}</b> {{fmt_date(b.due_date)}} · ${{fmt_money(b.amount)}}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+      <div style="margin-top:8px;background:#ffe6f2;border:1px solid #f5c2dc;border-radius:10px;padding:8px">
+        <p style="margin:0"><b>Projected ending balance until next pay:</b> ${{fmt_money(carry_after_balance)}}
+          {% if carry_after_balance < 0 %}
+            <span class="badge badge-due">Negative</span>
+          {% else %}
+            <span class="badge badge-paid">Good</span>
+          {% endif %}
+        </p>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+
+  {% if view == 'checklist' %}
+  <div class="card" id="unpaid-checklist">
+    <h3 style="margin-top:14px">Unpaid Bills Checklist</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px 0">
+      <a class="pill" href="/?month={{month}}&view=paycheck&page={{page}}">Per Paycheck</a>
+      <a class="pill" href="/?month={{month}}&view=checklist&page={{page}}">Checklist</a>
+    </div>
+    <h3 style="margin:8px 0 8px 0">Add Income/Debt</h3>
+    <form method="post" action="/entries/add" style="margin-bottom:12px">
+      <input type="hidden" name="month" value="{{month}}">
+      <input type="hidden" name="view" value="{{view}}">
+      <input type="hidden" name="page" value="{{page}}">
+
+      <select id="entryType" name="entry_type" onchange="onEntryTypeChange()">
+        <option value="income">Income</option>
+        <option value="bill" selected>Bill/Debt</option>
+        <option value="trip_contribution">Trip Contribution</option>
+      </select>
+
+      <div id="incomeFields" style="display:none">
+        <select name="income_kind" id="incomeKind" onchange="onIncomeKindChange()">
+          <option value="paycheck">Paycheck</option>
+          <option value="other">Other Income</option>
+        </select>
+        <input name="owner" id="incomeOwner" placeholder="Owner">
+        <span class="date-hint-wrap" id="incomePayDateWrap"><input type="date" id="incomePayDate" name="pay_date"><span class="date-hint"></span></span>
+        <input type="number" step="0.01" name="income_amount" placeholder="Amount">
+      </div>
+
+      <div id="billFields" style="display:none">
+        <input name="name" placeholder="Name">
+        <input type="date" name="due_date">
+        <input type="number" step="0.01" name="bill_amount" placeholder="Amount">
+        <label><input type="checkbox" name="recurring" onchange="toggleEntryRecurringEnd(this)"> recurring</label>
+        <span class="entry-recurring-end" style="display:none"><input type="date" name="recurring_end_date" title="Optional recurring end date"></span>
+        <label><input type="checkbox" name="autopay"> autopay</label>
+      </div>
+
+      <div id="tripContributionFields" style="display:none">
+        <select name="contrib_trip_id">{% for t in trips %}<option value="{{t.id}}">{{t.name}}</option>{% endfor %}</select>
+        <input type="date" name="contrib_date">
+        <input type="number" step="0.01" name="contrib_amount" placeholder="Contribution Amount">
+      </div>
+
+      <button>Add</button>
+    </form>
+    <table class="planner-table">
+      <tr><th>Due</th><th>Name</th><th>Category</th><th>Recurring</th><th>Amount</th><th>Status</th><th>Paycheck</th><th>AutoPay</th><th>Edit</th><th>Mark Paid</th></tr>
+      {% for b in unpaid_bills_all %}
+      <tr {% if b.is_postponed %}style="background:#fffde7"{% endif %}>
+        <td>{{fmt_date(b.due_date)}}</td>
+        <td>{{b.name}}{% if b.note %}<div style="font-size:11px;color:#7a5a00;margin-top:2px">📝 {{b.note}}</div>{% endif %}</td>
+        <td>{{b.category}}</td>
+        <td>{% if b.recurring %}YES{% else %}NO{% endif %}</td>
+        <td>${{fmt_money(b.amount)}}</td>
+        <td>{% if b.is_postponed %}<span class="badge" style="background:#fff1a8;color:#7a5a00">POSTPONED</span>{% else %}<span class="badge badge-due">DUE</span>{% endif %}</td>
+        <td>#{{buckets[b.id][0]}} ({{fmt_date(buckets[b.id][2])}})</td>
+        <td>{% if b.autopay %}<span class="badge badge-paid">AUTO</span>{% else %}<span class="badge badge-due">MANUAL</span>{% endif %}</td>
+        <td><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" onclick="openEdit('{{b.id}}','{{b.due_date}}','{{b.planned_pay_date or b.due_date}}','{{"%.2f"|format(b.amount)}}',{{1 if b.recurring else 0}},'{{b.recurring_timeframe or "monthly"}}','{{b.recurring_every_months or ""}}','{{b.recurring_end_date or ""}}',{{1 if b.autopay else 0}},'{{b.name|replace("'","\\'")}}','{{b.paycheck_bucket if b.paycheck_bucket is not none else ''}}',{{1 if b.paid else 0}},'{{b.paid_date or ''}}')">Edit</button></div></td>
+        <td><div style="display:grid;grid-template-columns:110px;gap:6px;align-items:start;justify-content:start"><form method="post" action="/bills/toggle/{{b.id}}" style="margin:0;width:110px"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><button title="Marks paid and logs to checkbook" style="background:#dff6df;color:#1f5d1f;border:1px solid #bde7bd;width:110px;display:inline-flex;justify-content:center;box-sizing:border-box">☑ Paid</button></form><button type="button" onclick="openPostponeModal('{{b.id}}','{{b.planned_pay_date or b.due_date}}')" style="background:#fff9d9;color:#7a5a00;border:1px solid #f2e4a3;width:110px;display:inline-flex;justify-content:center;box-sizing:border-box">Postpone</button></div></td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p style="margin-top:8px"><span class="badge badge-paid">PAID</span> items disappear from this checklist and stay logged in History.</p>
+  </div>
+  {% endif %}
+{% endif %}
+
+{% if page == 'checkbook' %}
+  <div class="card" id="checkbook">
+    <h3>History</h3>
+    <form method="post" action="/ledger/add">
+      <input type="hidden" name="month" value="{{month}}">
+      <input type="hidden" name="view" value="{{view}}">
+      <input type="hidden" name="page" value="{{page}}">
+      <input type="date" name="tx_date" required>
+      <input name="label" placeholder="Label" required>
+      <input type="number" step="0.01" name="amount" placeholder="Use negative for spend" required>
+      <input name="note" placeholder="Note">
+      <button>Add Entry</button>
+    </form>
+    <table class="adaptive-table" style="margin-top:10px">
+      <tr><th>Paid Date</th><th>Label</th><th>Amount</th><th>Note</th><th>Running Balance</th><th>Edit</th></tr>
+      {% for t in ledger_running %}
+      <tr>
+        <td>{{fmt_date(t[1])}}</td><td>{{t[2]}}</td><td>{{'%+.2f'|format(t[3])}}</td><td>{{t[4]}}</td><td><b>${{fmt_money(t[5])}}</b></td>
+        <td><button type="button" onclick="openLedgerEdit('{{t[0]}}','{{t[1]}}','{{t[2]|replace("'","\\'")}}','{{fmt_money(t[3])}}','{{(t[4] or '')|replace("'","\\'")}}')">Edit</button></td>
+      </tr>
+      {% endfor %}
+    </table>
+    <p style="margin-top:8px"><b>Ending Balance:</b> ${{fmt_money(balance)}}</p>
+
+    <div style="margin-top:16px;padding-top:10px;border-top:1px dashed var(--line)">
+      <h3>Completed Promotions</h3>
+      <table class="adaptive-table" style="margin-top:10px">
+        <tr><th>Account</th><th>Promotion</th><th>Start</th><th>End</th><th>Total</th><th>Status</th></tr>
+        {% for p in completed_promotions %}
+        <tr>
+          <td>{{p.card_name}}</td>
+          <td>{{p.promo_name}}</td>
+          <td>{{fmt_date(p.start_date)}}</td>
+          <td>{{fmt_date(p.end_date)}}</td>
+          <td>${{fmt_money(p.balance)}}</td>
+          <td><span class="badge badge-paid">Completed</span></td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+
+    <div style="margin-top:16px;padding-top:10px;border-top:1px dashed var(--line)">
+      <h3>Paid-Off Loans</h3>
+      <table class="adaptive-table" style="margin-top:10px">
+        <tr><th>Loan Name</th><th>Interest Rate</th><th>Loan Amount</th><th>Status</th></tr>
+        {% for ln in paid_loans %}
+        <tr>
+          <td>{{ln.loan_name}}</td>
+          <td>{{fmt_money(ln.interest_rate)}}%</td>
+          <td>${{fmt_money(ln.loan_amount)}}</td>
+          <td><span class="badge badge-paid">Paid Off</span></td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+  </div>
+{% endif %}
+
+    </main>
+  </div>
+</div>
+
+<div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;">
+  <div style="max-width:420px;margin:10vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:14px;">
+    <h3 style="margin-top:0">Edit Bill</h3>
+    <form id="editForm" class="stack-form" method="post" action="">
+      <input type="hidden" name="month" value="{{month}}">
+      <input type="hidden" name="view" value="{{view}}">
+        <input type="hidden" name="page" value="{{page}}">
+      <div class="field-row"><label for="editName">Name</label><input id="editName" type="text" name="name" required></div>
+      <div class="field-row"><label for="editPaycheck">Paycheck Bucket</label><select id="editPaycheck" name="paycheck_bucket">
+        <option value="">Auto (by due date)</option>
+        {% for p in paychecks %}
+          <option value="{{loop.index}}">#{{loop.index}} — {{fmt_date(p.pay_date)}} ({{p.owner}})</option>
+        {% endfor %}
+      </select></div>
+      <div class="field-row"><label for="editDue">Due Date</label><input id="editDue" type="date" name="due_date" required></div>
+      <div class="field-row"><label for="editPlannedPay">Planned Pay Date</label><input id="editPlannedPay" type="date" name="planned_pay_date"></div>
+      <div class="field-row"><label for="editAmount">Amount</label><input id="editAmount" type="number" step="0.01" name="amount" required></div>
+      <div class="field-row"><label for="editRecurring">Recurring</label><div><input id="editRecurring" type="checkbox" name="recurring" onchange="toggleBillRecurringOptions()"> <span>recurring payment</span></div></div>
+      <div id="editRecurringOptions" style="display:none">
+        <div class="field-row"><label for="editRecurringTimeframe">Timeframe</label>
+          <select id="editRecurringTimeframe" name="recurring_timeframe" onchange="toggleBillRecurringOptions()">
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+            <option value="specified_months">Specified # months</option>
+          </select>
+        </div>
+        <div class="field-row" id="editRecurringMonthsRow" style="display:none"><label for="editRecurringEveryMonths">Every # Months</label><input id="editRecurringEveryMonths" type="number" min="1" step="1" name="recurring_every_months" placeholder="e.g. 3"></div>
+        <div class="field-row" id="editRecurringEndDateRow" style="display:none"><label for="editRecurringEndDate">End Date</label><input id="editRecurringEndDate" type="date" name="recurring_end_date"></div>
+      </div>
+      <div class="field-row"><label for="editAutopay">AutoPay</label><div><input id="editAutopay" type="checkbox" name="autopay"> <span>autopay</span></div></div>
+      <div class="field-row"><label for="editPaid">Paid</label><div><input id="editPaid" type="checkbox" name="paid"> <span>paid</span></div></div>
+      <div class="field-row"><label for="editPaidDate">Paid Date</label><input id="editPaidDate" type="date" name="paid_date"></div>
+      <div class="actions">
+        <button type="submit">Save</button>
+        <button type="button" onclick="closeEdit()" style="background:#999">Cancel</button>
+      </div>
+    </form>
+    <form id="deleteBillForm" method="post" action="" style="margin-top:8px" onsubmit="return confirmDelete('this bill')">
+      <input type="hidden" name="month" value="{{month}}">
+      <input type="hidden" name="view" value="{{view}}">
+        <input type="hidden" name="page" value="{{page}}">
+      <button type="submit" style="background:#b00020">Delete Bill</button>
+    </form>
+  </div>
+</div>
+
+<div id="postponeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;">
+  <div style="max-width:420px;margin:12vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:14px;">
+    <h3 style="margin-top:0">Postpone Bill</h3>
+    <form id="postponeForm" class="stack-form" method="post" action="">
+      <input type="hidden" name="month" value="{{month}}">
+      <input type="hidden" name="view" value="{{view}}">
+      <input type="hidden" name="page" value="{{page}}">
+      <input type="hidden" id="removePostponeFlag" name="remove_postpone" value="0">
+      <div class="field-row"><label for="postponeDate">New Planned Pay Date</label><input id="postponeDate" type="date" name="postpone_date"></div>
+      <div class="field-row"><label for="postponeNote">Postpone Note</label><input id="postponeNote" type="text" name="postpone_note" placeholder="Why are we postponing?"></div>
+      <div class="actions">
+        <button type="submit">Save Postpone</button>
+        <button type="button" onclick="submitRemovePostpone()" style="background:#fff9d9;color:#7a5a00;border:1px solid #f2e4a3">Remove Postpone</button>
+        <button type="button" onclick="closePostponeModal()" style="background:#999">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="paycheckManagerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;">
+  <div style="max-width:760px;margin:8vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:14px;max-height:82vh;overflow:auto;">
+    <h3 style="margin-top:0">Edit Paychecks / Income</h3>
+    <table class="adaptive-table">
+      <tr><th>Type</th><th>Owner</th><th>Date</th><th>Amount</th><th>Action</th></tr>
+      {% for p in paychecks %}
+      <tr>
+        <td>{% if (p.income_type or 'paycheck') == 'other' %}Income{% else %}Paycheck{% endif %}</td>
+        <td>{{p.owner}}</td>
+        <td>{{fmt_date(p.pay_date)}}</td>
+        <td>${{fmt_money(p.amount)}}</td>
+        <td><button type="button" onclick="openPaycheckEdit('{{p.id}}','{{p.owner|replace("'","\\'")}}','{{p.pay_date}}','{{fmt_money(p.amount)}}','{{p.income_type or 'paycheck'}}')">Edit</button></td>
+      </tr>
+      {% endfor %}
+    </table>
+    <div class="actions" style="margin-top:10px"><button type="button" onclick="closePaycheckManager()" style="background:#999">Close</button></div>
+  </div>
+</div>
+
+<div id="paycheckEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;">
+  <div style="max-width:420px;margin:10vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:14px;">
+    <h3 style="margin-top:0">Edit Income/Paycheck</h3>
+    <form id="paycheckEditForm" class="stack-form" method="post" action="">
+      <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
+      <div class="field-row"><label>Type</label><select id="pType" name="income_type" onchange="onPaycheckTypeChange()"><option value="paycheck">Paycheck</option><option value="other">Other Income</option></select></div>
+      <div class="field-row"><label>Owner</label><input id="pOwner" type="text" name="owner" required></div>
+      <div class="field-row"><label>Date</label><input id="pDate" type="date" name="pay_date" required></div>
+      <div class="field-row"><label>Amount</label><input id="pAmount" type="number" step="0.01" name="amount" required></div>
+      <div class="actions"><button type="submit">Save</button><button type="button" onclick="closePaycheckEdit()" style="background:#999">Cancel</button></div>
+    </form>
+    <form id="deletePaycheckForm" method="post" action="" style="margin-top:8px" onsubmit="return confirmDelete('this paycheck')">
+      <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
+      <button type="submit" style="background:#b00020">Delete Paycheck</button>
+    </form>
+  </div>
+</div>
+
+<div id="startOverrideModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;">
+  <div style="max-width:420px;margin:12vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:14px;">
+    <h3 style="margin-top:0">Set Starting Balance</h3>
+    <form id="startOverrideForm" method="post" action="/settings/starting-balance" class="stack-form" onsubmit="return submitStartOverride()">
+      <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
+      <input id="soMonthHidden" type="hidden" name="starting_balance_month" value="{{month}}">
+      <div class="field-row"><label>Month</label><input id="soMonth" type="text" inputmode="numeric" placeholder="MM-YYYY" required></div>
+      <div class="field-row"><label>Starting Balance</label><input id="soAmount" type="number" step="0.01" name="starting_balance" required></div>
+      <div class="actions"><button type="submit">Apply</button><button type="button" onclick="closeStartOverride()" style="background:#999">Cancel</button></div>
+    </form>
+  </div>
+</div>
+
+<div id="ledgerEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;">
+  <div style="max-width:420px;margin:10vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:14px;">
+    <h3 style="margin-top:0">Edit Checkbook Entry</h3>
+    <form id="ledgerEditForm" class="stack-form" method="post" action="">
+      <input type="hidden" name="month" value="{{month}}">
+      <input type="hidden" name="view" value="{{view}}">
+        <input type="hidden" name="page" value="{{page}}">
+      <div class="field-row"><label for="lDate">Paid Date</label><input id="lDate" type="date" name="tx_date" required></div>
+      <div class="field-row"><label for="lLabel">Label</label><input id="lLabel" type="text" name="label" required></div>
+      <div class="field-row"><label for="lAmount">Amount</label><input id="lAmount" type="number" step="0.01" name="amount" required></div>
+      <div class="field-row"><label for="lNote">Note</label><input id="lNote" type="text" name="note"></div>
+      <div class="actions">
+        <button type="submit">Save</button>
+        <button type="button" onclick="closeLedgerEdit()" style="background:#999">Cancel</button>
+      </div>
+    </form>
+    <form id="deleteLedgerForm" method="post" action="" style="margin-top:8px" onsubmit="return confirmDelete('this checkbook entry')">
+      <input type="hidden" name="month" value="{{month}}">
+      <input type="hidden" name="view" value="{{view}}">
+        <input type="hidden" name="page" value="{{page}}">
+      <button type="submit" style="background:#b00020">Delete Entry</button>
+    </form>
+  </div>
+</div>
+
+<div id="tripEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;">
+  <div style="max-width:420px;margin:10vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:14px;">
+    <h3 style="margin-top:0">Edit Trip</h3>
+    <form id="tripEditForm" class="stack-form" method="post" action="">
+      <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}">
+        <input type="hidden" name="page" value="{{page}}">
+      <div class="field-row"><label>Name</label><input id="tripName" type="text" name="name" required></div>
+      <div class="field-row"><label>Due Date</label><input id="tripDue" type="date" name="due_month" required></div>
+      <div class="field-row"><label>Target</label><input id="tripTarget" type="number" step="0.01" name="target" required></div>
+      <div class="field-row"><label>Saved</label><input id="tripSaved" type="number" step="0.01" name="saved" required></div>
+      <div class="actions"><button type="submit">Save</button><button type="button" onclick="closeTripEdit()" style="background:#999">Cancel</button></div>
+    </form>
+    <form id="deleteTripForm" method="post" action="" onsubmit="return confirmDelete('this trip goal')" style="margin-top:8px">
+      <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}">
+        <input type="hidden" name="page" value="{{page}}">
+      <button type="submit" style="background:#b00020">Delete Trip</button>
+    </form>
+  </div>
+</div>
+
+<div id="tripContribModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;">
+  <div style="max-width:420px;margin:10vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:14px;">
+    <h3 id="tripContribTitle" style="margin-top:0">Add Trip Contribution</h3>
+    <form id="tripContribForm" class="stack-form" method="post" action="">
+      <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}">
+        <input type="hidden" name="page" value="{{page}}">
+      <div class="field-row"><label>Paid Date</label><input type="date" name="paid_date" required></div>
+      <div class="field-row"><label>Amount</label><input type="number" step="0.01" name="amount" required></div>
+      <div class="actions"><button type="submit">Save Contribution</button><button type="button" onclick="closeTripContrib()" style="background:#999">Cancel</button></div>
+    </form>
+  </div>
+</div>
+
+<div id="promotionEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;">
+  <div style="max-width:420px;margin:10vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:14px;">
+    <h3 style="margin-top:0">Edit Promotion</h3>
+    <form id="promotionEditForm" class="stack-form" method="post" action="">
+      <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
+      <div class="field-row"><label>Card / Account</label><input id="promoCard" type="text" name="card_name" required></div>
+      <div class="field-row"><label>Promotion</label><input id="promoName" type="text" name="promo_name" required></div>
+      <div class="field-row"><label>Start Date</label><input id="promoStart" type="date" name="start_date"></div>
+      <div class="field-row"><label>End Date</label><input id="promoEnd" type="date" name="end_date" required></div>
+      <div class="field-row"><label>Promo Balance</label><input id="promoBalance" type="number" step="0.01" name="balance" required></div>
+      <div class="field-row"><label>Note</label><input id="promoNote" type="text" name="note"></div>
+      <div class="actions"><button type="submit">Save</button><button type="button" onclick="closePromotionEdit()" style="background:#999">Cancel</button></div>
+    </form>
+    <form id="deletePromotionForm" method="post" action="" style="margin-top:8px" onsubmit="return confirmDelete('this promotion')">
+      <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
+      <button type="submit" style="background:#b00020">Delete Promotion</button>
+    </form>
+  </div>
+</div>
+
+<div id="creditEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;">
+  <div style="max-width:420px;margin:10vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:14px;">
+    <h3 style="margin-top:0">Edit Credit Card</h3>
+    <form id="creditEditForm" class="stack-form" method="post" action="">
+      <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="anchor" value="credit-card-tracker">
+      <div class="field-row"><label>Credit Card Name</label><input id="creditCardName" type="text" name="card_name" required></div>
+      <div class="field-row"><label>Interest Rate (%)</label><input id="creditInterestRate" type="number" step="0.01" name="interest_rate" required></div>
+      <div class="field-row"><label>Credit Limit</label><input id="creditLimit" type="number" step="0.01" name="credit_limit" required></div>
+      <div class="field-row"><label>Paid Off</label><div><input id="creditPaidOff" type="checkbox" name="paid_off"> <span>No Balance</span></div></div>
+      <div class="actions"><button type="submit">Save</button><button type="button" onclick="closeCreditEdit()" style="background:#999">Cancel</button></div>
+    </form>
+  </div>
+</div>
+
+<div id="loanEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;">
+  <div style="max-width:420px;margin:10vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:14px;">
+    <h3 style="margin-top:0">Edit Loan</h3>
+    <form id="loanEditForm" class="stack-form" method="post" action="">
+      <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="anchor" value="loans-tracker">
+      <div class="field-row"><label>Loan Name</label><input id="loanName" type="text" name="loan_name" required></div>
+      <div class="field-row"><label>Interest Rate (%)</label><input id="loanInterestRate" type="number" step="0.01" name="interest_rate" required></div>
+      <div class="field-row"><label>Loan Amount</label><input id="loanAmount" type="number" step="0.01" name="loan_amount" required></div>
+      <div class="field-row"><label>End Date</label><input id="loanEndDate" type="date" name="end_date"></div>
+      <div class="field-row"><label>Note</label><input id="loanNote" type="text" name="note" maxlength="24"></div>
+      <div class="actions"><button type="submit">Save</button><button type="button" onclick="closeLoanEdit()" style="background:#999">Cancel</button></div>
+    </form>
+  </div>
+</div>
+
+<div id="subscriptionEditModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;">
+  <div style="max-width:420px;margin:10vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:14px;">
+    <h3 style="margin-top:0">Edit Subscription</h3>
+    <form id="subscriptionEditForm" class="stack-form" method="post" action="">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
+      <div class="field-row"><label>Subscription Name</label><input id="subName" type="text" name="name" required></div>
+      <div class="field-row"><label>Day Due</label><input id="subDayDue" type="number" min="1" max="31" name="day_due" required></div>
+      <div class="field-row"><label>Payment</label><input id="subPayment" type="number" step="0.01" name="payment" required></div>
+      <div class="field-row"><label>Recurring</label><div><input id="subRecurring" type="checkbox" name="recurring" onchange="toggleSubscriptionRecurringEdit()"> recurring</div></div>
+      <div class="field-row sub-recurring-edit-fields"><label>Timeframe</label><select id="subRecurringTimeframe" name="recurring_timeframe" onchange="toggleSubscriptionTimeframeEdit()"><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="specified_months">Specified # months</option></select></div>
+      <div class="field-row" id="subYearlyMonthRow" style="display:none"><label>Yearly Month</label><select id="subYearlyMonth" name="yearly_month" style="width:100%;min-height:40px;background:#fff;color:#111;border:1px solid var(--line);-webkit-appearance:menulist;appearance:menulist"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
+      <div class="field-row" id="subRecurringMonthsRow" style="display:none"><label>Every # Months</label><input id="subRecurringEveryMonths" type="number" min="1" step="1" name="recurring_every_months" placeholder="e.g. 3"></div>
+      <div class="actions"><button type="submit">Save</button><button type="button" onclick="closeSubscriptionEdit()" style="background:#999">Cancel</button></div>
+    </form>
+    <form id="deleteSubscriptionForm" method="post" action="" style="margin-top:8px" onsubmit="return confirmDelete('this subscription')">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
+      <button type="submit" style="background:#b00020">Delete</button>
+    </form>
+  </div>
+</div>
+
+<div id="settingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;">
+  <div style="max-width:1320px;width:98vw;margin:3vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:18px;max-height:90vh;overflow:auto;">
+    <h3 style="margin-top:0">Settings</h3>
+    <div style="display:grid;grid-template-columns:180px 1fr;gap:12px;align-items:start;">
+      <div style="display:grid;gap:8px;position:sticky;top:0;">
+        <button type="button" class="pill" style="display:block;text-align:left;color:#111" onclick="showSettingsTab('paychecks')">Recurring Paychecks</button>
+        <button type="button" class="pill" style="display:block;text-align:left;color:#111" onclick="showSettingsTab('categories')">Categories</button>
+        <button type="button" class="pill" style="display:block;text-align:left;color:#111" onclick="showSettingsTab('recurringBills')">Recurring Bills</button>
+        <button type="button" class="pill" style="display:block;text-align:left;color:#111" onclick="showSettingsTab('backup')">Export</button>
+        <button type="button" class="pill" style="display:block;text-align:left;color:#111" onclick="showSettingsTab('theme')">Theme</button>
+        <button type="button" class="pill" style="display:block;text-align:left;color:#111" onclick="showSettingsTab('help')">Help / Instructions</button>
+      </div>
+
+      <div>
+        <div id="settings-tab-paychecks" class="settings-tab">
+        <h3 id="settings-paychecks">Recurring Paychecks</h3>
+        <form method="post" action="/paycheck-rules/add">
+          <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}">
+            <input type="hidden" name="page" value="{{page}}">
+          <input name="owner" placeholder="Owner" required>
+          <input type="number" step="0.01" name="amount" placeholder="Amount" required>
+          <select name="cadence" onchange="toggleRuleCadenceRow(this)"><option value="weekly">weekly</option><option value="biweekly" selected>biweekly</option><option value="monthly">monthly</option><option value="specified_day">specified day</option></select>
+          <input type="number" min="1" max="31" name="day_of_month" placeholder="Day (1-31)" style="display:none;max-width:120px">
+          <select name="timeframe" onchange="toggleRuleTimeframeRow(this)"><option value="monthly" selected>Monthly</option><option value="yearly">Yearly</option><option value="specified_months">Specified Months</option></select>
+          <input type="text" name="months_mask" placeholder="e.g. 1,3,6,12" style="display:none;min-width:170px">
+          <input type="date" name="next_date" required>
+          <button>Add Rule</button>
+        </form>
+        <form id="paycheck-rules-bulk-form" method="post" action="/paycheck-rules/bulk-update">
+          <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="settings" value="1"><input type="hidden" name="settings_tab" value="paychecks">
+          <table class="adaptive-table" style="margin-top:10px">
+            <tr><th>Owner</th><th>Amount</th><th>Cadence</th><th>Day</th><th>Timeframe</th><th>Months</th><th>Next Date</th><th>Delete</th></tr>
+            {% for r in paycheck_rules %}
+            <tr>
+              <input type="hidden" name="rule_id" value="{{r.id}}">
+              <td><input name="owner" value="{{r.owner}}" required></td>
+              <td><input type="number" step="0.01" name="amount" value="{{'%.2f'|format(r.amount or 0)}}" required></td>
+              <td>
+                <select name="cadence" onchange="toggleRuleCadenceRow(this)">
+                  <option value="weekly" {% if r.cadence=='weekly' %}selected{% endif %}>weekly</option>
+                  <option value="biweekly" {% if r.cadence=='biweekly' %}selected{% endif %}>biweekly</option>
+                  <option value="monthly" {% if r.cadence=='monthly' %}selected{% endif %}>monthly</option>
+                  <option value="specified_day" {% if r.cadence=='specified_day' %}selected{% endif %}>specified day</option>
+                </select>
+              </td>
+              <td><input type="number" min="1" max="31" name="day_of_month" value="{{r.day_of_month or ''}}" placeholder="1-31" style="max-width:90px;{% if r.cadence != 'specified_day' %}display:none;{% endif %}"></td>
+              <td>
+                <select name="timeframe" onchange="toggleRuleTimeframeRow(this)">
+                  <option value="monthly" {% if (r.timeframe or 'monthly')=='monthly' %}selected{% endif %}>Monthly</option>
+                  <option value="yearly" {% if (r.timeframe or '')=='yearly' %}selected{% endif %}>Yearly</option>
+                  <option value="specified_months" {% if (r.timeframe or '')=='specified_months' %}selected{% endif %}>Specified Months</option>
+                </select>
+              </td>
+              <td><input type="text" name="months_mask" value="{{r.months_mask or ''}}" placeholder="1,3,6,12" style="min-width:150px;{% if (r.timeframe or 'monthly') != 'specified_months' %}display:none;{% endif %}"></td>
+              <td><input type="date" name="next_date" value="{{r.next_date}}" required></td>
+              <td>
+                <button type="submit" name="delete_rule_id" value="{{r.id}}" formaction="/paycheck-rules/delete/{{r.id}}" formmethod="post" onclick="return confirmDelete('this recurring paycheck rule')" style="background:#b00020">Delete</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </table>
+        </form>
+        <form method="post" action="/paycheck-rules/generate"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="settings" value="1"><input type="hidden" name="settings_tab" value="paychecks">
+            <input type="hidden" name="page" value="{{page}}"><button>Generate This Month's Paychecks</button></form>
+
+        </div>
+
+        <div id="settings-tab-categories" class="settings-tab" style="display:none">
+        <h3 id="settings-categories">Categories</h3>
+        <form method="post" action="/categories/add"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}">
+            <input type="hidden" name="page" value="{{page}}"><input name="name" placeholder="new category"><button>Add Category</button></form>
+        <ul>{% for c in categories %}<li>{{c.name}} {% if c.name not in ['bill','debt','trip'] %}<form style="display:inline" method="post" action="/categories/delete/{{c.id}}" onsubmit="return confirmDelete('this category')"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}">
+            <input type="hidden" name="page" value="{{page}}"><button>Delete</button></form>{% endif %}</li>{% endfor %}</ul>
+
+        </div>
+
+        <div id="settings-tab-recurringBills" class="settings-tab" style="display:none">
+          <h3>Recurring Bills</h3>
+
+          <form method="post" action="/entries/add" style="border:1px solid var(--line);padding:10px;border-radius:10px;display:grid;grid-template-columns:1.5fr minmax(150px,1fr) minmax(150px,1fr) 0.9fr 1fr 1fr 0.9fr auto;gap:8px;align-items:center;margin-bottom:10px;">
+            <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="settings" value="1"><input type="hidden" name="settings_tab" value="recurringBills">
+            <input type="hidden" name="entry_type" value="bill">
+            <input type="hidden" name="recurring" value="on">
+            <input type="text" name="name" placeholder="New recurring bill name" required>
+            <div style="display:grid;gap:4px;min-width:140px"><label style="font-size:12px;color:#666">Start Date</label><input type="date" name="due_date" required style="min-width:140px;padding-right:32px"></div>
+            <div style="display:grid;gap:4px;min-width:140px"><label style="font-size:12px;color:#666">End Date</label><input type="date" name="recurring_end_date" style="min-width:140px;padding-right:32px" title="Optional end date for recurring"></div>
+            <input type="number" step="0.01" name="bill_amount" placeholder="Amount" required>
+            <select name="recurring_timeframe" onchange="toggleRecurringBillMonths(this)">
+              <option value="monthly" selected>Monthly</option>
+              <option value="yearly">Yearly</option>
+              <option value="specified_months">Specified # months</option>
+            </select>
+            <input type="number" min="1" step="1" name="recurring_every_months" placeholder="# months" style="display:none;max-width:120px">
+            <select name="category">
+              {% for c in categories %}
+                {% if c.name != 'trip' %}
+                  <option value="{{c.name}}" {% if c.name=='bill' %}selected{% endif %}>{{c.name}}</option>
+                {% endif %}
+              {% endfor %}
+            </select>
+            <label style="font-size:13px"><input type="checkbox" name="autopay"> autopay</label>
+            <button type="submit">Add Recurring Bill</button>
+          </form>
+
+          <div style="display:grid;gap:8px;">
+            {% for b in recurring_bills %}
+              <form method="post" action="/bills/update/{{b.id}}" style="border:1px solid var(--line);padding:10px;border-radius:10px;display:grid;grid-template-columns:1.5fr minmax(150px,1fr) minmax(150px,1fr) 0.9fr 1fr 1fr 0.8fr auto;gap:8px;align-items:center;">
+                <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="settings" value="1"><input type="hidden" name="settings_tab" value="recurringBills">
+                <input type="hidden" name="recurring" value="on">
+                <input type="text" name="name" value="{{b.name}}" required>
+                <div style="display:grid;gap:4px;min-width:140px"><label style="font-size:12px;color:#666">Start Date</label><input type="date" name="due_date" value="{{b.due_date}}" required style="min-width:140px;padding-right:32px"></div>
+                <div style="display:grid;gap:4px;min-width:140px"><label style="font-size:12px;color:#666">End Date</label><input type="date" name="recurring_end_date" value="{{b.recurring_end_date or ''}}" style="min-width:140px;padding-right:32px" title="Optional end date for recurring"></div>
+                <input type="number" step="0.01" name="amount" value="{{fmt_money(b.amount)}}" required>
+                <select name="recurring_timeframe" onchange="toggleRecurringBillMonths(this)">
+                  <option value="monthly" {% if (b.recurring_timeframe or 'monthly')=='monthly' %}selected{% endif %}>Monthly</option>
+                  <option value="yearly" {% if (b.recurring_timeframe or '')=='yearly' %}selected{% endif %}>Yearly</option>
+                  <option value="specified_months" {% if (b.recurring_timeframe or '')=='specified_months' %}selected{% endif %}>Specified # months</option>
+                </select>
+                <input type="number" min="1" step="1" name="recurring_every_months" value="{{b.recurring_every_months or ''}}" placeholder="# months" style="max-width:120px;{% if (b.recurring_timeframe or 'monthly')!='specified_months' %}display:none;{% endif %}">
+                <label style="font-size:13px"><input type="checkbox" name="autopay" {% if b.autopay %}checked{% endif %}> autopay</label>
+                <div style="grid-column:1 / -1;font-size:12px;color:#666">
+                  Repeats:
+                  {% if (b.recurring_timeframe or 'monthly') == 'yearly' %}
+                    Yearly
+                  {% elif (b.recurring_timeframe or 'monthly') == 'specified_months' %}
+                    Every {{b.recurring_every_months or 1}} month(s)
+                  {% else %}
+                    Monthly
+                  {% endif %}
+                </div>
+                <div style="grid-column:-1;grid-row:1;justify-self:end;align-self:center;margin-left:auto">
+                  <button type="button" aria-label="Delete recurring bill" title="Delete recurring bill" style="background:#f5a3a3;color:#111;padding:1px 5px;min-height:20px;min-width:20px;width:20px;display:inline-flex;align-items:center;justify-content:center;line-height:1;font-size:12px;border:1px solid #e58f8f" onclick="document.getElementById('rb-del-{{b.id}}').submit()">🗑︎</button>
+                </div>
+              </form>
+              <form id="rb-del-{{b.id}}" method="post" action="/bills/unset-recurring/{{b.id}}" style="display:none">
+                <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="settings" value="1"><input type="hidden" name="settings_tab" value="recurringBills">
+              </form>
+            {% endfor %}
+          </div>
+
+          <h3 style="margin-top:16px">Recurring Subscriptions</h3>
+          <div style="display:grid;gap:8px;">
+            {% for s in recurring_subscriptions %}
+              <form method="post" action="/subscriptions/update/{{s.id}}" style="border:1px solid var(--line);padding:10px;border-radius:10px;display:grid;grid-template-columns:1.2fr 0.7fr 0.8fr 0.95fr 0.8fr 0.95fr auto;gap:8px;align-items:center;">
+                <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="settings" value="1"><input type="hidden" name="settings_tab" value="recurringBills"><input type="hidden" name="_csrf" value="{{ csrf_token }}">
+                <input type="hidden" name="recurring" value="on">
+                <input type="text" name="name" value="{{s.name}}" required>
+                <input type="number" min="1" max="31" name="day_due" value="{{s.day_due}}" required>
+                <input type="number" step="0.01" name="payment" value="{{'%.2f'|format(s.payment or 0)}}" required>
+                <select name="recurring_timeframe" onchange="toggleRecurringBillMonths(this)">
+                  <option value="monthly" {% if (s.recurring_timeframe or 'monthly')=='monthly' %}selected{% endif %}>Monthly</option>
+                  <option value="yearly" {% if (s.recurring_timeframe or '')=='yearly' %}selected{% endif %}>Yearly</option>
+                  <option value="specified_months" {% if (s.recurring_timeframe or '')=='specified_months' %}selected{% endif %}>Specified # months</option>
+                </select>
+                <select name="yearly_month" style="display:block !important;width:100%;min-height:36px;background:#fff;color:#111;border:1px solid var(--line);-webkit-appearance:menulist;appearance:menulist;opacity:1;pointer-events:auto">
+                  <option value="1" {% if (s.yearly_month or 0)==1 %}selected{% endif %}>January</option>
+                  <option value="2" {% if (s.yearly_month or 0)==2 %}selected{% endif %}>February</option>
+                  <option value="3" {% if (s.yearly_month or 0)==3 %}selected{% endif %}>March</option>
+                  <option value="4" {% if (s.yearly_month or 0)==4 %}selected{% endif %}>April</option>
+                  <option value="5" {% if (s.yearly_month or 0)==5 %}selected{% endif %}>May</option>
+                  <option value="6" {% if (s.yearly_month or 0)==6 %}selected{% endif %}>June</option>
+                  <option value="7" {% if (s.yearly_month or 0)==7 %}selected{% endif %}>July</option>
+                  <option value="8" {% if (s.yearly_month or 0)==8 %}selected{% endif %}>August</option>
+                  <option value="9" {% if (s.yearly_month or 0)==9 %}selected{% endif %}>September</option>
+                  <option value="10" {% if (s.yearly_month or 0)==10 %}selected{% endif %}>October</option>
+                  <option value="11" {% if (s.yearly_month or 0)==11 %}selected{% endif %}>November</option>
+                  <option value="12" {% if (s.yearly_month or 0)==12 %}selected{% endif %}>December</option>
+                </select>
+                <input type="number" min="1" step="1" name="recurring_every_months" value="{{s.recurring_every_months or ''}}" placeholder="# months" style="max-width:120px;{% if (s.recurring_timeframe or 'monthly')!='specified_months' %}display:none;{% endif %}">
+                <div style="justify-self:end"><button type="submit">Save</button></div>
+              </form>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div id="settings-tab-backup" class="settings-tab" style="display:none">
+          <h3>Export</h3>
+          <p style="font-size:13px;color:#666">Export your current household data to an organized Excel workbook (multiple sheets).</p>
+          <p><a class="pill" href="/export/excel" style="color:#1f1f1f;text-decoration:none">Download Excel Export (.xlsx)</a></p>
+        </div>
+
+        <div id="settings-tab-theme" class="settings-tab" style="display:none">
+          <h3>Accent Color</h3>
+          <form id="settings-theme" method="post" action="/settings/update" class="stack-form">
+            <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
+            <div class="field-row">
+              <label>Theme</label>
+              <select name="accent_theme">
+                <option value="slate" {% if theme_name=='slate' %}selected{% endif %}>Slate (Default)</option>
+                <option value="pink" {% if theme_name=='pink' %}selected{% endif %}>Pink</option>
+                <option value="blue" {% if theme_name=='blue' %}selected{% endif %}>Blue</option>
+                <option value="purple" {% if theme_name=='purple' %}selected{% endif %}>Purple</option>
+                <option value="red" {% if theme_name=='red' %}selected{% endif %}>Red</option>
+              </select>
+            </div>
+          </form>
+        </div>
+
+        <div id="settings-tab-help" class="settings-tab" style="display:none">
+          <h3>Full Instructions</h3>
+          <ol style="line-height:1.5">
+            <li><b>Dashboard:</b> Use this for quick month overview (balance, income, bills, and alerts).</li>
+            <li><b>Bills:</b> Add bills, set due/planned pay dates, and mark paid. Use planner to avoid negative balance.</li>
+            <li><b>Trips/Savings:</b> Track trip targets and contributions.</li>
+            <li><b>Promotions:</b> Track promo deadlines and totals to avoid missed promotional windows.</li>
+            <li><b>Calendar:</b> Click events to edit records directly (bills/paychecks/trips/promotions).</li>
+            <li><b>History:</b> Manual ledger entries, completed promotions, and paid-off loan history.</li>
+            <li><b>Export:</b> Download an organized Excel workbook for your records.</li>
+            <li><b>Theme:</b> Choose your preferred visual style.</li>
+          </ol>
+          <div class="actions"><button type="button" onclick="openTour()">Replay Step-by-Step Tutorial</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions" style="margin-top:12px">
+      <button type="button" onclick="saveSettingsActiveTab()">Save Settings</button>
+      <button type="button" onclick="closeSettings()" style="background:#999">Close</button>
+    </div>
+  </div>
+</div>
+
+<div id="tourModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;">
+  <div style="max-width:620px;margin:8vh auto;background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;">
+    <h3 style="margin-top:0">Welcome to NorthStar Ledger 👋</h3>
+    <div id="tourStepBody" style="line-height:1.45"></div>
+    <p id="tourStepCounter" style="font-size:12px;color:#666;margin-top:8px"></p>
+    <div class="actions" style="display:flex;gap:8px;justify-content:space-between">
+      <button type="button" onclick="skipTour()" style="background:#999">Skip Tutorial</button>
+      <div style="display:flex;gap:8px">
+        <button type="button" id="tourBackBtn" onclick="tourPrev()" style="background:#666">Back</button>
+        <button type="button" id="tourNextBtn" onclick="tourNext()">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="rolloverModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:9999;">
+  <div style="max-width:420px;margin:12vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:14px;">
+    <h3 style="margin-top:0">Monthly Rollover</h3>
+    <form method="post" action="/rollover" class="stack-form">
+      <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}">
+        <input type="hidden" name="page" value="{{page}}">
+      <div class="field-row"><label>Source</label><input name="source_month" placeholder="YYYY-MM"></div>
+      <div class="field-row"><label>Target</label><input name="target_month" placeholder="YYYY-MM"></div>
+      <div class="actions"><button>Rollover Recurring Bills</button><button type="button" onclick="closeRollover()" style="background:#999">Close</button></div>
+    </form>
+  </div>
+</div>
+
+<div id="dayEventsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:10001;">
+  <div style="width:min(92vw,420px);margin:8vh auto;background:#fff;border:1px solid #ffd1e8;border-radius:12px;padding:14px;max-height:82vh;overflow:auto;">
+    <h3 id="dayEventsTitle" style="margin-top:0">Day Entries</h3>
+    <div id="dayEventsBody"></div>
+    <div class="actions" style="margin-top:10px"><button type="button" onclick="closeDayEvents()" style="background:#999">Close</button></div>
+  </div>
+</div>
+
+<script>
+function addCsrfToForms(){
+  const token = "{{ csrf_token }}";
+  if(!token) return;
+  document.querySelectorAll('form').forEach(f=>{
+    if(f.querySelector('input[name="_csrf"]')) return;
+    const i=document.createElement('input');
+    i.type='hidden'; i.name='_csrf'; i.value=token;
+    f.appendChild(i);
+  });
+}
+
+function applyInputHints(){
+  const supported = new Set(['text','date','number','email','search','month']);
+  const humanize = (value='') => value
+    .replace(/[_-]+/g,' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+    .trim();
+
+  document.querySelectorAll('input, textarea').forEach(el => {
+    const tag = (el.tagName || '').toLowerCase();
+    const type = (el.type || '').toLowerCase();
+    if(tag === 'input' && !supported.has(type)) return;
+    if(el.type === 'hidden') return;
+    if(el.hasAttribute('placeholder') && el.getAttribute('placeholder')?.trim()) return;
+
+    let hint = '';
+    const row = el.closest('.field-row');
+    const rowLabel = row?.querySelector('label');
+    if(rowLabel) hint = rowLabel.textContent || '';
+    if(!hint && el.name) hint = humanize(el.name);
+
+    if(type === 'date') hint = 'MM-DD-YYYY';
+    if(type === 'month') hint = 'MM-YYYY';
+
+    if(hint) el.setAttribute('placeholder', hint);
+  });
+}
+
+function normalizeNumberForInput(v){
+  if(v === null || v === undefined) return '';
+  return String(v).replace(/[$,\s]/g,'').trim();
+}
+
+function updateStickyOffsets(){
+  const topCard = document.getElementById('top');
+  if(!topCard) return;
+  const root = document.documentElement;
+  const stickyTop = parseInt(getComputedStyle(root).getPropertyValue('--sticky-top-offset')) || 10;
+  const stickyGap = parseInt(getComputedStyle(root).getPropertyValue('--sticky-gap')) || 10;
+  const h = Math.ceil(topCard.getBoundingClientRect().height || 0);
+  root.style.setProperty('--sticky-notes-top', `${stickyTop + h + stickyGap}px`);
+}
+
+function rcDisplayEl(){ return document.getElementById('rcDisplay'); }
+const RC_STORAGE_KEY = 'northstar_calc_display';
+function saveCalculatorState(){
+  const el = rcDisplayEl();
+  if(!el) return;
+  try { localStorage.setItem(RC_STORAGE_KEY, el.value || '0'); } catch(e) {}
+}
+function loadCalculatorState(){
+  const el = rcDisplayEl();
+  if(!el) return;
+  try {
+    const v = localStorage.getItem(RC_STORAGE_KEY);
+    if(v !== null && v !== undefined && v !== '') el.value = v;
+  } catch(e) {}
+}
+function clearCalculatorState(){
+  try { localStorage.removeItem(RC_STORAGE_KEY); } catch(e) {}
+}
+function rcAppend(v){
+  const el = rcDisplayEl(); if(!el) return;
+  const cur = el.value || '0';
+  el.value = (cur === '0' && /[0-9.]/.test(v)) ? String(v) : (cur + String(v));
+  saveCalculatorState();
+}
+function rcClear(){ const el = rcDisplayEl(); if(el) { el.value = '0'; saveCalculatorState(); } }
+function rcBack(){
+  const el = rcDisplayEl(); if(!el) return;
+  const next = (el.value || '').slice(0, -1);
+  el.value = next || '0';
+  saveCalculatorState();
+}
+function rcEval(){
+  const el = rcDisplayEl(); if(!el) return;
+  const expr = (el.value || '').replace(/÷/g,'/').replace(/×/g,'*').replace(/−/g,'-');
+  if(!/^[0-9+\-*/%.()\s]+$/.test(expr)){ el.value = 'Error'; saveCalculatorState(); return; }
+  try {
+    const val = Function('"use strict"; return (' + expr + ')')();
+    el.value = Number.isFinite(val) ? Number(val).toFixed(2) : 'Error';
+  } catch { el.value = 'Error'; }
+  saveCalculatorState();
+}
+
+function openEdit(id,due,plannedPay,amount,recurring,recurringTimeframe,recurringEveryMonths,recurringEndDate,autopay,name,paycheckBucket,paid,paidDate){
+  document.getElementById('editForm').action = '/bills/update/' + id;
+  document.getElementById('deleteBillForm').action = '/bills/delete/' + id;
+  document.getElementById('editName').value = name || '';
+  document.getElementById('editPaycheck').value = paycheckBucket || '';
+  document.getElementById('editDue').value = due;
+  document.getElementById('editPlannedPay').value = plannedPay || due;
+  document.getElementById('editAmount').value = normalizeNumberForInput(amount);
+  document.getElementById('editRecurring').checked = !!recurring;
+  document.getElementById('editRecurringTimeframe').value = recurringTimeframe || 'monthly';
+  document.getElementById('editRecurringEveryMonths').value = normalizeNumberForInput(recurringEveryMonths) || '';
+  document.getElementById('editRecurringEndDate').value = recurringEndDate || '';
+  toggleBillRecurringOptions();
+  document.getElementById('editAutopay').checked = !!autopay;
+  document.getElementById('editPaid').checked = !!paid;
+  document.getElementById('editPaidDate').value = paidDate || '';
+  document.getElementById('editModal').style.display = 'block';
+}
+function closeEdit(){ document.getElementById('editModal').style.display='none'; }
+
+function openPostponeModal(id, plannedDate){
+  document.getElementById('postponeForm').action = '/bills/postpone/' + id;
+  document.getElementById('postponeDate').value = plannedDate || '';
+  document.getElementById('postponeNote').value = '';
+  document.getElementById('removePostponeFlag').value = '0';
+  document.getElementById('postponeModal').style.display = 'block';
+}
+function closePostponeModal(){ document.getElementById('postponeModal').style.display='none'; }
+function submitRemovePostpone(){
+  const form = document.getElementById('postponeForm');
+  document.getElementById('removePostponeFlag').value = '1';
+  try { sessionStorage.setItem('ns_scroll_y', String(window.scrollY || 0)); } catch(e) {}
+  if(form && typeof form.requestSubmit === 'function') form.requestSubmit();
+  else if(form) form.submit();
+}
+
+function toggleBillRecurringOptions(){
+  const recurring = document.getElementById('editRecurring');
+  const opts = document.getElementById('editRecurringOptions');
+  const timeframe = document.getElementById('editRecurringTimeframe');
+  const monthsRow = document.getElementById('editRecurringMonthsRow');
+  const endDateRow = document.getElementById('editRecurringEndDateRow');
+  if(!recurring || !opts || !timeframe || !monthsRow || !endDateRow) return;
+  const on = !!recurring.checked;
+  opts.style.display = on ? 'block' : 'none';
+  const showMonths = (on && timeframe.value === 'specified_months');
+  monthsRow.style.display = showMonths ? 'block' : 'none';
+  endDateRow.style.display = on ? 'block' : 'none';
+  const monthsInput = document.getElementById('editRecurringEveryMonths');
+  if(monthsInput) monthsInput.required = showMonths;
+  const endInput = document.getElementById('editRecurringEndDate');
+  if(endInput && !on) endInput.value = '';
+}
+
+function openPaycheckManager(){ document.getElementById('paycheckManagerModal').style.display='block'; }
+function closePaycheckManager(){ document.getElementById('paycheckManagerModal').style.display='none'; }
+
+function openPaycheckEdit(id, owner, date, amount, incomeType){
+  closePaycheckManager();
+  document.getElementById('paycheckEditForm').action = '/paychecks/update/' + id;
+  document.getElementById('deletePaycheckForm').action = '/paychecks/delete/' + id;
+  document.getElementById('pOwner').value = owner || '';
+  document.getElementById('pDate').value = date || '';
+  document.getElementById('pAmount').value = normalizeNumberForInput(amount) || '';
+  document.getElementById('pType').value = incomeType || 'paycheck';
+  onPaycheckTypeChange();
+  document.getElementById('paycheckEditModal').style.display = 'block';
+}
+function onPaycheckTypeChange(){
+  const t = document.getElementById('pType');
+  const o = document.getElementById('pOwner');
+  if(!t || !o) return;
+  if(t.value === 'other'){
+    o.value = 'Income';
+    o.readOnly = true;
+    o.required = false;
+  } else {
+    o.readOnly = false;
+    if(o.value === 'Income') o.value = '';
+    o.required = true;
+  }
+}
+function closePaycheckEdit(){ document.getElementById('paycheckEditModal').style.display='none'; }
+
+function openStartOverride(month, amount){
+  const raw = month || '';
+  const display = /^\d{4}-\d{2}$/.test(raw) ? `${raw.slice(5,7)}-${raw.slice(0,4)}` : raw;
+  document.getElementById('soMonth').value = display;
+  document.getElementById('soMonthHidden').value = raw;
+  document.getElementById('soAmount').value = amount || '';
+  document.getElementById('startOverrideModal').style.display='block';
+}
+function submitStartOverride(){
+  const vis = (document.getElementById('soMonth')?.value || '').trim();
+  const hidden = document.getElementById('soMonthHidden');
+  const m = vis.match(/^(\d{2})-(\d{4})$/);
+  if(!m){
+    alert('Please use MM-YYYY format for Month.');
+    return false;
+  }
+  if(hidden) hidden.value = `${m[2]}-${m[1]}`;
+  return true;
+}
+function closeStartOverride(){ document.getElementById('startOverrideModal').style.display='none'; }
+
+function openLedgerEdit(id, txDate, label, amount, note){
+  document.getElementById('ledgerEditForm').action = '/ledger/update/' + id;
+  document.getElementById('deleteLedgerForm').action = '/ledger/delete/' + id;
+  document.getElementById('lDate').value = txDate;
+  document.getElementById('lLabel').value = label || '';
+  document.getElementById('lAmount').value = normalizeNumberForInput(amount);
+  document.getElementById('lNote').value = note || '';
+  document.getElementById('ledgerEditModal').style.display = 'block';
+}
+function closeLedgerEdit(){ document.getElementById('ledgerEditModal').style.display='none'; }
+function confirmDelete(thing){
+  return window.confirm(`Are you sure you want to delete ${thing}? This cannot be undone.`);
+}
+
+function openTripEdit(id,name,due,target,saved){
+  document.getElementById('tripEditForm').action = '/trips/update/' + id;
+  document.getElementById('deleteTripForm').action = '/trips/delete/' + id;
+  document.getElementById('tripName').value = name || '';
+  document.getElementById('tripDue').value = due || '';
+  document.getElementById('tripTarget').value = normalizeNumberForInput(target) || '';
+  document.getElementById('tripSaved').value = normalizeNumberForInput(saved) || '';
+  document.getElementById('tripEditModal').style.display = 'block';
+}
+function closeTripEdit(){ document.getElementById('tripEditModal').style.display='none'; }
+
+function openTripContrib(id,name){
+  document.getElementById('tripContribForm').action = '/trips/contribute/' + id;
+  document.getElementById('tripContribTitle').innerText = 'Add Trip Contribution — ' + name;
+  document.getElementById('tripContribModal').style.display='block';
+}
+function closeTripContrib(){ document.getElementById('tripContribModal').style.display='none'; }
+
+function openPromotionEdit(id, card, promo, startDate, endDate, balance, note){
+  document.getElementById('promotionEditForm').action = '/promotions/update/' + id;
+  document.getElementById('deletePromotionForm').action = '/promotions/delete/' + id;
+  document.getElementById('promoCard').value = card || '';
+  document.getElementById('promoName').value = promo || '';
+  document.getElementById('promoStart').value = startDate || '';
+  document.getElementById('promoEnd').value = endDate || '';
+  document.getElementById('promoBalance').value = normalizeNumberForInput(balance) || '';
+  document.getElementById('promoNote').value = note || '';
+  document.getElementById('promotionEditModal').style.display='block';
+}
+function closePromotionEdit(){ document.getElementById('promotionEditModal').style.display='none'; }
+
+function openSubscriptionEdit(id, name, dayDue, payment, recurring, timeframe, everyMonths, yearlyMonth){
+  document.getElementById('subscriptionEditForm').action = '/subscriptions/update/' + id;
+  document.getElementById('deleteSubscriptionForm').action = '/subscriptions/delete/' + id;
+  document.getElementById('subName').value = name || '';
+  document.getElementById('subDayDue').value = normalizeNumberForInput(dayDue) || '';
+  document.getElementById('subPayment').value = normalizeNumberForInput(payment) || '';
+  document.getElementById('subRecurring').checked = !!recurring;
+  document.getElementById('subRecurringTimeframe').value = timeframe || 'monthly';
+  document.getElementById('subRecurringEveryMonths').value = normalizeNumberForInput(everyMonths) || '';
+  document.getElementById('subYearlyMonth').value = normalizeNumberForInput(yearlyMonth) || '1';
+  toggleSubscriptionRecurringEdit();
+  toggleSubscriptionTimeframeEdit();
+  document.getElementById('subscriptionEditModal').style.display='block';
+}
+function closeSubscriptionEdit(){ document.getElementById('subscriptionEditModal').style.display='none'; }
+
+function toggleSubscriptionRecurring(checkboxEl){
+  const form = checkboxEl?.closest('form');
+  if(!form) return;
+  const on = !!checkboxEl.checked;
+  form.querySelectorAll('.sub-recurring-fields').forEach(el=>el.style.display = on ? '' : 'none');
+  const tf = form.querySelector('select[name="recurring_timeframe"]');
+  if(tf && on){
+    toggleSubscriptionTimeframe(tf);
+  } else {
+    const monthsRow = form.querySelector('.sub-recurring-months');
+    const yearlyRow = form.querySelector('.sub-yearly-month');
+    if(monthsRow) monthsRow.style.display = 'none';
+    if(yearlyRow) yearlyRow.style.display = 'none';
+  }
+}
+function toggleSubscriptionTimeframe(selectEl){
+  const form = selectEl?.closest('form');
+  if(!form) return;
+  const monthsRow = form.querySelector('.sub-recurring-months');
+  const yearlyRow = form.querySelector('.sub-yearly-month');
+  const isSpecified = (selectEl.value === 'specified_months');
+  const isYearly = (selectEl.value === 'yearly');
+  if(monthsRow) monthsRow.style.display = isSpecified ? '' : 'none';
+  if(yearlyRow) yearlyRow.style.display = isYearly ? '' : 'none';
+}
+function toggleSubscriptionRecurringEdit(){
+  const recurring = document.getElementById('subRecurring');
+  const on = recurring && recurring.checked;
+  document.querySelectorAll('.sub-recurring-edit-fields').forEach(el=>el.style.display = on ? '' : 'none');
+  if(on){
+    toggleSubscriptionTimeframeEdit();
+  } else {
+    const row = document.getElementById('subRecurringMonthsRow');
+    const yrow = document.getElementById('subYearlyMonthRow');
+    if(row) row.style.display = 'none';
+    if(yrow) yrow.style.display = 'none';
+  }
+}
+function toggleSubscriptionTimeframeEdit(){
+  const t = document.getElementById('subRecurringTimeframe');
+  const row = document.getElementById('subRecurringMonthsRow');
+  const yrow = document.getElementById('subYearlyMonthRow');
+  if(!t) return;
+  if(row) row.style.display = (t.value === 'specified_months') ? '' : 'none';
+  if(yrow) yrow.style.display = (t.value === 'yearly') ? '' : 'none';
+}
+
+function openCreditEdit(id, cardName, interestRate, creditLimit, paidOff){
+  document.getElementById('creditEditForm').action = '/credit/update/' + id;
+  document.getElementById('creditCardName').value = cardName || '';
+  document.getElementById('creditInterestRate').value = normalizeNumberForInput(interestRate) || '';
+  document.getElementById('creditLimit').value = normalizeNumberForInput(creditLimit) || '';
+  document.getElementById('creditPaidOff').checked = !!paidOff;
+  document.getElementById('creditEditModal').style.display = 'block';
+}
+function closeCreditEdit(){ document.getElementById('creditEditModal').style.display='none'; }
+
+function openLoanEdit(id, loanName, interestRate, loanAmount, note, endDate){
+  document.getElementById('loanEditForm').action = '/loans/update/' + id;
+  document.getElementById('loanName').value = loanName || '';
+  document.getElementById('loanInterestRate').value = normalizeNumberForInput(interestRate) || '';
+  document.getElementById('loanAmount').value = normalizeNumberForInput(loanAmount) || '';
+  document.getElementById('loanNote').value = note || '';
+  document.getElementById('loanEndDate').value = endDate || '';
+  document.getElementById('loanEditModal').style.display = 'block';
+}
+function closeLoanEdit(){ document.getElementById('loanEditModal').style.display='none'; }
+
+const TOUR_STEPS = [
+  {title:'Dashboard', text:'Use Dashboard for quick monthly overview (balance, income, bills, alerts).'},
+  {title:'Bills + Planner', text:'Add bills and due dates, then check paycheck planner to prevent negative balance. Use the edit feature to set up recurring bills so you don\'t have to manually enter them each month.'},
+  {title:'New Month Rollover', text:'When starting a new month, at the top navigation panel, select Add Recurring Bills/Income to automatically add bills.'},
+  {title:'Trips/Savings', text:'Track trip goals and contributions over time.'},
+  {title:'Promotions', text:'Track promo totals and deadlines so promotions do not expire unexpectedly.'},
+  {title:'Calendar', text:'Click calendar to view monthly bills, paychecks, trips, or promotions together.'},
+  {title:'History + Export', text:'Use History to view transactions, completed promotions, and paid-off loans. Navigate to settings to export data to an organized Excel copy if needed!'},
+  {title:'Settings/Theme', text:'Pick your preferred theme and adjust recurring setup from Settings tabs.'}
+];
+let tourIndex = 0;
+
+function renderTourStep(){
+  const step = TOUR_STEPS[tourIndex];
+  const body = document.getElementById('tourStepBody');
+  const counter = document.getElementById('tourStepCounter');
+  const back = document.getElementById('tourBackBtn');
+  const next = document.getElementById('tourNextBtn');
+  if(!body || !counter || !back || !next) return;
+  body.innerHTML = `<h4 style="margin:0 0 8px 0">${step.title}</h4><p style="margin:0">${step.text}</p>`;
+  counter.textContent = `Step ${tourIndex+1} of ${TOUR_STEPS.length}`;
+  back.disabled = tourIndex === 0;
+  back.style.opacity = tourIndex === 0 ? .5 : 1;
+  next.textContent = (tourIndex === TOUR_STEPS.length - 1) ? 'Finish' : 'Next';
+}
+
+function openSettings(){ document.getElementById('settingsModal').style.display='block'; }
+function closeSettings(){ document.getElementById('settingsModal').style.display='none'; }
+function toggleRuleCadenceRow(selectEl){
+  if(!selectEl) return;
+  const row = selectEl.closest('tr') || selectEl.parentElement;
+  const dayInput = row ? row.querySelector('input[name="day_of_month"]') : null;
+  if(!dayInput) return;
+  const isSpecified = (selectEl.value === 'specified_day');
+  dayInput.style.display = isSpecified ? '' : 'none';
+  dayInput.required = isSpecified;
+}
+function toggleRuleTimeframeRow(selectEl){
+  if(!selectEl) return;
+  const row = selectEl.closest('tr') || selectEl.parentElement;
+  const monthsInput = row ? row.querySelector('input[name="months_mask"]') : null;
+  if(!monthsInput) return;
+  const isSpecifiedMonths = (selectEl.value === 'specified_months');
+  monthsInput.style.display = isSpecifiedMonths ? '' : 'none';
+  monthsInput.required = isSpecifiedMonths;
+}
+function toggleRecurringBillMonths(selectEl){
+  if(!selectEl) return;
+  const container = selectEl.closest('form') || selectEl.parentElement;
+  const monthsInput = container ? container.querySelector('input[name="recurring_every_months"]') : null;
+  const yearlyRow = container ? container.querySelector('.sub-yearly-month') : null;
+  const yearlySel = container ? container.querySelector('select[name="yearly_month"]') : null;
+  const isSpecified = (selectEl.value === 'specified_months');
+  const isYearly = (selectEl.value === 'yearly');
+  if(monthsInput){
+    monthsInput.style.display = isSpecified ? '' : 'none';
+    monthsInput.required = isSpecified;
+  }
+  if(yearlyRow) yearlyRow.style.display = isYearly ? '' : 'none';
+  if(yearlySel) yearlySel.required = isYearly;
+}
+function saveSettingsActiveTab(){
+
+  const paychecksTab = document.getElementById('settings-tab-paychecks');
+  const themeTab = document.getElementById('settings-tab-theme');
+  if(paychecksTab && paychecksTab.style.display !== 'none'){
+    const f = document.getElementById('paycheck-rules-bulk-form');
+    if(f) return f.submit();
+  }
+  if(themeTab && themeTab.style.display !== 'none'){
+    const tf = document.getElementById('settings-theme');
+    if(tf) return tf.submit();
+  }
+  const fallback = document.getElementById('settings-theme') || document.getElementById('paycheck-rules-bulk-form');
+  if(fallback) fallback.submit();
+}
+function openTour(){ tourIndex = 0; document.getElementById('tourModal').style.display='block'; renderTourStep(); }
+function closeTour(){ document.getElementById('tourModal').style.display='none'; }
+function skipTour(){ closeTour(); }
+function tourPrev(){ if(tourIndex>0){ tourIndex--; renderTourStep(); } }
+function tourNext(){ if(tourIndex < TOUR_STEPS.length-1){ tourIndex++; renderTourStep(); } else { closeTour(); } }
+function openRollover(){ document.getElementById('rolloverModal').style.display='block'; }
+function closeRollover(){ document.getElementById('rolloverModal').style.display='none'; }
+function openDayEvents(dayKey){
+  const body = document.getElementById('dayEventsBody');
+  const src = document.getElementById('day-events-' + dayKey);
+  const title = document.getElementById('dayEventsTitle');
+  if(!body || !src || !title) return;
+  const parts = (dayKey || '').split('-');
+  if(parts.length === 3){
+    title.textContent = `Entries for ${parts[1]}-${parts[2]}-${parts[0]}`;
+  } else {
+    title.textContent = 'Day Entries';
+  }
+  body.innerHTML = src.innerHTML;
+  document.getElementById('dayEventsModal').style.display='block';
+}
+function closeDayEvents(){ document.getElementById('dayEventsModal').style.display='none'; }
+function showSettingsTab(tab){
+  const tabs=['paychecks','categories','recurringBills','backup','theme','help'];
+  tabs.forEach(t=>{
+    const el=document.getElementById('settings-tab-'+t);
+    if(el) el.style.display = (t===tab)?'block':'none';
+  });
+}
+function onAddCategoryChange(){
+  const c=document.getElementById('addCategory');
+  const t=document.getElementById('tripSelect');
+  if(!c || !t) return;
+  t.style.display = (c.value==='trip') ? 'inline-block' : 'none';
+}
+function onIncomeKindChange(){
+  const kind = document.getElementById('incomeKind');
+  const owner = document.getElementById('incomeOwner');
+  const type = document.getElementById('entryType');
+  if(!kind || !owner) return;
+
+  const incomeMode = type && type.value === 'income';
+  if(!incomeMode){
+    owner.required = false;
+    owner.readOnly = false;
+    return;
+  }
+
+  if(kind.value === 'other'){
+    owner.readOnly = false;
+    owner.placeholder = 'Income source (e.g. Bonus, Side Gig)';
+    if(owner.value === 'Income') owner.value = '';
+    owner.required = true;
+  } else {
+    owner.readOnly = false;
+    owner.placeholder = 'Owner';
+    if(owner.value === 'Other Income') owner.value = '';
+    owner.required = true;
+  }
+}
+function applyCalendarFilters(){
+  const show = {
+    bill: !!document.getElementById('tgBill')?.checked,
+    promotion: !!document.getElementById('tgPromotion')?.checked,
+    trip: !!document.getElementById('tgTrip')?.checked,
+    paycheck: !!document.getElementById('tgPaycheck')?.checked,
+    subscription: !!document.getElementById('tgSubscription')?.checked,
+  };
+  document.querySelectorAll('.cal-event').forEach(el=>{
+    const t = el.getAttribute('data-type');
+    el.style.display = show[t] ? 'block' : 'none';
+  });
+}
+
+function wireDateHints(){
+  const isInEditModal = (input) => !!input.closest('#editModal, #paycheckEditModal, #startOverrideModal, #ledgerEditModal, #tripEditModal, #tripContribModal, #promotionEditModal, #settings-tab-paychecks, #settings-tab-recurringBills');
+  const enhance = (input, hintText) => {
+    if(isInEditModal(input)) return;
+    let wrap = input.closest('.date-hint-wrap');
+    if(!wrap){
+      wrap = document.createElement('span');
+      wrap.className = 'date-hint-wrap';
+      input.parentNode.insertBefore(wrap, input);
+      wrap.appendChild(input);
+      const hint = document.createElement('span');
+      hint.className = 'date-hint';
+      hint.textContent = hintText;
+      wrap.appendChild(hint);
+    } else {
+      const hint = wrap.querySelector('.date-hint');
+      if(hint && !hint.textContent) hint.textContent = hintText;
+    }
+    const sync = () => wrap.classList.toggle('has-value', !!input.value);
+    input.addEventListener('change', sync);
+    input.addEventListener('input', sync);
+    sync();
+  };
+
+  document.querySelectorAll('input[type="date"]').forEach(input => enhance(input, ''));
+  document.querySelectorAll('input[type="month"]').forEach(input => enhance(input, 'Month'));
+}
+
+function calcCreditCard(){
+  const b = parseFloat(document.getElementById('ccBalance')?.value || '0');
+  const apr = parseFloat(document.getElementById('ccApr')?.value || '0');
+  const n = parseInt(document.getElementById('ccMonths')?.value || '0', 10);
+  const monthlyPay = parseFloat(document.getElementById('ccMonthlyPay')?.value || '0');
+  const out = document.getElementById('ccResult');
+  if(!out) return;
+  if(!(b>0) || apr < 0){
+    out.innerHTML = 'Please enter a valid balance and APR.';
+    return;
+  }
+  const r = (apr/100)/12;
+
+  if(monthlyPay > 0){
+    if(r > 0 && monthlyPay <= b * r){
+      out.innerHTML = 'Monthly payment is too low to reduce this balance at the current APR.';
+      return;
+    }
+    let bal = b;
+    let months = 0;
+    let totalPaid = 0;
+    while(bal > 0 && months < 1200){
+      const interest = bal * r;
+      let principalPay = monthlyPay - interest;
+      if(principalPay <= 0) break;
+      if(principalPay > bal) principalPay = bal;
+      const paymentThisMonth = interest + principalPay;
+      bal -= principalPay;
+      totalPaid += paymentThisMonth;
+      months += 1;
+    }
+    if(bal > 0){
+      out.innerHTML = 'Could not compute payoff timeline with current values.';
+      return;
+    }
+    const totalInterest = totalPaid - b;
+    out.innerHTML = `Estimated Payoff Time: <b>${months} months</b><br>Total Paid: <b>$${totalPaid.toFixed(2)}</b><br>Total Interest: <b>$${totalInterest.toFixed(2)}</b>`;
+    return;
+  }
+
+  if(!(n>0)){
+    out.innerHTML = 'Enter payoff timeline (months) or monthly payment.';
+    return;
+  }
+
+  let pay = 0;
+  if(r === 0){
+    pay = b / n;
+  }else{
+    pay = b * (r * Math.pow(1+r,n)) / (Math.pow(1+r,n)-1);
+  }
+  const totalPaid = pay * n;
+  const totalInterest = totalPaid - b;
+  out.innerHTML = `Needed Monthly Payment: <b>$${pay.toFixed(2)}</b><br>Total Paid by ${n} months: <b>$${totalPaid.toFixed(2)}</b><br>Total Interest: <b>$${totalInterest.toFixed(2)}</b>`;
+}
+
+function resetCreditCalc(){
+  const ids = ['ccBalance','ccApr','ccMonths','ccMonthlyPay'];
+  ids.forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+  const out = document.getElementById('ccResult');
+  if(out) out.innerHTML = 'Enter values and click Calculate Credit Card.';
+}
+
+function toggleEntryRecurringEnd(cb){
+  const container = cb ? cb.closest('#billFields') : null;
+  if(!container) return;
+  const endWrap = container.querySelector('.entry-recurring-end');
+  const endInput = container.querySelector('input[name="recurring_end_date"]');
+  const on = !!cb.checked;
+  if(endWrap) endWrap.style.display = on ? 'inline-block' : 'none';
+  if(endInput && !on) endInput.value = '';
+}
+
+function onEntryTypeChange(){
+  const type=document.getElementById('entryType');
+  const income=document.getElementById('incomeFields');
+  const bill=document.getElementById('billFields');
+  const tripContribution=document.getElementById('tripContributionFields');
+  if(!type || !income || !bill || !tripContribution) return;
+
+  const incomeMode = type.value === 'income';
+  const billMode = type.value === 'bill';
+  const tripMode = type.value === 'trip_contribution';
+
+  income.style.display = incomeMode ? 'contents' : 'none';
+  bill.style.display = billMode ? 'contents' : 'none';
+  tripContribution.style.display = tripMode ? 'contents' : 'none';
+
+  const owner = document.querySelector('input[name="owner"]');
+  const payDate = document.querySelector('input[name="pay_date"]');
+  const incomeAmount = document.querySelector('input[name="income_amount"]');
+  const name = document.querySelector('input[name="name"]');
+  const dueDate = document.querySelector('input[name="due_date"]');
+  const billAmount = document.querySelector('input[name="bill_amount"]');
+  const contribTrip = document.querySelector('select[name="contrib_trip_id"]');
+  const contribDate = document.querySelector('input[name="contrib_date"]');
+  const contribAmount = document.querySelector('input[name="contrib_amount"]');
+
+  if(owner) owner.required = incomeMode;
+  if(payDate) payDate.required = incomeMode;
+  if(incomeAmount) incomeAmount.required = incomeMode;
+  if(name) name.required = billMode;
+  if(dueDate) dueDate.required = billMode;
+  if(billAmount) billAmount.required = billMode;
+  if(contribTrip) contribTrip.required = tripMode;
+  if(contribDate) contribDate.required = tripMode;
+  if(contribAmount) contribAmount.required = tripMode;
+
+  document.querySelectorAll('#billFields').forEach(bf=>{
+    const cb = bf.querySelector('input[name="recurring"]');
+    if(cb) toggleEntryRecurringEnd(cb);
+  });
+
+  onAddCategoryChange();
+  onIncomeKindChange();
+}
+window.addEventListener('DOMContentLoaded', ()=>{
+  addCsrfToForms();
+  applyInputHints();
+  onAddCategoryChange();
+  onEntryTypeChange();
+  onIncomeKindChange();
+  applyCalendarFilters();
+  wireDateHints();
+  loadCalculatorState();
+  updateStickyOffsets();
+  window.addEventListener('resize', updateStickyOffsets);
+  document.querySelectorAll('select[name="cadence"]').forEach(toggleRuleCadenceRow);
+  document.querySelectorAll('select[name="timeframe"]').forEach(toggleRuleTimeframeRow);
+  document.querySelectorAll('select[name="recurring_timeframe"]').forEach(sel=>{ toggleRecurringBillMonths(sel); toggleSubscriptionTimeframe(sel); });
+  document.querySelectorAll('input[name="recurring"]').forEach(cb=>{ if(cb.closest('#subscriptions')) toggleSubscriptionRecurring(cb); });
+
+  // Global scroll preservation across POST/redirect refreshes
+  try {
+    const forms = document.querySelectorAll('form');
+    forms.forEach(f => {
+      f.addEventListener('submit', () => {
+        sessionStorage.setItem('ns_scroll_y', String(window.scrollY || 0));
+      });
+    });
+    const savedY = sessionStorage.getItem('ns_scroll_y');
+    if(savedY !== null){
+      const y = parseInt(savedY, 10);
+      if(!Number.isNaN(y)){
+        window.scrollTo(0, y);
+      }
+      sessionStorage.removeItem('ns_scroll_y');
+    }
+  } catch(e) {}
+
+  {% if show_tour %}
+  openTour();
+  {% endif %}
+  const params = new URLSearchParams(window.location.search);
+  if(params.get('settings') === '1'){
+    openSettings();
+    showSettingsTab(params.get('settings_tab') || 'paychecks');
+  } else {
+    showSettingsTab('paychecks');
+  }
+});
+
+</script>
+</body>
+</html>
