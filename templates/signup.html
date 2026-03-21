@@ -1,53 +1,365 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover" />
-  <style>
-    :root{--bg:#eef1f4;--card:#ffffff;--ink:#1f2937;--muted:#6b7280;--line:#d1d5db;--accent:#374151;--accent-2:#111827}
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:linear-gradient(160deg,#eceff3,#dfe5eb);color:var(--ink);display:grid;place-items:center;min-height:100vh;margin:0}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;min-width:320px;max-width:420px;box-shadow:0 6px 20px rgba(0,0,0,.08)}
-    .brand{display:flex;align-items:center;gap:10px;margin-bottom:4px}
-    .brand img{width:28px;height:28px;display:block}
-    h2{margin:0;color:var(--accent-2)}
-    .sub{margin:0 0 12px 0;color:var(--muted);font-size:14px}
-    .err{margin:0 0 10px 0;color:#b00020;font-size:13px;font-weight:700}
-    input,select,button{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);margin-top:8px;font-size:15px}
-    select{min-height:46px;background:#fff}
-    button{background:var(--accent);color:#fff;border:none;font-weight:700;cursor:pointer}
-    button:hover{filter:brightness(.95)}
-    .meta{margin-top:10px;font-size:13px;color:var(--muted)}
-    a{color:#1f3b5b;font-weight:700;text-decoration:none}
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>NorthStar Ledger — Create Account</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --gold:        #f5c842;
+    --gold-dk:     #c99a00;
+    --purple-deep: #1a0d2e;
+    --purple-mid:  #2d1654;
+    --purple-lite: #3d2070;
+    --ring-pink:   #c96dd8;
+    --bar-blue:    #4a90d9;
+    --bar-teal:    #2bc4c4;
+    --bar-orange:  #f0a030;
+    --muted:       #a08cc0;
+    --input-bg:    #f8f5ff;
+    --input-bd:    #ddd0f5;
+    --err:         #ff5b5b;
+    --ok:          #22c97a;
+    --radius-sm:   10px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--purple-deep);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+  .star {
+    position: absolute; background: #fff; border-radius: 50%; opacity: 0;
+    animation: twinkle var(--d,3s) var(--delay,0s) infinite ease-in-out;
+  }
+  @keyframes twinkle {
+    0%,100%{opacity:0;transform:scale(0.8);}
+    50%{opacity:var(--op,0.6);transform:scale(1.2);}
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 15% 40%, rgba(90,40,160,0.4) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 40% at 85% 20%, rgba(200,100,220,0.1) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 40% at 80% 80%, rgba(245,200,66,0.06) 0%, transparent 60%);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* ── CARD ── */
+  .card {
+    position: relative; z-index: 1;
+    background: #fff;
+    border-radius: 20px;
+    width: 100%; max-width: 460px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.35), 0 0 0 1px rgba(245,200,66,0.1);
+    overflow: hidden;
+    animation: fadeUp 0.5s ease both;
+  }
+  .card::before {
+    content: ''; display: block; height: 4px;
+    background: linear-gradient(90deg, var(--ring-pink), var(--gold), var(--bar-orange), var(--bar-blue), var(--bar-teal));
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-inner { padding: 30px 34px 34px; }
+
+  /* ── BRAND ── */
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+  .brand img { width: 42px; height: 42px; object-fit: contain; }
+  .brand-name { font-family: 'Cinzel', serif; font-size: 16px; font-weight: 700; color: var(--purple-deep); }
+  .brand-name span { color: var(--gold-dk); }
+
+  .card-title {
+    font-family: 'Cinzel', serif; font-size: 22px; font-weight: 900;
+    color: var(--purple-deep); letter-spacing: -0.3px; margin-bottom: 4px;
+  }
+  .card-sub { font-size: 13.5px; color: #7a6d99; margin-bottom: 22px; }
+
+  /* ── SECTION DIVIDERS ── */
+  .section-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 1.5px;
+    text-transform: uppercase; color: var(--muted);
+    margin: 18px 0 10px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-label::after {
+    content: ''; flex: 1; height: 1px; background: #ede5f8;
+  }
+
+  /* ── ERROR ── */
+  .err {
+    display: flex; align-items: center; gap: 8px;
+    background: #fff5f5; border: 1px solid #ffd0d0;
+    border-left: 3px solid var(--err);
+    border-radius: var(--radius-sm);
+    padding: 10px 13px; margin-bottom: 18px;
+    font-size: 13px; color: #c0392b; font-weight: 500;
+  }
+  .err svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+  /* ── FORM ── */
+  .form-group { margin-bottom: 14px; }
+  .form-label {
+    display: block; font-size: 11px; font-weight: 600;
+    color: #4a3a6a; margin-bottom: 6px;
+    letter-spacing: 0.6px; text-transform: uppercase;
+  }
+  .input-wrap { position: relative; }
+  .input-icon {
+    position: absolute; left: 13px; top: 50%; transform: translateY(-50%);
+    color: #b0a0d0; display: flex; align-items: center; pointer-events: none;
+    z-index: 1;
+  }
+  .input-icon svg { width: 15px; height: 15px; }
+  .toggle-pw {
+    position: absolute; right: 13px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; color: #b0a0d0;
+    display: flex; align-items: center; padding: 0;
+    transition: color 0.15s;
+  }
+  .toggle-pw:hover { color: var(--purple-lite); }
+  .toggle-pw svg { width: 15px; height: 15px; }
+
+  .form-input, .form-select {
+    width: 100%;
+    padding: 11px 13px 11px 40px;
+    background: var(--input-bg);
+    border: 1.5px solid var(--input-bd);
+    border-radius: var(--radius-sm);
+    font-size: 14px; font-family: 'DM Sans', sans-serif;
+    color: var(--purple-deep); outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    -webkit-appearance: none; appearance: none;
+  }
+  .form-input:focus, .form-select:focus {
+    border-color: var(--purple-lite);
+    box-shadow: 0 0 0 3px rgba(61,32,112,0.1);
+    background: #fff;
+  }
+  .form-input::placeholder { color: #c0b0d8; }
+  .form-select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23b0a0d0' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 13px center; padding-right: 36px; }
+  .form-select option { color: var(--purple-deep); background: #fff; }
+
+  /* Household input — no icon, full padding */
+  .form-input.no-icon { padding-left: 13px; }
+
+  /* Password strength */
+  .strength-wrap { margin-top: 6px; }
+  .strength-bar { height: 3px; background: #ede5f8; border-radius: 999px; overflow: hidden; margin-bottom: 3px; }
+  .strength-fill { height: 100%; border-radius: 999px; width: 0%; transition: width 0.3s, background 0.3s; }
+  .strength-label { font-size: 11px; color: #9a8cba; font-weight: 500; }
+
+  /* Security question pair */
+  .question-pair {
+    border: 1px solid #ede5f8;
+    border-radius: var(--radius-sm);
+    padding: 14px;
+    background: #fdf9ff;
+    margin-bottom: 12px;
+  }
+  .question-num {
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--ring-pink);
+    margin-bottom: 8px;
+  }
+
+  /* ── BUTTON ── */
+  .btn-primary {
+    width: 100%; padding: 13px;
+    background: linear-gradient(135deg, #f5c842 0%, #e8a020 55%, #c98000 100%);
+    color: var(--purple-deep); border: none; border-radius: var(--radius-sm);
+    font-size: 14px; font-weight: 700; font-family: 'Cinzel', serif; cursor: pointer;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    box-shadow: 0 6px 20px rgba(245,200,66,0.38);
+    transition: transform 0.15s, box-shadow 0.15s, filter 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-top: 20px;
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 28px rgba(245,200,66,0.48); filter: brightness(1.05); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary svg { width: 15px; height: 15px; }
+
+  .signin-row {
+    text-align: center; margin-top: 22px; font-size: 13px; color: #8a7aaa;
+  }
+  .signin-row a { color: var(--purple-lite); font-weight: 700; text-decoration: none; transition: color 0.15s; }
+  .signin-row a:hover { color: var(--ring-pink); }
+</style>
 </head>
 <body>
-  <div class="card">
+
+<div class="stars" id="stars"></div>
+
+<div class="card">
+  <div class="card-inner">
+
     <div class="brand">
-      <img src="/static/northstar-logo.svg" alt="NorthStar logo">
-      <h2>{{app_name}}</h2>
+      <img src="/static/brand_logo_transparent.png" alt="NorthStar logo">
+      <div class="brand-name">NorthStar <span>Ledger</span></div>
     </div>
-    <p class="sub">Create your account</p>
-    {% if error %}<p class="err">{{error}}</p>{% endif %}
+
+    <h2 class="card-title">Create Account</h2>
+    <p class="card-sub">Join {{app_name}} and take control of your finances.</p>
+
+    {% if error %}
+    <div class="err">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      {{error}}
+    </div>
+    {% endif %}
+
     <form method="post">
-      <input name="email" type="email" placeholder="Email" required>
-      <input name="password" type="password" placeholder="Password (8+ chars)" required>
-      <input name="household_name" type="text" placeholder="Household name (optional)">
-      <select name="security_q1" required>
-        <option value="" selected disabled>Choose security question 1</option>
-        {% for q in security_questions %}
-          <option value="{{q}}">{{q}}</option>
-        {% endfor %}
-      </select>
-      <input name="security_a1" type="text" placeholder="Answer 1" required>
-      <select name="security_q2" required>
-        <option value="" selected disabled>Choose security question 2</option>
-        {% for q in security_questions %}
-          <option value="{{q}}">{{q}}</option>
-        {% endfor %}
-      </select>
-      <input name="security_a2" type="text" placeholder="Answer 2" required>
-      <button type="submit">Create Account</button>
+
+      <!-- Account Info -->
+      <div class="section-label">Account Info</div>
+
+      <div class="form-group">
+        <label class="form-label">Email Address</label>
+        <div class="input-wrap">
+          <span class="input-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M2 7l10 7 10-7"/></svg></span>
+          <input class="form-input" name="email" type="email" placeholder="you@example.com" required autocomplete="email">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <div class="input-wrap">
+          <span class="input-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span>
+          <input class="form-input" name="password" type="password" id="pwInput" placeholder="8+ characters" required autocomplete="new-password" oninput="checkStrength(this.value)">
+          <button type="button" class="toggle-pw" onclick="togglePw()" tabindex="-1">
+            <svg id="eyeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </button>
+        </div>
+        <div class="strength-wrap">
+          <div class="strength-bar"><div class="strength-fill" id="strengthFill"></div></div>
+          <div class="strength-label" id="strengthLabel">Enter a password</div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Household Name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#b0a0cc">(optional)</span></label>
+        <div class="input-wrap">
+          <span class="input-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+          <input class="form-input" name="household_name" type="text" placeholder="e.g. The Johnson Household">
+        </div>
+      </div>
+
+      <!-- Security Questions -->
+      <div class="section-label">Security Questions</div>
+
+      <div class="question-pair">
+        <div class="question-num">Question 1</div>
+        <div class="form-group" style="margin-bottom:10px">
+          <div class="input-wrap">
+            <span class="input-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+            <select class="form-select" name="security_q1" required>
+              <option value="" selected disabled>Choose a security question</option>
+              {% for q in security_questions %}
+              <option value="{{q}}">{{q}}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <div class="input-wrap">
+            <span class="input-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+            <input class="form-input" name="security_a1" type="text" placeholder="Your answer" required>
+          </div>
+        </div>
+      </div>
+
+      <div class="question-pair">
+        <div class="question-num">Question 2</div>
+        <div class="form-group" style="margin-bottom:10px">
+          <div class="input-wrap">
+            <span class="input-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+            <select class="form-select" name="security_q2" required>
+              <option value="" selected disabled>Choose a security question</option>
+              {% for q in security_questions %}
+              <option value="{{q}}">{{q}}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <div class="input-wrap">
+            <span class="input-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></span>
+            <input class="form-input" name="security_a2" type="text" placeholder="Your answer" required>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+        Create Account
+      </button>
+
     </form>
-    <p class="meta">Already have one? <a href="/login">Sign in</a></p>
+
+    <div class="signin-row">Already have an account? <a href="/login">Sign in</a></div>
+
   </div>
+</div>
+
+<script>
+  // Starfield
+  const container = document.getElementById('stars');
+  for (let i = 0; i < 70; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const size = Math.random() * 2.2 + 0.8;
+    s.style.cssText = `width:${size}px;height:${size}px;top:${Math.random()*100}%;left:${Math.random()*100}%;--d:${(Math.random()*3+2).toFixed(1)}s;--delay:${(Math.random()*5).toFixed(1)}s;--op:${(Math.random()*0.5+0.25).toFixed(2)};`;
+    container.appendChild(s);
+  }
+
+  function togglePw() {
+    const inp = document.getElementById('pwInput');
+    const icon = document.getElementById('eyeIcon');
+    if (inp.type === 'password') {
+      inp.type = 'text';
+      icon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>';
+    } else {
+      inp.type = 'password';
+      icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    }
+  }
+
+  function checkStrength(val) {
+    const fill = document.getElementById('strengthFill');
+    const label = document.getElementById('strengthLabel');
+    const hasLen   = val.length >= 8;
+    const hasUpper = /[A-Z]/.test(val);
+    const hasNum   = /[0-9]/.test(val);
+    const hasSpec  = /[^A-Za-z0-9]/.test(val);
+    const score = [hasLen, hasUpper, hasNum, hasSpec, val.length >= 12].filter(Boolean).length;
+    const configs = [
+      { w:'0%',   color:'#ede5f8', text:'Enter a password' },
+      { w:'25%',  color:'#ff5b5b', text:'Too weak' },
+      { w:'50%',  color:'#f0a030', text:'Could be stronger' },
+      { w:'75%',  color:'#f5c842', text:'Getting there' },
+      { w:'90%',  color:'#22c97a', text:'Strong' },
+      { w:'100%', color:'#22c97a', text:'Very strong!' },
+    ];
+    const cfg = configs[Math.min(score, 5)];
+    fill.style.width = val.length === 0 ? '0%' : cfg.w;
+    fill.style.background = cfg.color;
+    label.textContent = val.length === 0 ? 'Enter a password' : cfg.text;
+    label.style.color = val.length === 0 ? '#9a8cba' : cfg.color;
+  }
+</script>
 </body>
 </html>
