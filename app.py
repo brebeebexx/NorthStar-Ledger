@@ -362,11 +362,55 @@ def init_db():
     ensure_column(c, "subscriptions", "recurring_timeframe", "recurring_timeframe text default 'monthly'")
     ensure_column(c, "subscriptions", "recurring_every_months", "recurring_every_months integer")
     ensure_column(c, "subscriptions", "yearly_month", "yearly_month integer")
+    ensure_column(c, "subscriptions", "start_month", "start_month text")
     ensure_column(c, "users", "tour_seen", "tour_seen integer default 0")
     ensure_column(c, "users", "security_q1", "security_q1 text")
     ensure_column(c, "users", "security_a1_hash", "security_a1_hash text")
     ensure_column(c, "users", "security_q2", "security_q2 text")
     ensure_column(c, "users", "security_a2_hash", "security_a2_hash text")
+    ensure_column(c, "users", "is_admin", "is_admin integer default 0")
+
+    c.executescript("""
+        create table if not exists update_log (
+            id integer primary key,
+            version text not null,
+            title text not null,
+            body text,
+            created_at text not null
+        );
+        create table if not exists site_banner (
+            id integer primary key,
+            enabled integer not null default 0,
+            text text not null default '',
+            start_date text,
+            end_date text,
+            updated_at text not null
+        );
+        create table if not exists feedback (
+            id integer primary key,
+            user_id integer,
+            household_id integer,
+            subject text not null default '',
+            message text not null,
+            feedback_type text not null default 'feedback',
+            is_read integer not null default 0,
+            created_at text not null
+        );
+    """)
+    ensure_column(c, "site_banner", "start_date", "start_date text")
+    ensure_column(c, "feedback", "feedback_type", "feedback_type text not null default 'feedback'")
+    ensure_column(c, "site_banner", "end_date", "end_date text")
+    c.executescript("""
+        create table if not exists banner_history (
+            id integer primary key,
+            text text not null,
+            start_date text,
+            end_date text,
+            saved_at text not null
+        );
+    """)
+    c.execute("insert or ignore into site_banner(id,enabled,text,updated_at) values(1,0,'',?)",
+              (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
 
     # defaults
     c.execute("insert or ignore into settings(key,value) values('starting_balance','0')")
@@ -432,6 +476,17 @@ def get_setting(c, key, default="0", household_id=1):
 
 def authed():
     return session.get("ok") is True
+
+def is_admin_user(c=None):
+    uid = current_user_id()
+    if not uid:
+        return False
+    close = False
+    if c is None:
+        c = conn(); close = True
+    row = c.execute("select is_admin from users where id=?", (uid,)).fetchone()
+    if close: c.close()
+    return bool(row and row["is_admin"])
 
 
 def api_error(message, status=400):
@@ -672,7 +727,11 @@ def projected_checkbook(c, month, household_id=1, carryover_bill_ids=None, start
         event_date = (b["planned_pay_date"] or b["due_date"])
         events.append((event_date, b["name"], -abs(float(b["amount"]))))
 
-    events.sort(key=lambda x: x[0])
+    # Include Balance Adjustment ledger entries so they affect the projected running balance
+    for row in c.execute("select tx_date, label, amount from ledger where household_id=? and label='Balance Adjustment' and substr(tx_date,1,7)=? order by tx_date, id", (household_id, month)).fetchall():
+        events.append((row["tx_date"], row["label"], float(row["amount"])))
+
+    events.sort(key=lambda x: (x[0], 1 if x[1] == 'Balance Adjustment' else 0))
     running = 0.0
     timeline = []
     first_negative = None
@@ -745,7 +804,11 @@ def build_paycheck_plan(bills_for_month, paychecks, starting_balance, buckets):
         groups.setdefault(idx, []).append(b)
 
     for idx in groups:
-        groups[idx].sort(key=lambda x: (1 if x.get("is_postponed") else 0, (x.get("planned_pay_date") or x["due_date"]), x["id"]))
+        groups[idx].sort(key=lambda x: (
+            (x.get("planned_pay_date") or x.get("due_date") or ""),
+            1 if x.get("is_adjustment") else (2 if x.get("is_postponed") else 0),
+            x.get("id") or 0
+        ))
 
     carry = starting_balance
     out = []
@@ -762,10 +825,19 @@ def build_paycheck_plan(bills_for_month, paychecks, starting_balance, buckets):
                 is_paid = bool(b["paid"])
                 is_postponed = bool(b.get("is_postponed"))
                 is_prior_month_carry = bool(b.get("is_prior_month_carry"))
-                effective_amt = 0.0 if (is_postponed or is_prior_month_carry) else amt
-                can_pay = True if (is_paid or is_postponed or is_prior_month_carry) else (running - effective_amt) >= 0
-                running -= effective_amt
-                items.append({"bill": b, "amount": amt, "can_pay": can_pay, "is_paid": is_paid, "is_postponed": is_postponed, "is_prior_month_carry": is_prior_month_carry, "running_after": running})
+                is_adjustment = bool(b.get("is_adjustment"))
+                if is_adjustment:
+                    running += amt
+                    items.append({"bill": b, "amount": amt, "can_pay": True, "is_paid": True,
+                                  "is_postponed": False, "is_prior_month_carry": False,
+                                  "is_adjustment": True, "running_after": running})
+                else:
+                    effective_amt = 0.0 if (is_postponed or is_prior_month_carry) else amt
+                    can_pay = True if (is_paid or is_postponed or is_prior_month_carry) else (running - effective_amt) >= 0
+                    running -= effective_amt
+                    items.append({"bill": b, "amount": amt, "can_pay": can_pay, "is_paid": is_paid,
+                                  "is_postponed": is_postponed, "is_prior_month_carry": is_prior_month_carry,
+                                  "is_adjustment": False, "running_after": running})
 
             out.append({
                 "index": 0, "type_index": 0, "paycheck_id": 0, "date": "",
@@ -794,10 +866,21 @@ def build_paycheck_plan(bills_for_month, paychecks, starting_balance, buckets):
             is_paid = bool(b["paid"])
             is_postponed = bool(b.get("is_postponed"))
             is_prior_month_carry = bool(b.get("is_prior_month_carry"))
-            effective_amt = 0.0 if (is_postponed or is_prior_month_carry) else amt
-            can_pay = True if (is_paid or is_postponed or is_prior_month_carry) else (running - effective_amt) >= 0
-            running -= effective_amt
-            items.append({"bill": b, "amount": amt, "can_pay": can_pay, "is_paid": is_paid, "is_postponed": is_postponed, "is_prior_month_carry": is_prior_month_carry, "running_after": running})
+            is_adjustment = bool(b.get("is_adjustment"))
+            if is_adjustment:
+                # Adjustments use their signed amount directly to snap the running balance
+                running += amt
+                effective_amt = 0.0  # already applied above
+                items.append({"bill": b, "amount": amt, "can_pay": True, "is_paid": True,
+                              "is_postponed": False, "is_prior_month_carry": False,
+                              "is_adjustment": True, "running_after": running})
+            else:
+                effective_amt = 0.0 if (is_postponed or is_prior_month_carry) else amt
+                can_pay = True if (is_paid or is_postponed or is_prior_month_carry) else (running - effective_amt) >= 0
+                running -= effective_amt
+                items.append({"bill": b, "amount": amt, "can_pay": can_pay, "is_paid": is_paid,
+                              "is_postponed": is_postponed, "is_prior_month_carry": is_prior_month_carry,
+                              "is_adjustment": False, "running_after": running})
 
         out.append({
             "index": i, "type_index": type_index, "paycheck_id": p["id"],
@@ -1150,7 +1233,7 @@ def api_mobile_dashboard():
     recent_ledger = c.execute("select id,tx_date,label,amount,note from ledger where household_id=? and substr(tx_date,1,7)=? order by tx_date desc,id desc limit 50", (household_id, month)).fetchall()
     trips = c.execute("select id,name,due_month,target,saved from trips where household_id=? and deleted_at is null order by due_month,id", (household_id,)).fetchall()
     promotions = c.execute("select id,card_name,promo_name,start_date,end_date,balance,completed,note from promotions where household_id=? and deleted_at is null order by end_date,id", (household_id,)).fetchall()
-    subscriptions = c.execute("select id,name,day_due,payment,recurring,recurring_timeframe,recurring_every_months,yearly_month from subscriptions where household_id=? and deleted_at is null order by day_due,name,id", (household_id,)).fetchall()
+    subscriptions = c.execute("select id,name,day_due,payment,recurring,recurring_timeframe,recurring_every_months,yearly_month,start_month from subscriptions where household_id=? and deleted_at is null order by day_due,name,id", (household_id,)).fetchall()
     theme = get_setting(c, 'accent_theme', 'blue', household_id)
     c.close()
 
@@ -1239,13 +1322,17 @@ def dashboard():
     if view not in ("checklist", "paycheck"):
         view = "checklist"
     page = request.args.get("page", "dashboard")
-    if page not in ("dashboard", "entries", "planner", "trips", "promotions", "subscriptions", "calendar", "checkbook", "settings"):
+    if page not in ("dashboard", "entries", "planner", "trips", "promotions", "subscriptions", "calendar", "checkbook", "settings", "admin"):
         page = "dashboard"
     prev_month, next_month = month_prev_next(month)
 
     c = conn()
     household_id = active_household_id()
     c.commit()
+
+    user_is_admin = is_admin_user(c)
+    if page == "admin" and not user_is_admin:
+        page = "dashboard" 
 
     bills_raw = c.execute("select * from bills where household_id=? and deleted_at is null and substr(due_date,1,7)=? order by due_date, id", (household_id, month)).fetchall()
     bills = []
@@ -1282,6 +1369,16 @@ def dashboard():
                 "id": 1000000 + int(t["id"]), "name": t["label"], "due_date": t["tx_date"],
                 "amount": abs(float(t["amount"])), "paid": 1, "category": "trip",
                 "recurring": 0, "autopay": 0, "paycheck_bucket": None,
+                "planned_pay_date": t["tx_date"], "is_adjustment": False,
+            })
+        elif t["label"] == "Balance Adjustment":
+            amt = float(t["amount"] or 0)
+            planner_items.append({
+                "id": 2000000 + int(t["id"]), "name": "Balance Adjustment",
+                "due_date": t["tx_date"], "planned_pay_date": t["tx_date"],
+                "amount": amt, "paid": 1, "category": "adjustment",
+                "recurring": 0, "autopay": 0, "paycheck_bucket": None,
+                "note": t["note"] or "", "is_adjustment": True,
             })
 
     bills_due = sum(r["amount"] for r in unpaid_bills)
@@ -1344,11 +1441,30 @@ def dashboard():
     this_month_end_balance = paycheck_plan[-1]["ending_balance"] if paycheck_plan else projection["starting"]
     carry_after_balance = float(this_month_end_balance) - float(next_month_carry_total)
 
+    # Build running balance: starting + paychecks + ledger entries
+    # Paychecks are not in the ledger, so we merge them in for the running total
+    paycheck_events = [(p["pay_date"], p["owner"], float(p["amount"] or 0)) for p in paychecks]
+    ledger_events = [(t["tx_date"], t["id"], t["label"], float(t["amount"] or 0), t["note"]) for t in ledger]
+
+    # Merge paychecks + ledger sorted by date, paychecks first on same date
+    all_events = []
+    for (ev_date, owner, amt) in paycheck_events:
+        all_events.append((ev_date, 0, 'paycheck', f"Paycheck ({owner})", amt, ""))
+    for (ev_date, eid, label, amt, note) in ledger_events:
+        all_events.append((ev_date, 1, 'ledger', label, amt, note or ""))
+    all_events.sort(key=lambda x: (x[0], x[1]))
+
+    # Build ledger_running for history display (only ledger rows, but balance accounts for paychecks)
     balance = month_start
     ledger_running = [(-1, month + '-01', 'Starting Balance', month_start, 'auto', month_start)]
-    for t in ledger:
-        balance += t["amount"]
-        ledger_running.append((t["id"], t["tx_date"], t["label"], t["amount"], t["note"], balance))
+    ledger_idx = 0
+    ledger_list = list(ledger)
+    for (ev_date, sort_type, etype, label, amt, note) in all_events:
+        balance += amt
+        if etype == 'ledger':
+            t = ledger_list[ledger_idx]
+            ledger_running.append((t["id"], t["tx_date"], t["label"], t["amount"], t["note"], balance))
+            ledger_idx += 1
 
     remaining_unpaid_total = sum(float(r["amount"]) for r in unpaid_bills)
     current_risk_balance = balance - remaining_unpaid_total
@@ -1358,6 +1474,58 @@ def dashboard():
     household_row = c.execute("select name from households where id=?", (household_id,)).fetchone()
     household_name = household_row["name"] if household_row else f"Household {household_id}"
     show_tour = bool(session.pop("show_tour", False))
+
+    # Banner (shown to all users)
+    banner_row = c.execute("select enabled, text, start_date, end_date from site_banner where id=1").fetchone()
+    banner_enabled = False
+    banner_text = ""
+    banner_start_date = ""
+    banner_end_date = ""
+    if banner_row and banner_row["enabled"]:
+        today_s = datetime.now().strftime("%Y-%m-%d")
+        start_ok = not banner_row["start_date"] or banner_row["start_date"] <= today_s
+        end_ok = not banner_row["end_date"] or banner_row["end_date"] >= today_s
+        banner_enabled = start_ok and end_ok
+        banner_text = (banner_row["text"] or "")
+        banner_start_date = banner_row["start_date"] or ""
+        banner_end_date = banner_row["end_date"] or ""
+
+    # Admin data
+    admin_users = []
+    admin_update_log = []
+    admin_feedback = []
+    banner_history = []
+    if user_is_admin:
+        admin_users = c.execute(
+            "select u.id, u.email, u.created_at, u.last_login_at, u.is_admin, "
+            "hm.role, h.name as household_name "
+            "from users u "
+            "left join household_members hm on hm.user_id=u.id "
+            "left join households h on h.id=hm.household_id "
+            "order by u.last_login_at desc nulls last"
+        ).fetchall()
+        admin_update_log = c.execute(
+            "select * from update_log order by id desc"
+        ).fetchall()
+
+        # Extra stats for admin dashboard tab
+        admin_stats = {
+            "total_users": c.execute("select count(*) n from users").fetchone()["n"],
+            "total_households": c.execute("select count(*) n from households").fetchone()["n"],
+            "logins_today": c.execute("select count(*) n from users where substr(last_login_at,1,10)=?", (datetime.now().strftime("%Y-%m-%d"),)).fetchone()["n"],
+            "unread_feedback": c.execute("select count(*) n from feedback where is_read=0").fetchone()["n"],
+            "newest_user": c.execute("select email, created_at from users order by id desc limit 1").fetchone(),
+            "latest_version": c.execute("select version, title, created_at from update_log order by id desc limit 1").fetchone(),
+            "banner_enabled": banner_enabled,
+        }
+        banner_history = c.execute(
+            "select * from banner_history order by id desc limit 20"
+        ).fetchall()
+        admin_feedback = c.execute(
+            "select f.id, f.subject, f.message, f.created_at, f.is_read, f.feedback_type, u.email "
+            "from feedback f left join users u on u.id=f.user_id "
+            "order by f.is_read asc, f.id desc"
+        ).fetchall()
 
     today = datetime.now().date()
     due_now_bills = []
@@ -1461,15 +1629,22 @@ def dashboard():
         show = False
         if timeframe == "yearly":
             ym = int(s["yearly_month"] or 0)
+            if ym == 0:
+                # No month set — fall back to showing on the subscription's due month
+                # Use day_due to determine: show every year on the same month
+                # Default to January if completely unset
+                ym = 1
             show = (ym == mon)
         elif timeframe == "specified_months":
             try: interval = int(s["recurring_every_months"] or 1)
             except Exception: interval = 1
             if interval < 1: interval = 1
-            anchor_ym = month
-            try: anchor_ym = c.execute("select substr(created_at,1,7) as ym from subscriptions where id=?", (s["id"],)).fetchone()["ym"] or month
-            except Exception: anchor_ym = month
-            ay, am = [int(x) for x in anchor_ym.split('-')]
+            # Use start_month as anchor (YYYY-MM format), fall back to current month
+            anchor_ym = (s["start_month"] or "").strip() or month
+            try:
+                ay, am = [int(x) for x in anchor_ym.split('-')]
+            except Exception:
+                ay, am = year, mon
             diff = (year - ay) * 12 + (mon - am)
             show = diff >= 0 and diff % interval == 0
         else:
@@ -1502,6 +1677,8 @@ def dashboard():
         dashboard_note_text=dashboard_note_text, savings_paid_month=savings_paid_month,
         savings_planned_month=savings_planned_month, savings_goal_monthly=savings_goal_monthly,
         show_tour=show_tour, today_str=today.strftime('%Y-%m-%d'),
+        user_is_admin=user_is_admin, banner_enabled=banner_enabled, banner_text=banner_text, banner_start_date=banner_start_date, banner_end_date=banner_end_date,
+        admin_users=admin_users, admin_update_log=admin_update_log, admin_stats=admin_stats if user_is_admin else {}, admin_feedback=admin_feedback if user_is_admin else [], banner_history=banner_history if user_is_admin else [],
     )
 
 
@@ -1599,6 +1776,7 @@ def bills_update(item_id):
         new_autopay = 1 if request.form.get("autopay") == "on" else 0
         new_paid = 1 if request.form.get("paid") == "on" else 0
         paid_date_raw = (request.form.get("paid_date", "") or "").strip()
+        was_paid = int(row["paid"] or 0)
         if new_paid: new_paid_date = paid_date_raw or (row["paid_date"] if "paid_date" in row.keys() else "") or local_now().strftime("%Y-%m-%d")
         else: new_paid_date = None
         pb_raw = request.form.get("paycheck_bucket", "")
@@ -1607,6 +1785,15 @@ def bills_update(item_id):
         prev_planned = (row["planned_pay_date"] if "planned_pay_date" in row.keys() else "") or row["due_date"]
         if new_planned != prev_planned: new_pb = None
         c.execute("update bills set name=?, due_date=?, planned_pay_date=?, amount=?, recurring=?, recurring_timeframe=?, recurring_every_months=?, recurring_end_date=?, autopay=?, paid=?, paid_date=?, paycheck_bucket=? where id=? and household_id=?", (new_name, new_due, new_planned, new_amt, new_recurring, recurring_timeframe, recurring_every_months, recurring_end_date, new_autopay, new_paid, new_paid_date, new_pb, item_id, household_id))
+        # Sync ledger: if marked unpaid, remove the "marked paid" ledger entry
+        if was_paid == 1 and new_paid == 0:
+            c.execute("delete from ledger where household_id=? and label=? and note in ('marked paid','marked paid (mobile)') and abs(amount - ?) < 0.01", (household_id, row["name"], float(row["amount"])))
+        # If marking paid and wasn't paid before, add ledger entry
+        elif was_paid == 0 and new_paid == 1:
+            paid_on = new_paid_date or local_now().strftime("%Y-%m-%d")
+            exists = c.execute("select 1 from ledger where household_id=? and label=? and note='marked paid' and tx_date=?", (household_id, row["name"], paid_on)).fetchone()
+            if not exists:
+                c.execute("insert into ledger(tx_date,label,amount,note,household_id) values(?,?,?,?,?)", (paid_on, row["name"], -abs(float(row["amount"])), "marked paid", household_id))
     c.commit(); c.close()
     return redirect_dashboard_from_form(request.form)
 
@@ -1670,10 +1857,16 @@ def bills_toggle(item_id):
     c = conn()
     household_id = active_household_id()
     row = c.execute("select * from bills where id=? and household_id=? and deleted_at is null", (item_id, household_id)).fetchone()
-    if row is not None and row["paid"] == 0:
-        paid_on = local_now().strftime("%Y-%m-%d")
-        c.execute("update bills set paid = 1, paid_date=? where id=? and household_id=?", (paid_on, item_id, household_id))
-        c.execute("insert into ledger(tx_date,label,amount,note,household_id) values(?,?,?,?,?)", (paid_on, row["name"], -abs(float(row["amount"])), "marked paid", household_id))
+    if row is not None:
+        if row["paid"] == 0:
+            # Mark paid — add ledger entry
+            paid_on = local_now().strftime("%Y-%m-%d")
+            c.execute("update bills set paid = 1, paid_date=? where id=? and household_id=?", (paid_on, item_id, household_id))
+            c.execute("insert into ledger(tx_date,label,amount,note,household_id) values(?,?,?,?,?)", (paid_on, row["name"], -abs(float(row["amount"])), "marked paid", household_id))
+        else:
+            # Mark unpaid — remove the matching ledger entry
+            c.execute("update bills set paid = 0, paid_date=NULL where id=? and household_id=?", (item_id, household_id))
+            c.execute("delete from ledger where household_id=? and label=? and note in ('marked paid','marked paid (mobile)') and abs(amount - ?) < 0.01", (household_id, row["name"], float(row["amount"])))
     c.commit(); c.close()
     return redirect_dashboard_from_form(request.form)
 
@@ -2004,7 +2197,19 @@ def subscriptions_add():
         if yearly_month < 1 or yearly_month > 12: yearly_month = None
     except Exception: yearly_month = None
     if name:
-        c.execute('insert into subscriptions(name,day_due,payment,household_id,recurring,recurring_timeframe,recurring_every_months,yearly_month) values(?,?,?,?,?,?,?,?)', (name, day_due, payment, household_id, recurring, timeframe, (every if timeframe=="specified_months" else None), (yearly_month if timeframe=="yearly" else None)))
+        start_date_raw = (request.form.get('start_month', '') or '').strip()
+        # Accept full date (YYYY-MM-DD) or YYYY-MM — store as YYYY-MM
+        if start_date_raw:
+            try:
+                if len(start_date_raw) == 10:  # full date
+                    start_month = start_date_raw[:7]
+                else:
+                    start_month = start_date_raw[:7]
+            except Exception:
+                start_month = datetime.now().strftime('%Y-%m')
+        else:
+            start_month = datetime.now().strftime('%Y-%m')
+        c.execute('insert into subscriptions(name,day_due,payment,household_id,recurring,recurring_timeframe,recurring_every_months,yearly_month,start_month) values(?,?,?,?,?,?,?,?,?)', (name, day_due, payment, household_id, recurring, timeframe, (every if timeframe=='specified_months' else None), (yearly_month if timeframe=='yearly' else None), (start_month if timeframe=='specified_months' else None)))
     c.commit(); c.close()
     return redirect_dashboard_from_form(request.form)
 
@@ -2247,6 +2452,63 @@ def settings_starting_balance():
     return redirect(url_for("dashboard", month=target_month, view=view, page=page, r=int(datetime.now().timestamp() * 1000), anchor="planner"))
 
 
+@app.post("/balance/adjust")
+def balance_adjust():
+    if not authed(): return redirect(url_for("login"))
+    c = conn(); household_id = active_household_id()
+    month = normalize_month(request.form.get("month", datetime.now().strftime("%Y-%m")))
+    view = request.form.get("view", "paycheck")
+
+    try:
+        new_balance = float(request.form.get("new_balance", "0") or "0")
+    except Exception:
+        new_balance = 0.0
+    note = (request.form.get("adjustment_note", "") or "").strip()
+
+    # Use provided date or fall back to today
+    adj_date = (request.form.get("adjustment_date", "") or "").strip()
+    try:
+        datetime.strptime(adj_date, "%Y-%m-%d")
+    except Exception:
+        adj_date = local_now().strftime("%Y-%m-%d")
+
+    # Compute NorthStar's running balance at adj_date by replaying all events up to that date
+    # This mirrors projected_checkbook: starting balance + paychecks - bills + prior adjustments
+    starting = get_month_starting_balance(c, month, household_id)
+
+    # All paychecks on or before adj_date
+    income_to_date = c.execute(
+        "select coalesce(sum(amount),0) s from paychecks where household_id=? and pay_date<=?",
+        (household_id, adj_date)
+    ).fetchone()["s"]
+
+    # All unpaid bills with planned/due date on or before adj_date (what planner deducts)
+    # Compute NorthStar's running balance at adj_date by replaying the planner:
+    # starting balance + paychecks up to date - paid bills up to date (current month only)
+    # This matches exactly what the running balance column shows in the planner.
+    starting = get_month_starting_balance(c, month, household_id)
+
+    try:
+        northstar_balance = float(request.form.get("planner_balance", "0") or "0")
+    except Exception:
+        northstar_balance = 0.0
+
+    # Write the difference as a ledger entry to snap running balance to bank value
+    difference = new_balance - northstar_balance
+
+    if difference != 0:
+        full_note = f"Adjusted from ${northstar_balance:,.2f} to ${new_balance:,.2f}"
+        if note:
+            full_note += f" — {note}"
+        c.execute(
+            "insert into ledger(tx_date,label,amount,note,household_id) values(?,?,?,?,?)",
+            (adj_date, "Balance Adjustment", round(difference, 2), full_note, household_id)
+        )
+
+    c.commit(); c.close()
+    return redirect(url_for("dashboard", month=month, view=view, page="entries", r=int(datetime.now().timestamp() * 1000)))
+
+
 @app.post("/rollover")
 def rollover():
     if not authed(): return redirect(url_for("login"))
@@ -2286,6 +2548,147 @@ def rollover():
             c.execute("insert into bills(name,due_date,amount,paid,category,recurring,recurring_timeframe,recurring_every_months,recurring_end_date,autopay,household_id) values(?,?,?,?,?,?,?,?,?,?,?)", (r["name"], new_due, r["amount"], 0, r["category"], r["recurring"], timeframe, (r["recurring_every_months"] if timeframe=='specified_months' else None), r["recurring_end_date"], r["autopay"], household_id))
 
     apply_paycheck_rules_for_month(c, household_id, tgt)
+    c.commit(); c.close()
+    return redirect_dashboard_from_form(request.form)
+
+
+# ── FEEDBACK ROUTES ──────────────────────────────────────────────────────────
+
+@app.post("/feedback/submit")
+def feedback_submit():
+    if not authed(): return redirect(url_for("login"))
+    subject = (request.form.get("subject", "") or "").strip()[:120]
+    message = (request.form.get("message", "") or "").strip()
+    if not message:
+        return redirect_dashboard_from_form(request.form)
+    c = conn()
+    household_id = active_household_id()
+    uid = current_user_id() or None
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    feedback_type = (request.form.get("feedback_type", "feedback") or "feedback").strip()
+    if feedback_type not in ("feedback", "review"):
+        feedback_type = "feedback"
+    c.execute(
+        "insert into feedback(user_id,household_id,subject,message,feedback_type,is_read,created_at) values(?,?,?,?,?,0,?)",
+        (uid, household_id, subject, message, feedback_type, now)
+    )
+    c.commit(); c.close()
+    return redirect_dashboard_from_form(request.form)
+
+
+@app.post("/admin/feedback/settype/<int:item_id>")
+def admin_feedback_settype(item_id):
+    if not authed() or not is_admin_user(): return ("Forbidden", 403)
+    feedback_type = (request.form.get("feedback_type", "") or "").strip()
+    if feedback_type not in ("feedback", "review", ""):
+        feedback_type = ""
+    c = conn()
+    # Also mark as read when categorized
+    c.execute("update feedback set feedback_type=?, is_read=1 where id=?", (feedback_type or None, item_id))
+    c.commit(); c.close()
+    return redirect_dashboard_from_form(request.form)
+
+
+@app.post("/admin/feedback/read/<int:item_id>")
+def admin_feedback_read(item_id):
+    if not authed() or not is_admin_user(): return ("Forbidden", 403)
+    c = conn()
+    c.execute("update feedback set is_read=1 where id=?", (item_id,))
+    c.commit(); c.close()
+    return redirect_dashboard_from_form(request.form)
+
+
+@app.post("/admin/feedback/delete/<int:item_id>")
+def admin_feedback_delete(item_id):
+    if not authed() or not is_admin_user(): return ("Forbidden", 403)
+    c = conn()
+    c.execute("delete from feedback where id=?", (item_id,))
+    c.commit(); c.close()
+    return redirect_dashboard_from_form(request.form)
+
+
+# ── ADMIN ROUTES ─────────────────────────────────────────────────────────────
+
+@app.post("/admin/banner/save")
+def admin_banner_save():
+    if not authed() or not is_admin_user(): return ("Forbidden", 403)
+    enabled = 1 if request.form.get("banner_enabled") == "1" else 0
+    text = (request.form.get("banner_text", "") or "").strip()
+    start_date = (request.form.get("banner_start_date", "") or "").strip() or None
+    end_date = (request.form.get("banner_end_date", "") or "").strip() or None
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    c = conn()
+    c.execute("update site_banner set enabled=?, text=?, start_date=?, end_date=?, updated_at=? where id=1",
+              (enabled, text, start_date, end_date, now))
+    # Log this banner to history if it has text and isn't a duplicate of the last entry
+    if text:
+        last = c.execute("select text from banner_history order by id desc limit 1").fetchone()
+        if not last or last["text"] != text:
+            c.execute("insert into banner_history(text,start_date,end_date,saved_at) values(?,?,?,?)",
+                      (text, start_date, end_date, now))
+    c.commit(); c.close()
+    return redirect_dashboard_from_form(request.form)
+
+
+@app.post("/admin/update-log/add")
+def admin_update_log_add():
+    if not authed() or not is_admin_user(): return ("Forbidden", 403)
+    version = (request.form.get("version", "") or "").strip()
+    title = (request.form.get("title", "") or "").strip()
+    body = (request.form.get("body", "") or "").strip()
+    if version and title:
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c = conn()
+        c.execute("insert into update_log(version,title,body,created_at) values(?,?,?,?)",
+                  (version, title, body, now))
+        c.commit(); c.close()
+    return redirect_dashboard_from_form(request.form)
+
+
+@app.post("/admin/update-log/update/<int:item_id>")
+def admin_update_log_update(item_id):
+    if not authed() or not is_admin_user(): return ("Forbidden", 403)
+    version = (request.form.get("version", "") or "").strip()
+    title = (request.form.get("title", "") or "").strip()
+    body = (request.form.get("body", "") or "").strip()
+    if version and title:
+        c = conn()
+        c.execute("update update_log set version=?, title=?, body=? where id=?",
+                  (version, title, body, item_id))
+        c.commit(); c.close()
+    return redirect_dashboard_from_form(request.form)
+
+
+@app.post("/admin/update-log/delete/<int:item_id>")
+def admin_update_log_delete(item_id):
+    if not authed() or not is_admin_user(): return ("Forbidden", 403)
+    c = conn()
+    c.execute("delete from update_log where id=?", (item_id,))
+    c.commit(); c.close()
+    return redirect_dashboard_from_form(request.form)
+
+
+@app.post("/admin/user/toggle-admin/<int:user_id>")
+def admin_user_toggle_admin(user_id):
+    if not authed() or not is_admin_user(): return ("Forbidden", 403)
+    c = conn()
+    row = c.execute("select is_admin from users where id=?", (user_id,)).fetchone()
+    if row:
+        new_val = 0 if int(row["is_admin"] or 0) == 1 else 1
+        # Prevent removing your own admin
+        if user_id != current_user_id():
+            c.execute("update users set is_admin=? where id=?", (new_val, user_id))
+    c.commit(); c.close()
+    return redirect_dashboard_from_form(request.form)
+
+
+@app.post("/admin/user/delete/<int:user_id>")
+def admin_user_delete(user_id):
+    if not authed() or not is_admin_user(): return ("Forbidden", 403)
+    if user_id == current_user_id(): return ("Cannot delete your own account", 400)
+    c = conn()
+    c.execute("delete from household_members where user_id=?", (user_id,))
+    c.execute("delete from users where id=?", (user_id,))
     c.commit(); c.close()
     return redirect_dashboard_from_form(request.form)
 

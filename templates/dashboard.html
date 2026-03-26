@@ -209,7 +209,7 @@
 
     /* ── NOTES ── */
     .notes-section { margin-top: 12px; padding-top: 12px; border-top: 1px dashed rgba(200,170,255,0.2); }
-    .notes-label { font-family: 'Cinzel', serif; font-size: 12px; font-weight: 700; color: var(--gold); letter-spacing: 0.5px; margin-bottom: 8px; }
+    .notes-label { font-family: 'Cinzel', serif; font-size: 12px; font-weight: 700; color: #b8960a; letter-spacing: 0.5px; margin-bottom: 8px; }
     textarea {
       width: 100%; background: rgba(255,255,255,0.06); border: 1px solid var(--line-light);
       border-radius: var(--radius-sm); color: #e0d0ff; font-size: 13.5px;
@@ -285,6 +285,7 @@
     .badge-promo   { background: #ffe3e8; color: #b00030; }
     .badge-trip    { background: #ede3ff; color: #5a2d91; }
     .badge-paycheck{ background: #dcfce7; color: #166534; }
+    .badge-subscription{ background: #ede9fe; color: #5b21b6; }
     .badge-status-ok   { background: var(--ok-bg); border: 1px solid var(--ok-border); color: #0a7a4a; }
     .badge-status-bad  { background: var(--bad-bg); border: 1px solid var(--bad-border); color: #9a0020; }
 
@@ -679,7 +680,7 @@
     }
     .sn-compose textarea {
       width: 100%; border: none; background: transparent; resize: none;
-      font-family: 'DM Sans', sans-serif; font-size: 13px; color: #e0d0ff;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; color: #1a0d2e;
       outline: none; min-height: 52px;
     }
     .sn-compose textarea::placeholder { color: rgba(160,140,192,0.55); }
@@ -701,16 +702,17 @@
     }
     .sn-add-btn:hover { filter: brightness(1.08); transform: none; }
     .sn-grid {
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 200px)); gap: 8px;
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px;
     }
     .sn-card {
-      border-radius: 8px; padding: 8px 10px; width: 180px; height: 140px;
+      border-radius: 8px; padding: 8px 10px; min-height: 70px; max-height: 200px;
       display: flex; flex-direction: column; position: relative;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1); overflow: hidden;
     }
     .sn-body {
-      font-size: 12.5px; line-height: 1.5; color: #2d1f27;
-      flex: 1; white-space: pre-wrap; word-break: break-word; outline: none; overflow-y: auto; max-height: 80px;
+      font-size: 12px; line-height: 1.45; color: #000;
+      flex: 1; white-space: pre-wrap; word-break: break-word; outline: none;
+      overflow-y: auto; overflow-x: hidden;
     }
     .sn-footer {
       display: flex; align-items: center; justify-content: space-between; margin-top: 8px;
@@ -749,6 +751,13 @@
           <a class="pill {% if page=='checkbook' %}active{% endif %}" href="/?month={{month}}&view={{view}}&page=checkbook">⊞ History</a>
         </div>
 
+        {% if user_is_admin %}
+        <div class="sidebar-section-label" style="margin-top:14px;color:var(--gold)">Admin</div>
+        <div class="nav-links">
+          <a class="pill {% if page=='admin' %}active{% endif %}" href="/?month={{month}}&view={{view}}&page=admin" style="color:var(--gold)">⚙ Admin Panel</a>
+        </div>
+        {% endif %}
+
         <!-- CALCULATOR -->
         <div class="calc-card" id="sidebar-calculator">
           <div class="calc-title">★ Calculator</div>
@@ -781,11 +790,14 @@
     <!-- ═══════ MAIN CONTENT ═══════ -->
     <main>
 
-      <!-- UPDATE BANNER -->
+      <!-- DYNAMIC BANNER -->
+      {% if banner_enabled and banner_text %}
       <div style="background:#fffbea;border:1.5px solid #f5c842;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span style="background:#f5c842;color:#5a4000;font-size:11px;font-weight:800;letter-spacing:.5px;padding:3px 9px;border-radius:999px;white-space:nowrap">Update 3.1</span>
-        <span style="font-size:13px;color:#5a4000;font-weight:500">Navigate to the Settings page and click <strong>Help → Replay Tutorial</strong> to see all the new features.</span>
+        <span style="background:#f5c842;color:#5a4000;font-size:11px;font-weight:800;letter-spacing:.5px;padding:3px 9px;border-radius:999px;white-space:nowrap">Notice</span>
+        <span style="font-size:11px;font-weight:700;color:#856404;white-space:nowrap">{{today_str[5:7]}}-{{today_str[8:10]}}-{{today_str[:4]}}</span>
+        <span style="font-size:13px;color:#5a4000;font-weight:500">{{banner_text}}</span>
       </div>
+      {% endif %}
 
       <!-- TOP BAR -->
       <div class="card dark-card" id="top" style="margin-bottom:16px">
@@ -807,6 +819,7 @@
             </div>
           </div>
           <div class="topbar-controls">
+            <button type="button" class="top-pill-btn" onclick="openFeedback()">💬 Feedback</button>
             <button type="button" class="top-pill-btn" onclick="openSettings()">⚙ Settings</button>
             <a class="top-pill-btn" href="/logout" onclick="clearCalculatorState()">↩ Logout</a>
           </div>
@@ -835,7 +848,7 @@
             <span style="font-size:11px;color:var(--muted)" id="sn-count"></span>
           </div>
           <div class="sn-compose">
-            <textarea id="sn-new" placeholder="Jot something down... (Ctrl+Enter to save)"></textarea>
+            <textarea id="sn-new" placeholder="Add a note... (Ctrl+Enter to save)"></textarea>
             <div class="sn-compose-footer">
               <div class="sn-dots" id="sn-color-picker">
                 <div class="sn-dot selected" data-color="#FFF9C4" style="background:#FFF9C4"></div>
@@ -879,7 +892,7 @@
       <!-- Overview: 2 large cards on top -->
       <div class="overview-grid-top">
         <div class="stat-card balance">
-          <div class="stat-card-label">Current Balance</div>
+          <div class="stat-card-label">Projected Ending Balance</div>
           <div class="overview-value large">${{fmt_money(balance)}}</div>
           <div style="margin-top:8px">
             {% if current_risk_balance < 0 %}
@@ -912,20 +925,6 @@
           <div class="overview-value">${{fmt_money(savings_paid_month)}}</div>
           <div style="margin-top:4px;font-size:12px;color:#7a6a9a">of ${{fmt_money(savings_planned_month)}} planned</div>
         </div>
-      </div>
-
-      <!-- Set Current Balance (new quick action) -->
-      <div class="card" style="margin-bottom:16px">
-        <h3>⚡ Set Current Balance</h3>
-        <form method="post" action="/settings/starting-balance" style="flex-wrap:wrap;gap:10px;align-items:center">
-          <input type="hidden" name="month" value="{{month}}">
-          <input type="hidden" name="view" value="{{view}}">
-          <input type="hidden" name="page" value="{{page}}">
-          <input type="hidden" name="starting_balance_month" value="{{month}}">
-          <input type="number" step="0.01" name="starting_balance" placeholder="Enter your current balance" style="min-width:220px">
-          <button type="submit" class="btn-gold">Update Balance</button>
-        </form>
-        <div style="margin-top:8px;font-size:12px;color:#6a5a8a">Sets the starting balance for {{fmt_month_label(month)}}. This is the amount in your account right now.</div>
       </div>
 
       <!-- Upcoming Bills Widget (new) -->
@@ -985,7 +984,7 @@
       <div class="card" style="margin-bottom:16px">
         <h3>✦ Trip / Savings Progress</h3>
         {% if trips|length == 0 %}
-          <div style="font-size:13px;color:#6a5a8a">No trips set up yet. <a href="/?month={{month}}&view={{view}}&page=trips">Add one →</a></div>
+          <div style="font-size:13px;color:#4a2a7a">No trips set up yet. <a href="/?month={{month}}&view={{view}}&page=trips">Add one →</a></div>
         {% else %}
           <div style="display:grid;gap:12px;margin-top:10px">
             {% for t in trips %}
@@ -1046,7 +1045,7 @@
                       {% elif ev.type == 'paycheck' %}
                         <button type="button" class="cal-event-btn cal-event" data-type="paycheck" onclick="openPaycheckEdit('{{ev.id}}','{{ev.title|replace("'","\\'")}}','{{ev.pay_date}}','{{fmt_money(ev.amount)}}','{{ev.income_type}}')"><span class="badge badge-paycheck">Pay: {{ev.title}}</span></button>
                       {% elif ev.type == 'subscription' %}
-                        <button type="button" class="cal-event-btn cal-event" data-type="subscription" onclick="openSubscriptionEdit('{{ev.id}}','{{ev.name|replace("'","\\'")}}','{{ev.day_due}}','{{fmt_money(ev.payment)}}',{{1 if ev.recurring else 0}},'{{ev.recurring_timeframe}}','{{ev.recurring_every_months}}','{{ev.yearly_month}}')"><span class="badge badge-bill">Sub: {{ev.title}}</span></button>
+                        <button type="button" class="cal-event-btn cal-event" data-type="subscription" onclick="openSubscriptionEdit('{{ev.id}}','{{ev.name|replace("'","\\'")}}','{{ev.day_due}}','{{fmt_money(ev.payment)}}',{{1 if ev.recurring else 0}},'{{ev.recurring_timeframe}}','{{ev.recurring_every_months}}','{{ev.yearly_month}}')"><span class="badge badge-subscription">Sub: {{ev.title}}</span></button>
                       {% endif %}
                     {% endfor %}
                   </div>
@@ -1071,7 +1070,8 @@
           {% if promotions_ending_soon|length == 0 %}
             <p class="good">✓ No promotions expiring in the next 60 days.</p>
           {% else %}
-            <ul>{% for p in promotions_ending_soon %}<li><b>{{p.card_name}}</b> — {{p.promo_name}}
+            <ul>{% for p in promotions_ending_soon %}<li>
+              <b>{{p.card_name}}</b> — <span style="color:var(--bad);font-weight:700">${{fmt_money(p.balance)}}</span> remaining
               {% if p.days_left < 0 %}<span class="badge badge-due">Expired {{-p.days_left}}d ago</span>
               {% elif p.days_left == 0 %}<span class="badge badge-due">Ends today</span>
               {% else %}<span class="badge {% if p.days_left <= 14 %}badge-due{% else %}badge-paid{% endif %}">{{p.days_left}}d left</span>{% endif %}
@@ -1112,27 +1112,33 @@
 
       <!-- Active Subscriptions on Bills Page -->
       <div class="card" id="subscriptions-on-bills" style="margin-bottom:16px">
-        <h3>↻ Active Subscriptions This Month</h3>
-        <p style="font-size:12.5px;color:var(--purple-lite);margin-bottom:10px">These recurring subscriptions are active. Manage them fully in the <a href="/?month={{month}}&view={{view}}&page=subscriptions">Subscriptions</a> tab.</p>
-        {% if recurring_subscriptions|length == 0 %}
-          <div class="good" style="font-size:13px">No active subscriptions.</div>
-        {% else %}
-          <table class="adaptive-table">
-            <tr><th>Name</th><th>Day Due</th><th>Amount</th><th>Frequency</th></tr>
-            {% for s in recurring_subscriptions %}
-            <tr>
-              <td>{{s.name}}</td>
-              <td>{{s.day_due}}</td>
-              <td>${{'%.2f'|format(s.payment or 0)}}</td>
-              <td>{% if (s.recurring_timeframe or 'monthly') == 'yearly' %}Yearly{% elif (s.recurring_timeframe or 'monthly') == 'specified_months' %}Every {{s.recurring_every_months or 1}} mo{% else %}Monthly{% endif %}</td>
-            </tr>
-            {% endfor %}
-          </table>
-          <div style="margin-top:10px;font-size:13.5px">
-            <b>Monthly subscription total:</b>
-            ${{fmt_money(recurring_subscriptions | selectattr('recurring_timeframe', 'equalto', 'monthly') | sum(attribute='payment') + (recurring_subscriptions | selectattr('recurring_timeframe', 'equalto', 'yearly') | sum(attribute='payment') / 12) + (recurring_subscriptions | selectattr('recurring_timeframe', 'equalto', 'specified_months') | sum(attribute='payment')))}}
-          </div>
-        {% endif %}
+        <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none"
+             onclick="toggleSubsWidget()">
+          <h3 style="margin:0">↻ Active Subscriptions This Month</h3>
+          <span id="subs-widget-chevron" style="font-size:12px;color:var(--muted);transition:transform 0.2s">▼</span>
+        </div>
+        <div id="subs-widget-body" style="display:none;margin-top:12px">
+          <p style="font-size:12.5px;color:var(--purple-lite);margin-bottom:10px">These recurring subscriptions are active. Manage them fully in the <a href="/?month={{month}}&view={{view}}&page=subscriptions">Subscriptions</a> tab.</p>
+          {% if recurring_subscriptions|length == 0 %}
+            <div class="good" style="font-size:13px">No active subscriptions.</div>
+          {% else %}
+            <table class="adaptive-table">
+              <tr><th>Name</th><th>Day Due</th><th>Amount</th><th>Frequency</th></tr>
+              {% for s in recurring_subscriptions %}
+              <tr>
+                <td>{{s.name}}</td>
+                <td>{{s.day_due}}</td>
+                <td>${{'%.2f'|format(s.payment or 0)}}</td>
+                <td>{% if (s.recurring_timeframe or 'monthly') == 'yearly' %}Yearly{% elif (s.recurring_timeframe or 'monthly') == 'specified_months' %}Every {{s.recurring_every_months or 1}} months{% else %}Monthly{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </table>
+            <div style="margin-top:10px;font-size:13.5px">
+              <b>Monthly subscription total:</b>
+              ${{fmt_money(recurring_subscriptions | selectattr('recurring_timeframe', 'equalto', 'monthly') | sum(attribute='payment') + (recurring_subscriptions | selectattr('recurring_timeframe', 'equalto', 'yearly') | sum(attribute='payment') / 12) + (recurring_subscriptions | selectattr('recurring_timeframe', 'equalto', 'specified_months') | sum(attribute='payment')))}}
+            </div>
+          {% endif %}
+        </div>
       </div>
 
       {% endif %}
@@ -1180,6 +1186,33 @@
           <button class="btn-gold">Add</button>
         </form>
 
+        <!-- BALANCE ADJUSTMENT — above paycheck sections -->
+        {% if page == 'entries' %}
+        <div style="border:1px solid rgba(160,160,180,0.25);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:14px;background:rgba(160,160,180,0.06)">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-family:'Cinzel',serif;font-size:13px;font-weight:700;color:var(--gold)">⚖ Balance Adjustment</span>
+          </div>
+          <form method="post" action="/balance/adjust" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
+            <input type="hidden" name="month" value="{{month}}">
+            <input type="hidden" name="view" value="{{view}}">
+            <input type="hidden" name="page" value="{{page}}">
+            <input type="hidden" name="adjustment_note" value="">
+            <input type="hidden" id="plannerBalanceInput" name="planner_balance" value="0">
+            <div>
+              <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:3px">Your bank balance ($)</label>
+              <input type="number" step="0.01" name="new_balance" placeholder="e.g. 143.00" required style="width:180px">
+            </div>
+            <div>
+              <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:3px">As of date</label>
+              <input type="date" name="adjustment_date" id="adjDate" onchange="updatePlannerBalance(this.value)" style="width:160px">
+            </div>
+            <div style="display:flex;flex-direction:column;justify-content:flex-end">
+              <button type="submit" class="btn-gold">Adjust</button>
+            </div>
+          </form>
+        </div>
+        {% endif %}
+
         <!-- PAYCHECK SECTIONS — individual collapsible widgets (NEW) -->
         {% for pk in paycheck_plan %}
         {% set is_current_pk = (pk['index'] > 0 and (not loop.nextitem or loop.nextitem['index'] == 0)) or (pk['index'] == paycheck_plan|length - 1) %}
@@ -1201,7 +1234,25 @@
             <table class="planner-table">
               <tr><th>Due / Planned</th><th>Name</th><th>Category</th><th>Amount</th><th>Running Balance</th><th>Recurring</th><th>Status</th><th>AutoPay</th><th>Edit</th><th>Action</th></tr>
               {% for pass_paid in [1,0] %}{% for it in pk['items'] %}
-              {% if (pass_paid == 1 and it['is_paid']) or (pass_paid == 0 and not it['is_paid']) %}
+              {% if (pass_paid == 1 and it['is_paid'] and not it.get('is_adjustment')) or (pass_paid == 0 and (not it['is_paid'] or it.get('is_adjustment'))) %}
+              {% if it.get('is_adjustment') %}
+              <tr style="background:rgba(160,160,180,0.1)">
+                <td>{{fmt_date(it['bill']['due_date'])}}</td>
+                <td><span style="font-weight:600;color:var(--gold)">⚖ Balance Adjustment</span>{% if it['bill']['note'] %}<div style="font-size:11px;color:#3a1f6e">{{it['bill']['note']}}</div>{% endif %}</td>
+                <td><span class="badge" style="background:rgba(160,160,180,0.2);color:#a0a0c0;font-size:10px">ADJ</span></td>
+                <td style="color:{% if it['amount'] >= 0 %}var(--good){% else %}var(--bad){% endif %};font-weight:700">{{'+' if it['amount'] >= 0 else ''}}${{fmt_money(it['amount'])}}</td>
+                <td><strong>${{fmt_money(it['running_after'])}}</strong></td>
+                <td>—</td><td>—</td><td>—</td><td>—</td>
+                <td>
+                  <form method="post" action="/ledger/delete/{{ (it['bill']['id']|int) - 2000000 }}" onsubmit="return confirm('Delete this balance adjustment?')" style="margin:0">
+                    <input type="hidden" name="month" value="{{month}}">
+                    <input type="hidden" name="view" value="{{view}}">
+                    <input type="hidden" name="page" value="{{page}}">
+                    <button type="submit" class="btn-sm btn-danger" style="background:#f8d7da;color:#721c24;border:1px solid #f5c2c7">🗑 Delete</button>
+                  </form>
+                </td>
+              </tr>
+              {% else %}
               <tr {% if it['is_paid'] %}style="background:#e9f9ee"{% elif it['is_postponed'] %}style="background:#fffde7"{% endif %}>
                 <td><div>{{fmt_date(it['bill']['due_date'])}}</div>{% if it['bill']['planned_pay_date'] and it['bill']['planned_pay_date'] != it['bill']['due_date'] %}<div style="font-size:11px;color:#7a5a00">Planned: {{fmt_date(it['bill']['planned_pay_date'])}}</div>{% endif %}</td>
                 <td>{{it['bill']['name']}}{% if it['bill']['note'] %}<div style="font-size:11px;color:#7a5a00">📝 {{it['bill']['note']}}</div>{% endif %}</td>
@@ -1212,10 +1263,10 @@
                 <td>{% if it['is_paid'] %}<span class="badge badge-paid">PAID</span>{% elif it['is_postponed'] %}<span class="badge" style="background:#fff1a8;color:#7a5a00">POSTPONED</span>{% elif it['can_pay'] %}<span class="badge badge-paid">OK</span>{% else %}<span class="badge badge-due">NEGATIVE</span>{% endif %}</td>
                 <td>{% if it['bill']['autopay'] %}<span class="badge badge-paid">AUTO</span>{% else %}<span class="badge badge-due">MANUAL</span>{% endif %}</td>
                 <td>
-                  {% if (it['bill']['id']|int) >= 1000000 %}
-                    <button class="btn-sm" type="button" onclick="openLedgerEdit('{{ (it['bill']['id']|int) - 1000000 }}','{{it['bill']['due_date']}}','{{it['bill']['name']|replace("'","\\'")}}','-{{"%.2f"|format(it["amount"])}}','trip contribution')">Edit</button>
+                  {% if (it['bill']['id']|int) >= 1000000 and not it.get('is_adjustment') %}
+                    <button class="btn-sm" type="button" onclick="openLedgerEdit('{{ (it['bill']['id']|int) - 1000000 }}','{{it['bill']['due_date']}}','{{it['bill']['name']|replace("'","\'")}}','-{{"%.2f"|format(it["amount"])}}','trip contribution')">Edit</button>
                   {% else %}
-                    <button class="btn-sm" type="button" onclick="openEdit('{{it['bill']['id']}}','{{it['bill']['due_date']}}','{{it['bill']['planned_pay_date'] or it['bill']['due_date']}}','{{"%.2f"|format(it["amount"])}}',{{1 if it['bill']['recurring'] else 0}},'{{it['bill']['recurring_timeframe'] or "monthly"}}','{{it['bill']['recurring_every_months'] or ""}}','{{it['bill']['recurring_end_date'] or ""}}',{{1 if it['bill']['autopay'] else 0}},'{{it['bill']['name']|replace("'","\\'")}}','{{it['bill']['paycheck_bucket'] if it['bill']['paycheck_bucket'] is not none else ""}}',{{1 if it['bill']['paid'] else 0}},'{{it['bill']['paid_date'] or ""}}')">Edit</button>
+                    <button class="btn-sm" type="button" onclick="openEdit('{{it['bill']['id']}}','{{it['bill']['due_date']}}','{{it['bill']['planned_pay_date'] or it['bill']['due_date']}}','{{"%.2f"|format(it["amount"])}}',{{1 if it['bill']['recurring'] else 0}},'{{it['bill']['recurring_timeframe'] or "monthly"}}','{{it['bill']['recurring_every_months'] or ""}}','{{it['bill']['recurring_end_date'] or ""}}',{{1 if it['bill']['autopay'] else 0}},'{{it['bill']['name']|replace("'","\'")}}','{{it['bill']['paycheck_bucket'] if it['bill']['paycheck_bucket'] is not none else ""}}',{{1 if it['bill']['paid'] else 0}},'{{it['bill']['paid_date'] or ""}}')">Edit</button>
                   {% endif %}
                 </td>
                 <td>
@@ -1223,7 +1274,7 @@
                     <span class="badge badge-paid">✓</span>
                   {% elif not it['is_paid'] %}
                     <div style="display:grid;gap:4px">
-                      <form method="post" action="/bills/toggle/{{it['bill']['id']}}" style="margin:0"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><button type="submit" class="btn-sm" style="background:#dff6df;color:#1f5d1f;border:1px solid #bde7bd;width:100%">☑ Paid</button></form>
+                      <form method="post" action="/bills/toggle/{{it['bill']['id']}}" style="margin:0"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="anchor" value="paycheck-section-{{loop.index}}"><button type="submit" class="btn-sm" style="background:#dff6df;color:#1f5d1f;border:1px solid #bde7bd;width:100%">☑ Paid</button></form>
                       <button type="button" class="btn-sm" onclick="openPostponeModal('{{it['bill']['id']}}','{{it['bill']['planned_pay_date'] or it['bill']['due_date']}}')" style="background:#fff9d9;color:#7a5a00;border:1px solid #f2e4a3">Postpone</button>
                     </div>
                   {% else %}
@@ -1231,6 +1282,7 @@
                   {% endif %}
                 </td>
               </tr>
+              {% endif %}
               {% endif %}{% endfor %}{% endfor %}
             </table>
             <p style="margin-top:10px"><b>End of {{pk['display_label']|lower}} projected:</b> ${{fmt_money(pk['ending_balance'])}} {% if pk['goes_negative'] %}<span class="badge badge-due">Needs adjustment</span>{% else %}<span class="badge badge-paid">Good</span>{% endif %}</p>
@@ -1342,7 +1394,7 @@
         <h3>Savings</h3>
         <p style="font-size:13.5px"><b>Saved this month (paid savings bills):</b> ${{fmt_money(savings_paid_month)}}</p>
         <p style="font-size:13.5px"><b>Planned savings bills this month:</b> ${{fmt_money(savings_planned_month)}}</p>
-        <p style="font-size:12px;color:#6a5a8a;margin-top:8px">Tip: In Bills/Paycheck Planner, add or edit a bill and choose category <b>savings</b> to track savings contributions here.</p>
+        <p style="font-size:12px;color:#4a2a7a;margin-top:8px">Tip: In Bills/Paycheck Planner, add or edit a bill and choose category <b>savings</b> to track savings contributions here.</p>
       </div>
       {% endif %}
 
@@ -1399,11 +1451,11 @@
         </table>
       </div>
 
-      <!-- DEBT WIDGETS GRID — Credit Cards and Loans side by side (NEW) -->
-      <div class="debt-widgets-grid">
+      <!-- DEBT WIDGETS STACKED -->
+      <div>
 
         <!-- Credit Card Tracker — own widget -->
-        <div class="card" id="credit-card-tracker" style="margin:0">
+        <div class="card" id="credit-card-tracker" style="margin-bottom:14px">
           <h3>💳 Credit Card Tracker</h3>
           <form method="post" action="/credit/add" class="stack-form">
             <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="anchor" value="credit-card-tracker">
@@ -1427,7 +1479,7 @@
         </div>
 
         <!-- Loans Tracker — own widget -->
-        <div class="card" id="loans-tracker" style="margin:0">
+        <div class="card" id="loans-tracker" style="margin-bottom:14px">
           <h3>🏦 Loans Tracker</h3>
           <form method="post" action="/loans/add" class="stack-form">
             <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="anchor" value="loans-tracker">
@@ -1517,10 +1569,24 @@
           <div class="field-row"><label>Subscription Name</label><input name="name" required></div>
           <div class="field-row"><label>Day Due</label><input type="number" min="1" max="31" name="day_due" required></div>
           <div class="field-row"><label>Payment</label><input type="number" step="0.01" name="payment" required></div>
-          <div class="field-row"><label>Recurring</label><div><input type="checkbox" name="recurring" checked onchange="toggleSubscriptionRecurring(this)"> recurring</div></div>
+          <div class="field-row"><label>Recurring</label><input type="checkbox" name="recurring" checked onchange="toggleSubscriptionRecurring(this)" style="width:18px;height:18px;margin:0"></div>
           <div class="field-row sub-recurring-fields"><label>Timeframe</label><select name="recurring_timeframe" onchange="toggleSubscriptionTimeframe(this)"><option value="monthly" selected>Monthly</option><option value="yearly">Yearly</option><option value="specified_months">Every X Months</option></select></div>
           <div class="field-row sub-yearly-month" style="display:none"><label>Yearly Month</label><select name="yearly_month"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
-          <div class="field-row sub-recurring-months" style="display:none"><label>Every # Months</label><input type="number" min="1" step="1" name="recurring_every_months" placeholder="e.g. 3 or 6"></div>
+          <div class="field-row sub-recurring-months" style="display:none">
+            <label>Starting Date</label>
+            <input type="date" name="start_month" style="width:160px">
+          </div>
+          <div class="field-row sub-recurring-months" style="display:none">
+            <label>Every How Many Months</label>
+            <select name="recurring_every_months">
+              <option value="1">Every 1 month</option>
+              <option value="2">Every 2 months</option>
+              <option value="3">Every 3 months (quarterly)</option>
+              <option value="4">Every 4 months</option>
+              <option value="6">Every 6 months (bi-annual)</option>
+              <option value="12">Every 12 months (yearly)</option>
+            </select>
+          </div>
           <div class="actions"><button class="btn-gold">Add Subscription</button></div>
         </form>
 
@@ -1532,8 +1598,8 @@
             <td>{% if (s.recurring or 0) %}<span class="badge badge-paid">YES</span>{% else %}<span class="badge badge-due">NO</span>{% endif %}</td>
             <td>
               {% if not (s.recurring or 0) %}—
-              {% elif (s.recurring_timeframe or 'monthly') == 'yearly' %}Yearly — Month {{s.yearly_month or '?'}}
-              {% elif (s.recurring_timeframe or 'monthly') == 'specified_months' %}Every {{s.recurring_every_months or 1}} months
+              {% elif (s.recurring_timeframe or 'monthly') == 'yearly' %}Yearly — {% set _months = ['January','February','March','April','May','June','July','August','September','October','November','December'] %}{{_months[(s.yearly_month or 1) - 1]}}
+              {% elif (s.recurring_timeframe or 'monthly') == 'specified_months' %}Every {{s.recurring_every_months or 1}} month{{'s' if (s.recurring_every_months or 1)|int != 1 else ''}}{% if s.start_month %} (from {{s.start_month[5:7]}}/{{s.start_month[8:10] if s.start_month|length >= 10 else '01'}}/{{s.start_month[:4]}}){% endif %}
               {% else %}Monthly (day {{s.day_due}})
               {% endif %}
             </td>
@@ -1549,42 +1615,480 @@
            CHECKBOOK / HISTORY
       ══════════════════════════════ -->
       {% if page == 'checkbook' %}
+
+      <!-- Completed Promotions Widget -->
+      {% if completed_promotions|length > 0 %}
+      <div class="card" style="margin-bottom:14px">
+        <h3 style="margin-top:0">◉ Completed Promotions</h3>
+        <table class="adaptive-table">
+          <tr><th>Account</th><th>Promotion</th><th>Start</th><th>End</th><th>Total</th><th>Action</th></tr>
+          {% for p in completed_promotions %}
+          <tr>
+            <td>{{p.card_name}}</td><td>{{p.promo_name}}</td>
+            <td>{{fmt_date(p.start_date)}}</td><td>{{fmt_date(p.end_date)}}</td>
+            <td>${{fmt_money(p.balance)}}</td>
+            <td>
+              <span class="badge badge-paid" style="margin-right:6px">Completed</span>
+              <form method="post" action="/promotions/reopen/{{p.id}}" style="display:inline">
+                <input type="hidden" name="month" value="{{month}}">
+                <input type="hidden" name="view" value="{{view}}">
+                <input type="hidden" name="page" value="{{page}}">
+                <button type="submit" class="btn-sm">Reopen</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+      {% endif %}
+
+      <!-- Paid-Off Loans Widget -->
+      {% if paid_loans|length > 0 %}
+      <div class="card" style="margin-bottom:14px">
+        <h3 style="margin-top:0">◈ Paid-Off Loans</h3>
+        <table class="adaptive-table">
+          <tr><th>Loan Name</th><th>Interest Rate</th><th>Loan Amount</th><th>Action</th></tr>
+          {% for ln in paid_loans %}
+          <tr>
+            <td>{{ln.loan_name}}</td>
+            <td>{{fmt_money(ln.interest_rate)}}%</td>
+            <td>${{fmt_money(ln.loan_amount)}}</td>
+            <td>
+              <span class="badge badge-paid" style="margin-right:6px">Paid Off</span>
+              <form method="post" action="/loans/toggle-paid/{{ln.id}}" style="display:inline">
+                <input type="hidden" name="month" value="{{month}}">
+                <input type="hidden" name="view" value="{{view}}">
+                <input type="hidden" name="page" value="{{page}}">
+                <button type="submit" class="btn-sm">Reopen</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </table>
+      </div>
+      {% endif %}
+
+      <!-- History Ledger -->
       <div class="card" id="checkbook">
-        <h3>History</h3>
-        <form method="post" action="/ledger/add" style="margin-bottom:14px">
-          <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
-          <input type="date" name="tx_date" required>
-          <input name="label" placeholder="Label" required>
-          <input type="number" step="0.01" name="amount" placeholder="Use negative for spend" required>
-          <input name="note" placeholder="Note">
+        <h3 style="margin-top:0">⊞ History</h3>
+        <form method="post" action="/ledger/add" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+          <input type="hidden" name="month" value="{{month}}">
+          <input type="hidden" name="view" value="{{view}}">
+          <input type="hidden" name="page" value="{{page}}">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:3px">Date</label>
+            <input type="date" name="tx_date" required style="width:150px">
+          </div>
+          <div style="flex:1;min-width:140px">
+            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:3px">Label</label>
+            <input name="label" placeholder="Label" required>
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:3px">Amount</label>
+            <input type="number" step="0.01" name="amount" placeholder="Negative = expense" required style="width:170px">
+          </div>
+          <div style="flex:1;min-width:120px">
+            <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:3px">Note</label>
+            <input name="note" placeholder="Optional">
+          </div>
           <button class="btn-gold">Add Entry</button>
         </form>
-        <table class="adaptive-table" style="margin-top:10px">
-          <tr><th>Paid Date</th><th>Label</th><th>Amount</th><th>Note</th><th>Running Balance</th><th>Edit</th></tr>
+        <table class="adaptive-table">
+          <tr><th>Date</th><th>Label</th><th>Amount</th><th>Note</th><th>Running Balance</th><th>Edit</th></tr>
           {% for t in ledger_running %}
-          <tr>
-            <td>{{fmt_date(t[1])}}</td><td>{{t[2]}}</td><td>{{'%+.2f'|format(t[3])}}</td><td>{{t[4]}}</td><td><b>${{fmt_money(t[5])}}</b></td>
-            <td><button class="btn-sm" type="button" onclick="openLedgerEdit('{{t[0]}}','{{t[1]}}','{{t[2]|replace("'","\\'")}}','{{fmt_money(t[3])}}','{{(t[4] or "")|replace("'","\\'")}}')" >Edit</button></td>
+          <tr {% if t[2] == 'Balance Adjustment' %}style="background:rgba(160,160,180,0.08)"{% endif %}>
+            <td>{{fmt_date(t[1])}}</td>
+            <td>
+              {{t[2]}}
+              {% if t[2] == 'Balance Adjustment' %}
+                <span class="badge" style="background:rgba(160,160,180,0.2);color:#8a8aaa;font-size:10px">ADJ</span>
+              {% endif %}
+            </td>
+            <td style="color:{% if t[3] >= 0 %}var(--good){% else %}var(--bad){% endif %};font-weight:600">
+              {{'%+.2f'|format(t[3])}}
+            </td>
+            <td style="font-size:12px;color:var(--muted)">{{t[4] or '—'}}</td>
+            <td><b>${{fmt_money(t[5])}}</b></td>
+            <td>
+              {% if t[0] == -1 %}
+                <span style="font-size:11px;color:var(--muted)">—</span>
+              {% else %}
+                <button class="btn-sm" type="button"
+                  onclick="openLedgerEdit('{{t[0]}}','{{t[1]}}','{{t[2]|replace("'","\'")|replace('"','\"')}}','{{fmt_money(t[3])}}','{{(t[4] or "")|replace("'","\'")|replace('"','\"')}}')">
+                  Edit
+                </button>
+              {% endif %}
+            </td>
           </tr>
           {% endfor %}
         </table>
         <p style="margin-top:10px;font-size:14px"><b>Ending Balance:</b> ${{fmt_money(balance)}}</p>
+      </div>
+      {% endif %}
 
-        <div style="margin-top:18px;padding-top:12px;border-top:1px dashed rgba(200,170,255,0.2)">
-          <h3>Completed Promotions</h3>
-          <table class="adaptive-table" style="margin-top:10px">
-            <tr><th>Account</th><th>Promotion</th><th>Start</th><th>End</th><th>Total</th><th>Status</th></tr>
-            {% for p in completed_promotions %}<tr><td>{{p.card_name}}</td><td>{{p.promo_name}}</td><td>{{fmt_date(p.start_date)}}</td><td>{{fmt_date(p.end_date)}}</td><td>${{fmt_money(p.balance)}}</td><td><span class="badge badge-paid">Completed</span></td></tr>{% endfor %}
-          </table>
+
+      <!-- ══════════════════════════════
+           ADMIN PAGE
+      ══════════════════════════════ -->
+      {% if page == 'admin' and user_is_admin %}
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden">
+
+        <!-- Admin Header -->
+        <div style="background:linear-gradient(135deg,rgba(245,200,66,0.12),rgba(201,109,216,0.08));padding:16px 20px;border-bottom:1px solid var(--line-light);display:flex;align-items:center;gap:12px">
+          <span style="font-family:'Cinzel',serif;font-size:18px;font-weight:900;color:var(--gold)">⚙ Admin Panel</span>
+          <span style="font-size:11px;font-weight:700;background:rgba(245,200,66,0.2);color:var(--gold);padding:2px 10px;border-radius:999px;border:1px solid rgba(245,200,66,0.3)">ADMIN ONLY</span>
         </div>
 
-        <div style="margin-top:18px;padding-top:12px;border-top:1px dashed rgba(200,170,255,0.2)">
-          <h3>Paid-Off Loans</h3>
-          <table class="adaptive-table" style="margin-top:10px">
-            <tr><th>Loan Name</th><th>Interest Rate</th><th>Loan Amount</th><th>Status</th></tr>
-            {% for ln in paid_loans %}<tr><td>{{ln.loan_name}}</td><td>{{fmt_money(ln.interest_rate)}}%</td><td>${{fmt_money(ln.loan_amount)}}</td><td><span class="badge badge-paid">Paid Off</span></td></tr>{% endfor %}
-          </table>
+        <!-- Admin Tab Nav -->
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--line-light);background:rgba(0,0,0,0.1);padding:0 16px">
+          <button type="button" class="admin-tab-btn active" id="admtab-btn-overview" onclick="adminTab('overview')" style="padding:10px 16px;border:none;background:transparent;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid var(--gold);font-family:'DM Sans',sans-serif">📊 Overview</button>
+          <button type="button" class="admin-tab-btn" id="admtab-btn-versions" onclick="adminTab('versions')" style="padding:10px 16px;border:none;background:transparent;color:#8a7aaa;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">📋 Versions</button>
+          <button type="button" class="admin-tab-btn" id="admtab-btn-banner" onclick="adminTab('banner')" style="padding:10px 16px;border:none;background:transparent;color:#8a7aaa;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">📢 Banner</button>
+          <button type="button" class="admin-tab-btn" id="admtab-btn-users" onclick="adminTab('users')" style="padding:10px 16px;border:none;background:transparent;color:#8a7aaa;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">👥 Users</button>
+          <button type="button" class="admin-tab-btn" id="admtab-btn-feedback" onclick="adminTab('feedback')" style="padding:10px 16px;border:none;background:transparent;color:#8a7aaa;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">
+            💬 Feedback{% if admin_stats.get('unread_feedback',0) > 0 %} <span style="background:var(--bad);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px">{{admin_stats.get('unread_feedback',0)}}</span>{% endif %}
+          </button>
         </div>
+
+        <div style="padding:20px">
+
+          <!-- ── OVERVIEW TAB ── -->
+          <div id="admtab-overview">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:20px">
+              <div class="stat-card" style="text-align:center;padding:14px">
+                <div style="font-size:26px;font-weight:700;color:var(--gold)">{{admin_stats.get('total_users',0)}}</div>
+                <div style="font-size:11px;color:#3a1f6e;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Total Users</div>
+              </div>
+              <div class="stat-card" style="text-align:center;padding:14px">
+                <div style="font-size:26px;font-weight:700;color:var(--gold)">{{admin_stats.get('total_households',0)}}</div>
+                <div style="font-size:11px;color:#3a1f6e;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Households</div>
+              </div>
+              <div class="stat-card" style="text-align:center;padding:14px">
+                <div style="font-size:26px;font-weight:700;color:var(--gold)">{{admin_stats.get('logins_today',0)}}</div>
+                <div style="font-size:11px;color:#3a1f6e;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Logins Today</div>
+              </div>
+              <div class="stat-card" style="text-align:center;padding:14px">
+                <div style="font-size:26px;font-weight:700;color:{% if admin_stats.get('unread_feedback',0) > 0 %}var(--bad){% else %}var(--gold){% endif %}">{{admin_stats.get('unread_feedback',0)}}</div>
+                <div style="font-size:11px;color:#3a1f6e;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Unread Feedback</div>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:14px">
+                <div style="font-size:11px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Current Version</div>
+                {% if admin_stats.get('latest_version') %}
+                <div style="font-family:'Cinzel',serif;font-size:20px;font-weight:700;color:var(--gold)">{{admin_stats['latest_version']['version']}}</div>
+                <div style="font-size:13px;color:#c0a8e0;margin-top:2px">{{admin_stats['latest_version']['title']}}</div>
+                <div style="font-size:11px;color:#4a2a7a;margin-top:4px">Released {{fmt_date(admin_stats['latest_version']['created_at'][:10])}}</div>
+                {% else %}
+                <div style="font-size:13px;color:#4a2a7a">No versions logged yet.</div>
+                {% endif %}
+              </div>
+              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:14px">
+                <div style="font-size:11px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Newest User</div>
+                {% if admin_stats.get('newest_user') %}
+                <div style="font-size:14px;font-weight:600;color:#1a0d2e;word-break:break-all">{{admin_stats['newest_user']['email']}}</div>
+                <div style="font-size:11px;color:#4a2a7a;margin-top:4px">Joined {{fmt_date(admin_stats['newest_user']['created_at'][:10])}}</div>
+                {% else %}
+                <div style="font-size:13px;color:#4a2a7a">No users yet.</div>
+                {% endif %}
+              </div>
+              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:14px">
+                <div style="font-size:11px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Banner Status</div>
+                {% if admin_stats.get('banner_enabled') %}
+                <span style="background:rgba(46,160,67,0.15);color:#2ea043;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px">● Active</span>
+                {% else %}
+                <span style="background:rgba(160,160,180,0.1);color:#8a7aaa;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px">● Off</span>
+                {% endif %}
+              </div>
+              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:14px">
+                <div style="font-size:11px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Total Versions Logged</div>
+                <div style="font-family:'Cinzel',serif;font-size:20px;font-weight:700;color:var(--gold)">{{admin_update_log|length}}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── VERSIONS TAB ── -->
+          <div id="admtab-versions" style="display:none">
+            <form method="post" action="/admin/update-log/add" style="display:grid;grid-template-columns:120px 1fr auto;gap:8px;align-items:end;margin-bottom:6px;width:100%">
+              <input type="hidden" name="month" value="{{month}}">
+              <input type="hidden" name="view" value="{{view}}">
+              <input type="hidden" name="page" value="admin">
+              <div>
+                <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Version</label>
+                <input type="text" name="version" placeholder="e.g. v3.2">
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Title</label>
+                <input type="text" name="title" placeholder="Short title for this release">
+              </div>
+              <button type="submit" class="btn-gold" style="align-self:end">+ Add</button>
+            </form>
+            <div style="font-size:11px;color:#4a2a7a;margin-bottom:14px">After adding, expand the row to write detailed notes.</div>
+
+            {% if admin_update_log %}
+            <div style="display:grid;gap:8px">
+              {% for entry in admin_update_log %}
+              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);overflow:hidden">
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(255,255,255,0.03);cursor:pointer" onclick="toggleAdminEntry({{entry.id}})">
+                  <span style="font-family:'Cinzel',serif;font-weight:700;color:var(--gold);font-size:14px;min-width:60px">{{entry.version}}</span>
+                  <span style="font-weight:600;color:#1a0d2e;flex:1">{{entry.title}}</span>
+                  <span style="font-size:11px;color:#4a2a7a">{{entry.created_at[5:7]}}-{{entry.created_at[8:10]}}-{{entry.created_at[:4]}}</span>
+                  <span style="font-size:11px;color:#4a2a7a">▼</span>
+                </div>
+                <div id="admin-entry-{{entry.id}}" style="display:none;padding:14px;border-top:1px solid var(--line-light)">
+                  <div style="display:flex;flex-direction:column;gap:10px;width:100%">
+                  <form method="post" action="/admin/update-log/update/{{entry.id}}" style="width:100%">
+                    <input type="hidden" name="month" value="{{month}}">
+                    <input type="hidden" name="view" value="{{view}}">
+                    <input type="hidden" name="page" value="admin">
+                    <div style="display:flex;gap:8px;margin-bottom:8px">
+                      <div style="width:120px;flex-shrink:0">
+                        <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Version</label>
+                        <input type="text" name="version" value="{{entry.version}}" required>
+                      </div>
+                      <div style="flex:1">
+                        <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Title</label>
+                        <input type="text" name="title" value="{{entry.title}}" required style="width:100%">
+                      </div>
+                    </div>
+                    <div style="margin-bottom:10px;width:100%">
+                      <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Notes — describe exactly what changed in this version</label>
+                      <textarea name="body" style="width:100%;box-sizing:border-box;min-height:220px;resize:vertical;font-size:13px;line-height:1.6;color:#000;background:#fff">{{entry.body or ''}}</textarea>
+                    </div>
+                    <div style="display:flex;gap:8px">
+                      <button type="submit" class="btn-gold btn-sm">Save Changes</button>
+                    </div>
+                  </form>
+                  <form method="post" action="/admin/update-log/delete/{{entry.id}}" onsubmit="return confirm('Delete this entry?')" style="margin:0">
+                    <input type="hidden" name="month" value="{{month}}">
+                    <input type="hidden" name="view" value="{{view}}">
+                    <input type="hidden" name="page" value="admin">
+                    <button type="submit" class="btn-danger btn-sm">Delete</button>
+                  </form>
+                </div>
+
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <div style="font-size:13px;color:#4a2a7a;padding:20px;text-align:center">No version entries yet. Add your first one above.</div>
+            {% endif %}
+          </div>
+
+          <!-- ── BANNER TAB ── -->
+          <div id="admtab-banner" style="display:none">
+            <form method="post" action="/admin/banner/save">
+              <input type="hidden" name="month" value="{{month}}">
+              <input type="hidden" name="view" value="{{view}}">
+              <input type="hidden" name="page" value="admin">
+              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:16px;margin-bottom:14px">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+                  <label style="font-size:14px;color:#c0a8e0;display:flex;align-items:center;gap:8px;cursor:pointer">
+                    <input type="checkbox" name="banner_enabled" value="1" {% if banner_enabled %}checked{% endif %} style="width:16px;height:16px">
+                    Show banner to all users
+                  </label>
+                </div>
+                <div style="margin-bottom:12px">
+                  <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Banner Text</label>
+                  <input type="text" name="banner_text" value="{{banner_text}}" placeholder="e.g. Update 3.2 is live!">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+                  <div>
+                    <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Show From <span style="font-weight:400;color:#6a5a8a">(optional)</span></label>
+                    <input type="date" name="banner_start_date" value="{{banner_start_date}}">
+                    <div style="font-size:11px;color:#4a2a7a;margin-top:3px">Banner starts showing on this date</div>
+                  </div>
+                  <div>
+                    <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Hide After <span style="font-weight:400;color:#6a5a8a">(optional)</span></label>
+                    <input type="date" name="banner_end_date" value="{{banner_end_date}}">
+                    <div style="font-size:11px;color:#4a2a7a;margin-top:3px">Banner auto-hides after this date</div>
+                  </div>
+                </div>
+                <button type="submit" class="btn-gold">Save Banner</button>
+              </div>
+            </form>
+            {% if banner_enabled and banner_text %}
+            <div style="background:#fffbea;border:1.5px solid #f5c842;border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:10px">
+              <span style="background:#f5c842;color:#5a4000;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;white-space:nowrap">Preview</span>
+              <span style="font-size:13px;color:#5a4000">{{banner_text}}</span>
+            </div>
+            {% else %}
+            <div style="font-size:13px;color:#4a2a7a;padding:12px;text-align:center;border:1px dashed rgba(200,170,255,0.2);border-radius:8px">Banner is currently off. Enable it above to show a message to all users.</div>
+            {% endif %}
+
+            {% if banner_history %}
+            <div style="margin-top:18px;border-top:1px solid var(--line-light);padding-top:14px">
+              <div style="font-size:12px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">📜 Banner History — click to reuse</div>
+              <div style="display:grid;gap:6px">
+                {% for h in banner_history %}
+                <div style="border:1px solid var(--line-light);border-radius:8px;padding:10px 12px;cursor:pointer;transition:background 0.15s"
+                     onclick="reuseAdminBanner('{{h.text|replace("'","\'")}}','{{h.start_date or ""}}','{{h.end_date or ""}}')"
+                     onmouseover="this.style.background='rgba(245,200,66,0.06)'"
+                     onmouseout="this.style.background=''">
+                  <div style="font-size:13px;color:#1a0d2e;margin-bottom:4px">{{h.text}}</div>
+                  <div style="font-size:11px;color:#4a2a7a">
+                    Saved {{h.saved_at[5:7]}}-{{h.saved_at[8:10]}}-{{h.saved_at[:4]}}
+                    {% if h.start_date %} · From {{h.start_date[5:7]}}-{{h.start_date[8:10]}}-{{h.start_date[:4]}}{% endif %}
+                    {% if h.end_date %} · Until {{h.end_date[5:7]}}-{{h.end_date[8:10]}}-{{h.end_date[:4]}}{% endif %}
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+          </div>
+
+          <!-- ── USERS TAB ── -->
+          <div id="admtab-users" style="display:none">
+            <div style="margin-bottom:12px">
+              <input type="text" id="adminUserSearch" placeholder="Search by email..." oninput="filterAdminUsers()" style="max-width:320px">
+            </div>
+            <div style="overflow-x:auto">
+            <table class="adaptive-table" id="adminUsersTable">
+              <tr><th>ID</th><th style="min-width:220px">Email</th><th>Household</th><th>Role</th><th>Joined</th><th>Last Login</th><th>Admin</th><th>Delete</th></tr>
+              {% for u in admin_users %}
+              <tr class="admin-user-row" data-search="{{u.email|lower}} {{(u.household_name or '')|lower}}" {% if u.is_admin %}style="background:rgba(245,200,66,0.05)"{% endif %}>
+                <td style="font-size:12px;color:#3a1f6e">{{u.id}}</td>
+                <td style="word-break:break-all">
+                  <span style="font-weight:600;color:#1a0d2e">{{u.email}}</span>
+                  {% if u.is_admin %}<span style="font-size:10px;background:rgba(245,200,66,0.2);color:var(--gold);padding:1px 6px;border-radius:999px;margin-left:4px">ADMIN</span>{% endif %}
+                </td>
+                <td style="font-size:12px">{{u.household_name or '—'}}</td>
+                <td style="font-size:12px;color:#3a1f6e">{{u.role or '—'}}</td>
+                <td style="font-size:12px;color:#3a1f6e;white-space:nowrap">
+                  {% if u.created_at %}{{u.created_at[5:7]}}-{{u.created_at[8:10]}}-{{u.created_at[:4]}}{% else %}—{% endif %}
+                </td>
+                <td style="font-size:12px;color:#3a1f6e;white-space:nowrap">
+                  {% if u.last_login_at %}{{u.last_login_at[5:7]}}-{{u.last_login_at[8:10]}}-{{u.last_login_at[:4]}}{% else %}Never{% endif %}
+                </td>
+                <td>
+                  {% if u.id != session.get('user_id') %}
+                  <form method="post" action="/admin/user/toggle-admin/{{u.id}}" style="margin:0">
+                    <input type="hidden" name="month" value="{{month}}">
+                    <input type="hidden" name="view" value="{{view}}">
+                    <input type="hidden" name="page" value="admin">
+                    <button type="submit" class="btn-sm" style="white-space:nowrap;{% if u.is_admin %}background:#fff3cd;color:#856404{% else %}background:rgba(255,255,255,0.07);color:#8a7aaa{% endif %}">
+                      {{'★ Admin' if u.is_admin else '☆ Grant'}}
+                    </button>
+                  </form>
+                  {% else %}
+                  <span style="font-size:11px;color:var(--gold)">★ You</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if u.id != session.get('user_id') %}
+                  <form method="post" action="/admin/user/delete/{{u.id}}" onsubmit="return confirm('Delete {{u.email}}?')" style="margin:0">
+                    <input type="hidden" name="month" value="{{month}}">
+                    <input type="hidden" name="view" value="{{view}}">
+                    <input type="hidden" name="page" value="admin">
+                    <button type="submit" class="btn-danger btn-sm">Delete</button>
+                  </form>
+                  {% else %}
+                  <span style="font-size:11px;color:#4a2a7a">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </table>
+            </div>
+          </div>
+
+          <!-- ── FEEDBACK TAB ── -->
+          <div id="admtab-feedback" style="display:none">
+
+            <!-- Filter tabs -->
+            <div style="display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid var(--line-light)">
+              <button type="button" onclick="filterFeedback('all')" id="fb-filter-all"
+                style="padding:7px 14px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:var(--gold);border-bottom:2px solid var(--gold);font-family:'DM Sans',sans-serif">
+                All
+              </button>
+              <button type="button" onclick="filterFeedback('unread')" id="fb-filter-unread"
+                style="padding:7px 14px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:#4a2a7a;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">
+                Unread
+              </button>
+              <button type="button" onclick="filterFeedback('feedback')" id="fb-filter-feedback"
+                style="padding:7px 14px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:#4a2a7a;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">
+                💬 Feedback
+              </button>
+              <button type="button" onclick="filterFeedback('review')" id="fb-filter-review"
+                style="padding:7px 14px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:#4a2a7a;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">
+                ⭐ Reviews
+              </button>
+            </div>
+
+            {% if admin_feedback %}
+            <table class="adaptive-table" id="feedbackTable">
+              <tr>
+                <th style="min-width:140px">From</th>
+                <th>Subject</th>
+                <th>Message</th>
+                <th style="min-width:130px">Type</th>
+                <th style="min-width:80px">Actions</th>
+              </tr>
+              {% for fb in admin_feedback %}
+              <tr class="fb-row"
+                  data-read="{{fb.is_read}}"
+                  data-type="{{fb.feedback_type or 'unread'}}"
+                  {% if not fb.is_read %}style="background:rgba(245,200,66,0.04)"{% endif %}>
+                <td style="font-size:12px">
+                  <div style="font-weight:600;color:#1a0d2e;word-break:break-all">{{fb.email or 'Anonymous'}}</div>
+                  <div style="color:#4a2a7a;font-size:11px;margin-top:2px">
+                    {{fb.created_at[5:7]}}-{{fb.created_at[8:10]}}-{{fb.created_at[:4]}}
+                    {% if not fb.is_read %}<span style="background:var(--bad);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;margin-left:4px">NEW</span>{% endif %}
+                  </div>
+                </td>
+                <td style="font-size:13px;font-weight:600;color:#1a0d2e;word-break:break-word;white-space:normal">{{fb.subject or '(no subject)'}}</td>
+                <td style="font-size:12px;color:#1a0d2e;max-width:300px">
+                  <div style="white-space:pre-wrap;background:rgba(0,0,0,0.04);padding:8px 10px;border-radius:5px;max-height:80px;overflow-y:auto">{{fb.message}}</div>
+                </td>
+                <td>
+                  <!-- Type toggle: Unread / Feedback / Review -->
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <form method="post" action="/admin/feedback/settype/{{fb.id}}" style="margin:0">
+                      <input type="hidden" name="month" value="{{month}}">
+                      <input type="hidden" name="view" value="{{view}}">
+                      <input type="hidden" name="page" value="admin">
+                      <select name="feedback_type" onchange="this.form.submit()"
+                        style="font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line-light);background:{% if fb.feedback_type == 'review' %}rgba(245,200,66,0.1){% elif fb.feedback_type == 'feedback' %}rgba(100,150,255,0.1){% else %}rgba(160,160,180,0.1){% endif %}">
+                        <option value="" {% if not fb.feedback_type or fb.feedback_type not in ('feedback','review') %}selected{% endif %}>— Unread —</option>
+                        <option value="feedback" {% if fb.feedback_type == 'feedback' %}selected{% endif %}>💬 Feedback</option>
+                        <option value="review" {% if fb.feedback_type == 'review' %}selected{% endif %}>⭐ Review</option>
+                      </select>
+                    </form>
+                  </div>
+                </td>
+                <td>
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    {% if not fb.is_read %}
+                    <form method="post" action="/admin/feedback/read/{{fb.id}}" style="margin:0">
+                      <input type="hidden" name="month" value="{{month}}">
+                      <input type="hidden" name="view" value="{{view}}">
+                      <input type="hidden" name="page" value="admin">
+                      <button type="submit" class="btn-sm" style="background:rgba(46,160,67,0.15);color:#2ea043;border:1px solid rgba(46,160,67,0.3);width:100%">✓ Read</button>
+                    </form>
+                    {% endif %}
+                    <form method="post" action="/admin/feedback/delete/{{fb.id}}" onsubmit="return confirm('Delete this message?')" style="margin:0">
+                      <input type="hidden" name="month" value="{{month}}">
+                      <input type="hidden" name="view" value="{{view}}">
+                      <input type="hidden" name="page" value="admin">
+                      <button type="submit" class="btn-danger btn-sm" style="width:100%">Delete</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </table>
+            {% else %}
+            <div style="text-align:center;padding:40px">
+              <div style="font-size:32px;margin-bottom:10px">💬</div>
+              <div style="font-size:14px;color:#4a2a7a">No messages yet. Users can submit via the 💬 Feedback button in the top bar.</div>
+            </div>
+            {% endif %}
+          </div>
+
+        </div><!-- end padding div -->
       </div>
       {% endif %}
 
@@ -1596,7 +2100,7 @@
 
 <!-- Edit Bill -->
 <div id="editModal" class="modal-overlay">
-  <div class="modal-box">
+  <div class="modal-box" style="max-height:88vh;overflow-y:auto">
     <h3>Edit Bill</h3>
     <form id="editForm" class="stack-form" method="post" action="">
       <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
@@ -1605,14 +2109,14 @@
       <div class="field-row"><label>Due Date</label><input id="editDue" type="date" name="due_date" required></div>
       <div class="field-row"><label>Planned Pay Date</label><input id="editPlannedPay" type="date" name="planned_pay_date"></div>
       <div class="field-row"><label>Amount</label><input id="editAmount" type="number" step="0.01" name="amount" required></div>
-      <div class="field-row"><label>Recurring</label><div><input id="editRecurring" type="checkbox" name="recurring" onchange="toggleBillRecurringOptions()"> recurring payment</div></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><label style="margin:0">Recurring</label><input id="editRecurring" type="checkbox" name="recurring" onchange="toggleBillRecurringOptions()" style="width:18px;height:18px;margin:0"></div>
       <div id="editRecurringOptions" style="display:none">
         <div class="field-row"><label>Timeframe</label><select id="editRecurringTimeframe" name="recurring_timeframe" onchange="toggleBillRecurringOptions()"><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="specified_months">Every X Months</option></select></div>
         <div class="field-row" id="editRecurringMonthsRow" style="display:none"><label>Every # Months</label><input id="editRecurringEveryMonths" type="number" min="1" step="1" name="recurring_every_months"></div>
         <div class="field-row" id="editRecurringEndDateRow" style="display:none"><label>End Date</label><input id="editRecurringEndDate" type="date" name="recurring_end_date"></div>
       </div>
-      <div class="field-row"><label>AutoPay</label><div><input id="editAutopay" type="checkbox" name="autopay"> autopay</div></div>
-      <div class="field-row"><label>Paid</label><div><input id="editPaid" type="checkbox" name="paid"> paid</div></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><label style="margin:0">AutoPay</label><input id="editAutopay" type="checkbox" name="autopay" style="width:18px;height:18px;margin:0"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><label style="margin:0">Paid</label><input id="editPaid" type="checkbox" name="paid" style="width:18px;height:18px;margin:0"></div>
       <div class="field-row"><label>Paid Date</label><input id="editPaidDate" type="date" name="paid_date"></div>
       <div class="actions"><button type="submit" class="btn-gold">Save</button><button type="button" onclick="closeEdit()" class="btn-muted">Cancel</button></div>
     </form>
@@ -1799,10 +2303,22 @@
       <div class="field-row"><label>Name</label><input id="subName" type="text" name="name" required></div>
       <div class="field-row"><label>Day Due</label><input id="subDayDue" type="number" min="1" max="31" name="day_due" required></div>
       <div class="field-row"><label>Payment</label><input id="subPayment" type="number" step="0.01" name="payment" required></div>
-      <div class="field-row"><label>Recurring</label><div><input id="subRecurring" type="checkbox" name="recurring" onchange="toggleSubscriptionRecurringEdit()"> recurring</div></div>
+      <div class="field-row"><label>Recurring</label><input id="subRecurring" type="checkbox" name="recurring" onchange="toggleSubscriptionRecurringEdit()" style="width:18px;height:18px;margin:0"></div>
       <div class="field-row sub-recurring-edit-fields"><label>Timeframe</label><select id="subRecurringTimeframe" name="recurring_timeframe" onchange="toggleSubscriptionTimeframeEdit()"><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="specified_months">Every X Months</option></select></div>
       <div class="field-row" id="subYearlyMonthRow" style="display:none"><label>Yearly Month</label><select id="subYearlyMonth" name="yearly_month"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
-      <div class="field-row" id="subRecurringMonthsRow" style="display:none"><label>Every # Months</label><input id="subRecurringEveryMonths" type="number" min="1" step="1" name="recurring_every_months"></div>
+      <div id="subRecurringMonthsRow" style="display:none">
+        <div class="field-row"><label>Starting Date</label><input id="subStartMonth" type="date" name="start_month" style="width:160px"></div>
+        <div class="field-row"><label>Every How Many Months</label>
+          <select id="subRecurringEveryMonths" name="recurring_every_months">
+            <option value="1">Every 1 month</option>
+            <option value="2">Every 2 months</option>
+            <option value="3">Every 3 months (quarterly)</option>
+            <option value="4">Every 4 months</option>
+            <option value="6">Every 6 months (bi-annual)</option>
+            <option value="12">Every 12 months (yearly)</option>
+          </select>
+        </div>
+      </div>
       <div class="actions"><button type="submit" class="btn-gold">Save</button><button type="button" onclick="closeSubscriptionEdit()" class="btn-muted">Cancel</button></div>
     </form>
     <form id="deleteSubscriptionForm" method="post" action="" style="margin-top:10px" onsubmit="return confirmDelete('this subscription')">
@@ -2134,6 +2650,31 @@
   </div>
 </div>
 
+<!-- FEEDBACK MODAL -->
+<div id="feedbackModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:500px">
+    <h3>💬 Send Feedback</h3>
+    <p style="font-size:13px;color:#3a1f6e;margin-bottom:14px">Have a question, found a bug, or want to leave a review? Send a message directly to the admin panel.</p>
+    <form method="post" action="/feedback/submit" class="stack-form">
+      <input type="hidden" name="month" value="{{month}}">
+      <input type="hidden" name="view" value="{{view}}">
+      <input type="hidden" name="page" value="{{page}}">
+      <div class="field-row">
+        <label>Subject</label>
+        <input type="text" name="subject" placeholder="e.g. Bug report, Feature idea, Love it!">
+      </div>
+      <div class="field-row">
+        <label>Message</label>
+        <textarea name="message" style="min-height:140px;resize:vertical;color:#000;background:#fff" placeholder="Describe your issue, idea, or leave a review..." required></textarea>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn-gold">Send Message</button>
+        <button type="button" onclick="closeFeedback()" class="btn-muted">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- ROLLOVER MODAL -->
 <div id="rolloverModal" class="modal-overlay">
   <div class="modal-box">
@@ -2222,6 +2763,78 @@ function rcEval(){
 }
 
 // ── PAYCHECK SECTION ACCORDION (NEW) ──
+function adminTab(tab){
+  ['overview','versions','banner','users','feedback'].forEach(t=>{
+    const el=document.getElementById('admtab-'+t);
+    const btn=document.getElementById('admtab-btn-'+t);
+    if(el) el.style.display=(t===tab)?'block':'none';
+    if(btn){
+      btn.style.color=(t===tab)?'var(--gold)':'#8a7aaa';
+      btn.style.borderBottom=(t===tab)?'2px solid var(--gold)':'2px solid transparent';
+    }
+  });
+  try{ sessionStorage.setItem('ns_admin_tab', tab); }catch(e){}
+}
+
+function openFeedback(){ document.getElementById('feedbackModal').style.display='block'; }
+function filterFeedback(type){
+  // Update filter button styles
+  ['all','unread','feedback','review'].forEach(t=>{
+    const btn = document.getElementById('fb-filter-'+t);
+    if(!btn) return;
+    const active = t === type;
+    btn.style.color = active ? 'var(--gold)' : '#4a2a7a';
+    btn.style.borderBottom = active ? '2px solid var(--gold)' : '2px solid transparent';
+  });
+  // Filter rows
+  document.querySelectorAll('.fb-row').forEach(row=>{
+    const isRead = row.dataset.read === '1';
+    const rowType = row.dataset.type || 'unread';
+    let show = false;
+    if(type === 'all') show = true;
+    else if(type === 'unread') show = !isRead;
+    else if(type === 'feedback') show = rowType === 'feedback';
+    else if(type === 'review') show = rowType === 'review';
+    row.style.display = show ? '' : 'none';
+  });
+  try{ sessionStorage.setItem('ns_fb_filter', type); }catch(e){}
+}
+
+function reuseAdminBanner(text, startDate, endDate){
+  const t=document.querySelector('input[name="banner_text"]');
+  const s=document.querySelector('input[name="banner_start_date"]');
+  const e=document.querySelector('input[name="banner_end_date"]');
+  const cb=document.querySelector('input[name="banner_enabled"]');
+  if(t) t.value=text;
+  if(s) s.value=startDate;
+  if(e) e.value=endDate;
+  if(cb) cb.checked=true;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function closeFeedback(){ document.getElementById('feedbackModal').style.display='none'; }
+
+function toggleAdminEntry(id){
+  const el=document.getElementById('admin-entry-'+id);
+  if(el) el.style.display=el.style.display==='none'?'block':'none';
+}
+
+function filterAdminUsers(){
+  const q=(document.getElementById('adminUserSearch').value||'').toLowerCase();
+  document.querySelectorAll('.admin-user-row').forEach(row=>{
+    row.style.display=(row.dataset.search||'').includes(q)?'':'none';
+  });
+}
+
+function toggleSubsWidget(){
+  const body = document.getElementById('subs-widget-body');
+  const chevron = document.getElementById('subs-widget-chevron');
+  if(!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if(chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+  try{ sessionStorage.setItem('ns_subs_widget_open', isOpen ? '0' : '1'); }catch(e){}
+}
+
 function togglePaycheckSection(sectionId){
   const body = document.getElementById(sectionId.replace('paycheck-section-', 'paycheck-body-'));
   const chevron = document.getElementById(sectionId.replace('paycheck-section-', 'paycheck-chevron-'));
@@ -2229,6 +2842,29 @@ function togglePaycheckSection(sectionId){
   const isOpen = body.classList.contains('open');
   body.classList.toggle('open', !isOpen);
   if(chevron) chevron.classList.toggle('open', !isOpen);
+  // Persist state so it survives page reloads
+  try{
+    const key = 'ns_pk_open_' + sectionId;
+    sessionStorage.setItem(key, (!isOpen) ? '1' : '0');
+  }catch(e){}
+}
+
+function restorePaycheckSections(){
+  // Restore any saved open/closed states, overriding the Jinja defaults
+  document.querySelectorAll('.paycheck-section').forEach(sec => {
+    const key = 'ns_pk_open_' + sec.id;
+    try{
+      const saved = sessionStorage.getItem(key);
+      if(saved === null) return; // no saved state, keep Jinja default
+      const bodyId = sec.id.replace('paycheck-section-', 'paycheck-body-');
+      const chevronId = sec.id.replace('paycheck-section-', 'paycheck-chevron-');
+      const body = document.getElementById(bodyId);
+      const chevron = document.getElementById(chevronId);
+      const shouldBeOpen = saved === '1';
+      if(body){ body.classList.toggle('open', shouldBeOpen); }
+      if(chevron){ chevron.classList.toggle('open', shouldBeOpen); }
+    }catch(e){}
+  });
 }
 
 // ── PAYCHECK OWNER GROUP ACCORDION (NEW) ──
@@ -2367,7 +3003,15 @@ function openSubscriptionEdit(id,name,dayDue,payment,recurring,timeframe,everyMo
   document.getElementById('subName').value=name||''; document.getElementById('subDayDue').value=normalizeNumberForInput(dayDue)||'';
   document.getElementById('subPayment').value=normalizeNumberForInput(payment)||''; document.getElementById('subRecurring').checked=!!recurring;
   document.getElementById('subRecurringTimeframe').value=timeframe||'monthly';
-  document.getElementById('subRecurringEveryMonths').value=normalizeNumberForInput(everyMonths)||'';
+  const everyMonthsSel = document.getElementById('subRecurringEveryMonths');
+  if(everyMonthsSel){
+    const evVal = String(parseInt(normalizeNumberForInput(everyMonths)||'1'));
+    let found = false;
+    for(let opt of everyMonthsSel.options){ if(opt.value===evVal){opt.selected=true;found=true;break;} }
+    if(!found) everyMonthsSel.options[0].selected=true;
+  }
+  const startMonthEl = document.getElementById('subStartMonth');
+  if(startMonthEl) startMonthEl.value = '';
   document.getElementById('subYearlyMonth').value=normalizeNumberForInput(yearlyMonth)||'1';
   toggleSubscriptionRecurringEdit(); toggleSubscriptionTimeframeEdit();
   document.getElementById('subscriptionEditModal').style.display='block';
@@ -2379,13 +3023,17 @@ function toggleSubscriptionRecurring(checkboxEl){
   const on=!!checkboxEl.checked;
   form.querySelectorAll('.sub-recurring-fields').forEach(el=>el.style.display=on?'':'none');
   const tf=form.querySelector('select[name="recurring_timeframe"]');
-  if(tf&&on){ toggleSubscriptionTimeframe(tf); } else { const mr=form.querySelector('.sub-recurring-months'); const yr=form.querySelector('.sub-yearly-month'); if(mr) mr.style.display='none'; if(yr) yr.style.display='none'; }
+  if(tf&&on){ toggleSubscriptionTimeframe(tf); } else {
+    form.querySelectorAll('.sub-recurring-months').forEach(el=>el.style.display='none');
+    form.querySelectorAll('.sub-yearly-month').forEach(el=>el.style.display='none');
+  }
 }
 function toggleSubscriptionTimeframe(selectEl){
   const form=selectEl?.closest('form'); if(!form) return;
-  const mr=form.querySelector('.sub-recurring-months'); const yr=form.querySelector('.sub-yearly-month');
-  if(mr) mr.style.display=(selectEl.value==='specified_months')?'':'none';
-  if(yr) yr.style.display=(selectEl.value==='yearly')?'':'none';
+  const isSpecified = selectEl.value==='specified_months';
+  const isYearly = selectEl.value==='yearly';
+  form.querySelectorAll('.sub-recurring-months').forEach(el=>el.style.display=isSpecified?'':'none');
+  form.querySelectorAll('.sub-yearly-month').forEach(el=>el.style.display=isYearly?'':'none');
 }
 function toggleSubscriptionRecurringEdit(){
   const r=document.getElementById('subRecurring'); const on=r&&r.checked;
@@ -2428,7 +3076,7 @@ const TOUR_STEPS=[
     nav:()=>{ tourGoPage('dashboard'); tourPosition('.overview-grid-top',null); }
   },
   {
-    title:'⚡ Set Your Current Balance',
+    title:'⚡ Set Your Projected Ending Balance',
     text:'Enter your real account balance here. NorthStar calculates projections, risk alerts, and paycheck planning from this number.',
     nav:()=>{ tourGoPage('dashboard'); tourPosition('form[action="/settings/starting-balance"]',null); }
   },
@@ -2456,6 +3104,11 @@ const TOUR_STEPS=[
     title:'☑ Marking Bills Paid',
     text:'Hit Paid to mark a bill done — it logs to History automatically. Use Postpone to push a bill to the next check.',
     nav:()=>{ tourGoPage('entries'); tourPosition('.paycheck-section',null); }
+  },
+  {
+    title:'⚖ Balance Adjustment',
+    text:'Notice your bank balance doesn\'t match NorthStar? Use the Balance Adjustment widget at the top of the Bills page. Enter what your bank actually shows and pick the date — NorthStar calculates the difference and drops a correction entry into the planner on that date so the running balance snaps to match.',
+    nav:()=>{ tourGoPage('entries'); tourPosition('#subscriptions-on-bills',null); }
   },
   {
     title:'🔁 Add Recurring Bills / Income',
@@ -2646,6 +3299,8 @@ function tourPosition(selector, titleMatch){
     if(arrow) arrow.style.display='none'; // hide arrow for simplicity
   }, 420);
 }
+
+
 function openRollover(){ document.getElementById('rolloverModal').style.display='block'; }
 function closeRollover(){ document.getElementById('rolloverModal').style.display='none'; }
 function openDayEvents(dayKey){
@@ -2747,6 +3402,8 @@ window.addEventListener('DOMContentLoaded', ()=>{
   // Set quick-add date to today
   const qad = document.getElementById('quickAddDate');
   if(qad){ const now = new Date(); qad.value = now.toISOString().slice(0,10); }
+  const adjDate = document.getElementById('adjDate');
+  if(adjDate){ const now = new Date(); adjDate.value = now.toISOString().slice(0,10); }
 
   try{ addCsrfToForms(); } catch(e){ console.error('addCsrfToForms failed',e); }
   try{ applyInputHints(); } catch(e){ console.error('applyInputHints failed',e); }
@@ -2775,6 +3432,28 @@ window.addEventListener('DOMContentLoaded', ()=>{
     if(params.get('settings')==='1'){ openSettings(); smShow(params.get('settings_tab')||'paychecks'); }
   }catch(e){ console.error('settings init failed',e); }
   try{ snLoad(); }catch(e){ console.error('snLoad failed',e); }
+  restorePaycheckSections();
+  // Restore feedback filter
+  if(document.getElementById('fb-filter-all')){
+    try{ filterFeedback(sessionStorage.getItem('ns_fb_filter')||'all'); }catch(e){}
+  }
+  // Restore admin tab state
+  if(document.getElementById('admtab-overview')){
+    try{
+      const savedTab = sessionStorage.getItem('ns_admin_tab') || 'overview';
+      adminTab(savedTab);
+    }catch(e){ adminTab('overview'); }
+  }
+  // Restore subscriptions widget state
+  try{
+    const subsOpen = sessionStorage.getItem('ns_subs_widget_open');
+    if(subsOpen === '1'){
+      const body = document.getElementById('subs-widget-body');
+      const chevron = document.getElementById('subs-widget-chevron');
+      if(body) body.style.display = 'block';
+      if(chevron) chevron.style.transform = 'rotate(180deg)';
+    }
+  }catch(e){}
 });
 
 // ── STICKY NOTES (server-backed) ──
@@ -2895,6 +3574,23 @@ document.addEventListener('DOMContentLoaded', ()=>{
     });
   }
 });
+</script>
+
+<script>
+// Paycheck bucket ending balances — used by balance adjustment
+var paycheckBuckets = [{% for pk in paycheck_plan %}{% if pk.index > 0 %}{"date":"{{pk.date}}","ending":{{pk.ending_balance}}}{% if not loop.last %},{% endif %}{% endif %}{% endfor %}];
+function updatePlannerBalance(adjDate){
+  if(!adjDate || paycheckBuckets.length===0) return;
+  // Find the paycheck bucket whose date is on or before adjDate
+  var balance = paycheckBuckets[0].ending;
+  for(var i=0; i<paycheckBuckets.length; i++){
+    if(paycheckBuckets[i].date <= adjDate){
+      balance = paycheckBuckets[i].ending;
+    }
+  }
+  var el = document.getElementById('plannerBalanceInput');
+  if(el) el.value = balance;
+}
 </script>
 </body>
 </html>
