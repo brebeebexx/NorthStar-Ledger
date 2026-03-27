@@ -331,6 +331,7 @@ def init_db():
     ensure_column(c, "bills", "recurring_every_months", "recurring_every_months integer")
     ensure_column(c, "bills", "recurring_end_date", "recurring_end_date text")
     ensure_column(c, "bills", "note", "note text")
+    ensure_column(c, "bills", "snap_balance", "snap_balance real")
     ensure_column(c, "paychecks", "income_type", "income_type text default 'paycheck'")
     ensure_column(c, "paychecks", "household_id", "household_id integer")
     ensure_column(c, "ledger", "household_id", "household_id integer")
@@ -703,7 +704,7 @@ def get_month_starting_balance(c, month, household_id=1):
             (household_id, prev_month),
         ).fetchone()["s"]
         prev_bills = c.execute(
-            "select coalesce(sum(amount),0) s from bills where household_id=? and deleted_at is null and substr(due_date,1,7)=? and lower(coalesce(note,'')) not like '%postponed%'",
+            "select coalesce(sum(amount),0) s from bills where household_id=? and deleted_at is null and substr(due_date,1,7)=? and lower(coalesce(note,'')) not like '%postponed%' and coalesce(category,'bill') != 'adjustment'",
             (household_id, prev_month),
         ).fetchone()["s"]
         return float(prev_start) + float(prev_income) - float(prev_bills)
@@ -727,11 +728,9 @@ def projected_checkbook(c, month, household_id=1, carryover_bill_ids=None, start
         event_date = (b["planned_pay_date"] or b["due_date"])
         events.append((event_date, b["name"], -abs(float(b["amount"]))))
 
-    # Include Balance Adjustment ledger entries so they affect the projected running balance
-    for row in c.execute("select tx_date, label, amount from ledger where household_id=? and label='Balance Adjustment' and substr(tx_date,1,7)=? order by tx_date, id", (household_id, month)).fetchall():
-        events.append((row["tx_date"], row["label"], float(row["amount"])))
 
-    events.sort(key=lambda x: (x[0], 1 if x[1] == 'Balance Adjustment' else 0))
+
+    events.sort(key=lambda x: x[0])
     running = 0.0
     timeline = []
     first_negative = None
@@ -827,7 +826,11 @@ def build_paycheck_plan(bills_for_month, paychecks, starting_balance, buckets):
                 is_prior_month_carry = bool(b.get("is_prior_month_carry"))
                 is_adjustment = bool(b.get("is_adjustment"))
                 if is_adjustment:
-                    running += amt
+                    snap = b["snap_balance"] if b["snap_balance"] is not None else None
+                    if snap is not None:
+                        running = float(snap)
+                    else:
+                        running += amt
                     items.append({"bill": b, "amount": amt, "can_pay": True, "is_paid": True,
                                   "is_postponed": False, "is_prior_month_carry": False,
                                   "is_adjustment": True, "running_after": running})
@@ -861,6 +864,7 @@ def build_paycheck_plan(bills_for_month, paychecks, starting_balance, buckets):
         type_index = type_counts[income_type]
         label_base = "Income" if income_type == "other" else "Paycheck"
 
+        unpaid_remaining = 0.0
         for b in groups.get(i, []):
             amt = float(b["amount"])
             is_paid = bool(b["paid"])
@@ -868,16 +872,20 @@ def build_paycheck_plan(bills_for_month, paychecks, starting_balance, buckets):
             is_prior_month_carry = bool(b.get("is_prior_month_carry"))
             is_adjustment = bool(b.get("is_adjustment"))
             if is_adjustment:
-                # Adjustments use their signed amount directly to snap the running balance
-                running += amt
-                effective_amt = 0.0  # already applied above
-                items.append({"bill": b, "amount": amt, "can_pay": True, "is_paid": True,
+                snap = b["snap_balance"] if b["snap_balance"] is not None else None
+                if snap is not None:
+                    running = float(snap)
+                else:
+                    running -= amt
+                items.append({"bill": b, "amount": amt, "can_pay": True, "is_paid": False,
                               "is_postponed": False, "is_prior_month_carry": False,
                               "is_adjustment": True, "running_after": running})
             else:
                 effective_amt = 0.0 if (is_postponed or is_prior_month_carry) else amt
                 can_pay = True if (is_paid or is_postponed or is_prior_month_carry) else (running - effective_amt) >= 0
                 running -= effective_amt
+                if not is_paid and not is_postponed and not is_prior_month_carry:
+                    unpaid_remaining += amt
                 items.append({"bill": b, "amount": amt, "can_pay": can_pay, "is_paid": is_paid,
                               "is_postponed": is_postponed, "is_prior_month_carry": is_prior_month_carry,
                               "is_adjustment": False, "running_after": running})
@@ -887,6 +895,7 @@ def build_paycheck_plan(bills_for_month, paychecks, starting_balance, buckets):
             "date": p["pay_date"], "owner": p["owner"], "income_type": income_type,
             "label_base": label_base, "display_label": f"{label_base} {type_index}",
             "paycheck_amount": paycheck_amt, "starting_available": available,
+            "unpaid_remaining": unpaid_remaining,
             "items": items, "ending_balance": running, "goes_negative": running < 0,
         })
         carry = running
@@ -1362,7 +1371,11 @@ def dashboard():
     dashboard_note_row = c.execute("select note_text from dashboard_notes where household_id=?", (household_id,)).fetchone()
     dashboard_note_text = (dashboard_note_row["note_text"] if dashboard_note_row else "") or ""
 
-    planner_items = [dict(b) for b in bills]
+    planner_items = []
+    for b in bills:
+        d = dict(b)
+        d["is_adjustment"] = (d.get("category") == "adjustment")
+        planner_items.append(d)
     for t in ledger:
         if (t["note"] or "") == "trip contribution" and float(t["amount"] or 0) < 0:
             planner_items.append({
@@ -1370,15 +1383,6 @@ def dashboard():
                 "amount": abs(float(t["amount"])), "paid": 1, "category": "trip",
                 "recurring": 0, "autopay": 0, "paycheck_bucket": None,
                 "planned_pay_date": t["tx_date"], "is_adjustment": False,
-            })
-        elif t["label"] == "Balance Adjustment":
-            amt = float(t["amount"] or 0)
-            planner_items.append({
-                "id": 2000000 + int(t["id"]), "name": "Balance Adjustment",
-                "due_date": t["tx_date"], "planned_pay_date": t["tx_date"],
-                "amount": amt, "paid": 1, "category": "adjustment",
-                "recurring": 0, "autopay": 0, "paycheck_bucket": None,
-                "note": t["note"] or "", "is_adjustment": True,
             })
 
     bills_due = sum(r["amount"] for r in unpaid_bills)
@@ -2236,7 +2240,9 @@ def subscriptions_update(item_id):
         if yearly_month < 1 or yearly_month > 12: yearly_month = None
     except Exception: yearly_month = None
     if name:
-        c.execute('update subscriptions set name=?, day_due=?, payment=?, recurring=?, recurring_timeframe=?, recurring_every_months=?, yearly_month=? where id=? and household_id=? and deleted_at is null', (name, day_due, payment, recurring, timeframe, (every if timeframe=="specified_months" else None), (yearly_month if timeframe=="yearly" else None), item_id, household_id))
+        start_date_raw = (request.form.get('start_month', '') or '').strip()
+        start_month = start_date_raw[:7] if start_date_raw else None
+        c.execute('update subscriptions set name=?, day_due=?, payment=?, recurring=?, recurring_timeframe=?, recurring_every_months=?, yearly_month=?, start_month=? where id=? and household_id=? and deleted_at is null', (name, day_due, payment, recurring, timeframe, (every if timeframe=='specified_months' else None), (yearly_month if timeframe=='yearly' else None), (start_month if timeframe=='specified_months' else None), item_id, household_id))
     c.commit(); c.close()
     return redirect_dashboard_from_form(request.form)
 
@@ -2465,49 +2471,24 @@ def balance_adjust():
         new_balance = 0.0
     note = (request.form.get("adjustment_note", "") or "").strip()
 
-    # Use provided date or fall back to today
     adj_date = (request.form.get("adjustment_date", "") or "").strip()
     try:
         datetime.strptime(adj_date, "%Y-%m-%d")
     except Exception:
         adj_date = local_now().strftime("%Y-%m-%d")
 
-    # Compute NorthStar's running balance at adj_date by replaying all events up to that date
-    # This mirrors projected_checkbook: starting balance + paychecks - bills + prior adjustments
-    starting = get_month_starting_balance(c, month, household_id)
-
-    # All paychecks on or before adj_date
-    income_to_date = c.execute(
-        "select coalesce(sum(amount),0) s from paychecks where household_id=? and pay_date<=?",
-        (household_id, adj_date)
-    ).fetchone()["s"]
-
-    # All unpaid bills with planned/due date on or before adj_date (what planner deducts)
-    # Compute NorthStar's running balance at adj_date by replaying the planner:
-    # starting balance + paychecks up to date - paid bills up to date (current month only)
-    # This matches exactly what the running balance column shows in the planner.
-    starting = get_month_starting_balance(c, month, household_id)
-
-    try:
-        northstar_balance = float(request.form.get("planner_balance", "0") or "0")
-    except Exception:
-        northstar_balance = 0.0
-
-    # Write the difference as a ledger entry to snap running balance to bank value
-    difference = new_balance - northstar_balance
-
-    if difference != 0:
-        full_note = f"Adjusted from ${northstar_balance:,.2f} to ${new_balance:,.2f}"
-        if note:
-            full_note += f" — {note}"
-        c.execute(
-            "insert into ledger(tx_date,label,amount,note,household_id) values(?,?,?,?,?)",
-            (adj_date, "Balance Adjustment", round(difference, 2), full_note, household_id)
-        )
+    # Store the target balance directly as snap_balance — the planner will teleport running to this value
+    full_note = f"Balance set to ${new_balance:,.2f}"
+    if note:
+        full_note += f" — {note}"
+    c.execute(
+        "insert into bills(name,due_date,planned_pay_date,amount,paid,paid_date,category,note,snap_balance,recurring,autopay,household_id) "
+        "values(?,?,?,0,1,?,'adjustment',?,?,0,0,?)",
+        ("Balance Adjustment", adj_date, adj_date, adj_date, full_note, round(new_balance, 2), household_id)
+    )
 
     c.commit(); c.close()
     return redirect(url_for("dashboard", month=month, view=view, page="entries", r=int(datetime.now().timestamp() * 1000)))
-
 
 @app.post("/rollover")
 def rollover():

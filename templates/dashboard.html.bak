@@ -234,13 +234,13 @@
 
     /* ── OVERVIEW GRID (updated — 2 col top, 3 col bottom) ── */
     .overview-grid-top {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;
     }
     .overview-grid-bottom {
-      display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px;
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 18px;
     }
     .stat-card {
-      border-radius: var(--radius-sm); padding: 16px; border: 1px solid; position: relative; overflow: hidden;
+      border-radius: var(--radius-sm); padding: 18px 16px; border: 1px solid; position: relative; overflow: hidden; min-height: 96px;
     }
     .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
     .stat-card.balance { background: linear-gradient(135deg, #f0fff8, #e6fff4); border-color: rgba(34,201,122,0.25); }
@@ -254,8 +254,8 @@
     .stat-card.savings-stat { background: linear-gradient(135deg, #f0f8ff, #e6f4ff); border-color: rgba(74,144,217,0.25); }
     .stat-card.savings-stat::before { background: var(--bar-blue); }
 
-    .stat-card-label { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #7a6a9a; margin-bottom: 6px; }
-    .overview-value { font-family: 'Cinzel', serif; font-size: 26px; font-weight: 900; color: var(--purple-deep); letter-spacing: -0.5px; }
+    .stat-card-label { font-size: 11px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #7a6a9a; margin-bottom: 8px; }
+    .overview-value { font-family: 'Cinzel', serif; font-size: 26px; font-weight: 900; color: var(--purple-deep); letter-spacing: -0.5px; line-height: 1.1; }
     .overview-value.large { font-size: 30px; }
 
     /* ── UPCOMING BILLS WIDGET ── */
@@ -314,14 +314,22 @@
     .btn-gold { background: linear-gradient(135deg, var(--gold), var(--bar-orange)); color: var(--purple-deep); box-shadow: 0 4px 16px rgba(245,200,66,0.3); }
     .btn-muted { background: #9a8cba; }
     .btn-danger { background: linear-gradient(135deg, #e03050, #b00020); }
-    .btn-sm { padding: 4px 10px; min-height: 28px; font-size: 12px; }
+    .btn-sm { padding: 5px 11px; min-height: 30px; font-size: 12px; border-radius: 8px; }
+    .btn-reconcile {
+      background: linear-gradient(135deg, #4a90d9, #2a6abf);
+      color: #fff; font-size: 12px; font-weight: 700; padding: 5px 12px;
+      min-height: 30px; border-radius: 8px; border: none; gap: 4px;
+      white-space: nowrap; cursor: pointer; font-family: 'DM Sans', sans-serif;
+      display: inline-flex; align-items: center; transition: filter 0.15s;
+    }
+    .btn-reconcile:hover { filter: brightness(1.12); transform: none; }
 
     form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .stack-form { display: block !important; }
-    .field-row { display: grid; grid-template-columns: 130px 1fr; gap: 8px; align-items: center; margin-bottom: 10px; }
+    .field-row { display: grid; grid-template-columns: 140px 1fr; gap: 8px; align-items: center; margin-bottom: 10px; }
     .field-row label { font-size: 13px; font-weight: 600; color: #4a3a6a; }
     .stack-form input, .stack-form select { width: 100%; }
-    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
 
     /* ── TABLE ── */
     table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
@@ -379,10 +387,10 @@
     .calc-result { margin-top: 10px; font-size: 15px; line-height: 1.5; text-align: center; font-weight: 600; color: var(--purple-deep); }
 
     /* ── MODALS ── */
-    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(16,8,32,0.75); z-index: 9999; backdrop-filter: blur(2px); }
-    .modal-box { max-width: 440px; margin: 8vh auto; background: #fff; border: 1px solid var(--tint-mid); border-radius: var(--radius); padding: 22px; box-shadow: 0 24px 64px rgba(0,0,0,0.3), 0 0 0 1px rgba(245,200,66,0.1); }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(16,8,32,0.75); z-index: 9999; backdrop-filter: blur(2px); overflow-y: auto; }
+    .modal-box { max-width: 440px; margin: 6vh auto 4vh; background: #fff; border: 1px solid var(--tint-mid); border-radius: var(--radius); padding: 24px; box-shadow: 0 24px 64px rgba(0,0,0,0.3), 0 0 0 1px rgba(245,200,66,0.1); }
     .modal-box h3 { margin-top: 0; padding-bottom: 12px; border-bottom: 1px solid var(--tint-soft); margin-bottom: 16px; }
-    .modal-wide { max-width: 780px; max-height: 84vh; overflow: auto; }
+    .modal-wide { max-width: 780px; }
 
     /* ── SETTINGS MODAL (rebuilt) ── */
     #settingsModal .modal-box { padding: 0; overflow: hidden; background: #3a1f6e; border: 1px solid rgba(200,170,255,0.15); }
@@ -654,17 +662,23 @@
       .layout { grid-template-columns: 1fr; }
       .sidebar { position: static; }
       #top { position: static; }
+      .overview-grid-bottom { grid-template-columns: repeat(3, 1fr); }
     }
     @media(max-width: 700px) {
       .wrap { padding: 0 10px 24px; }
       .card { padding: 12px; }
       .field-row { grid-template-columns: 1fr; gap: 4px; }
-      .overview-grid-top, .overview-grid-bottom { grid-template-columns: 1fr; }
+      .overview-grid-top { grid-template-columns: 1fr; }
+      .overview-grid-bottom { grid-template-columns: 1fr 1fr; }
       table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
       th, td { white-space: nowrap; font-size: 11px; padding: 6px; }
       .calendar-grid { display: table !important; table-layout: fixed; width: 100%; }
       .calendar-cell { height: 100px; }
       .calendar-events { max-height: 64px; }
+      .paycheck-section-header { flex-wrap: wrap; gap: 8px; }
+    }
+    @media(max-width: 480px) {
+      .overview-grid-bottom { grid-template-columns: 1fr; }
     }
 
     details > summary { cursor: pointer; font-size: 13px; color: var(--purple-lite); font-weight: 600; padding: 4px 0; }
@@ -729,6 +743,20 @@
   </style>
 </head>
 <body>
+<script>
+// Save scroll position before ALL form submits (including modal forms) so we can restore after redirect
+document.addEventListener('submit', function(e){
+  try{ sessionStorage.setItem('ns_scroll_y', window.scrollY); }catch(ex){}
+  // If submitting from inside the settings modal, also save which tab was open
+  if(e.target.closest('#settingsModal')){
+    try{
+      const activeTab = document.querySelector('#settingsModal .sm-nav-btn.active');
+      if(activeTab){ sessionStorage.setItem('ns_settings_reopen_tab', activeTab.id.replace('smnav-','')); }
+      sessionStorage.setItem('ns_settings_reopen', '1');
+    }catch(ex){}
+  }
+});
+</script>
 <div class="wrap">
   <div class="layout">
 
@@ -890,12 +918,15 @@
       {% if page == 'dashboard' %}
 
       <!-- Overview: 2 large cards on top -->
+      {% set this_month_end_balance = paycheck_plan[-1]['ending_balance'] if paycheck_plan else projection['starting'] %}
       <div class="overview-grid-top">
         <div class="stat-card balance">
           <div class="stat-card-label">Projected Ending Balance</div>
-          <div class="overview-value large">${{fmt_money(balance)}}</div>
+          <div class="overview-value large">${{fmt_money(this_month_end_balance)}}</div>
           <div style="margin-top:8px">
-            {% if current_risk_balance < 0 %}
+            {% if this_month_end_balance < 0 %}
+              <span class="badge badge-status-bad">⚠ Goes negative</span>
+            {% elif current_risk_balance < 0 %}
               <span class="badge badge-status-bad">⚠ Risk after unpaid bills</span>
             {% else %}
               <span class="badge badge-status-ok">✓ Covers all bills</span>
@@ -1045,7 +1076,7 @@
                       {% elif ev.type == 'paycheck' %}
                         <button type="button" class="cal-event-btn cal-event" data-type="paycheck" onclick="openPaycheckEdit('{{ev.id}}','{{ev.title|replace("'","\\'")}}','{{ev.pay_date}}','{{fmt_money(ev.amount)}}','{{ev.income_type}}')"><span class="badge badge-paycheck">Pay: {{ev.title}}</span></button>
                       {% elif ev.type == 'subscription' %}
-                        <button type="button" class="cal-event-btn cal-event" data-type="subscription" onclick="openSubscriptionEdit('{{ev.id}}','{{ev.name|replace("'","\\'")}}','{{ev.day_due}}','{{fmt_money(ev.payment)}}',{{1 if ev.recurring else 0}},'{{ev.recurring_timeframe}}','{{ev.recurring_every_months}}','{{ev.yearly_month}}')"><span class="badge badge-subscription">Sub: {{ev.title}}</span></button>
+                        <button type="button" class="cal-event-btn cal-event" data-type="subscription" onclick="openSubscriptionEdit('{{ev.id}}','{{ev.name|replace("'","\\'")}}','{{ev.day_due}}','{{fmt_money(ev.payment)}}',{{1 if ev.recurring else 0}},'{{ev.recurring_timeframe}}','{{ev.recurring_every_months}}','{{ev.yearly_month}}','')"><span class="badge badge-subscription">Sub: {{ev.title}}</span></button>
                       {% endif %}
                     {% endfor %}
                   </div>
@@ -1070,7 +1101,8 @@
           {% if promotions_ending_soon|length == 0 %}
             <p class="good">✓ No promotions expiring in the next 60 days.</p>
           {% else %}
-            <ul>{% for p in promotions_ending_soon %}<li><b>{{p.card_name}}</b> — {{p.promo_name}}
+            <ul>{% for p in promotions_ending_soon %}<li>
+              <b>{{p.card_name}}</b> — <span style="color:var(--bad);font-weight:700">${{fmt_money(p.balance)}}</span> remaining
               {% if p.days_left < 0 %}<span class="badge badge-due">Expired {{-p.days_left}}d ago</span>
               {% elif p.days_left == 0 %}<span class="badge badge-due">Ends today</span>
               {% else %}<span class="badge {% if p.days_left <= 14 %}badge-due{% else %}badge-paid{% endif %}">{{p.days_left}}d left</span>{% endif %}
@@ -1180,40 +1212,32 @@
           <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
           <select id="entryType" name="entry_type" onchange="onEntryTypeChange()"><option value="income">Income</option><option value="bill" selected>Bill/Debt</option><option value="trip_contribution">Trip Contribution</option></select>
           <div id="incomeFields" style="display:none"><select name="income_kind" id="incomeKind" onchange="onIncomeKindChange()"><option value="paycheck">Paycheck</option><option value="other">Other Income</option></select><input name="owner" id="incomeOwner" placeholder="Owner"><span class="date-hint-wrap" id="incomePayDateWrap"><input type="date" id="incomePayDate" name="pay_date"><span class="date-hint"></span></span><input type="number" step="0.01" name="income_amount" placeholder="Amount"></div>
-          <div id="billFields" style="display:none"><input name="name" placeholder="Name"><input type="date" name="due_date"><input type="number" step="0.01" name="bill_amount" placeholder="Amount"><select name="category" id="billCategory"><option value="bill">bill</option>{% for c in categories %}<option value="{{c.name}}">{{c.name}}</option>{% endfor %}</select><label><input type="checkbox" name="recurring" onchange="toggleEntryRecurringEnd(this)"> recurring</label><span class="entry-recurring-end" style="display:none"><input type="date" name="recurring_end_date"></span><label><input type="checkbox" name="autopay"> autopay</label></div>
+          <div id="billFields" style="display:none"><input name="name" placeholder="Name"><input type="date" name="due_date"><input type="number" step="0.01" name="bill_amount" placeholder="Amount"><input type="hidden" name="category" value="bill"><label><input type="checkbox" name="recurring" onchange="toggleEntryRecurringEnd(this)"> recurring</label><span class="entry-recurring-end" style="display:none"><input type="date" name="recurring_end_date"></span><label><input type="checkbox" name="autopay"> autopay</label></div>
           <div id="tripContributionFields" style="display:none"><select name="contrib_trip_id">{% for t in trips %}<option value="{{t.id}}">{{t.name}}</option>{% endfor %}</select><input type="date" name="contrib_date"><input type="number" step="0.01" name="contrib_amount" placeholder="Amount"></div>
           <button class="btn-gold">Add</button>
         </form>
 
-        <!-- BALANCE ADJUSTMENT — above paycheck sections -->
-        {% if page == 'entries' %}
-        <div style="border:1px solid rgba(160,160,180,0.25);border-radius:var(--radius-sm);padding:12px 16px;margin-bottom:14px;background:rgba(160,160,180,0.06)">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-            <span style="font-family:'Cinzel',serif;font-size:13px;font-weight:700;color:var(--gold)">⚖ Balance Adjustment</span>
-          </div>
-          <form method="post" action="/balance/adjust" style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
-            <input type="hidden" name="month" value="{{month}}">
-            <input type="hidden" name="view" value="{{view}}">
-            <input type="hidden" name="page" value="{{page}}">
-            <input type="hidden" name="adjustment_note" value="">
-            <div>
-              <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:3px">Your bank balance ($)</label>
-              <input type="number" step="0.01" name="new_balance" placeholder="e.g. 143.00" required style="width:180px">
-            </div>
-            <div>
-              <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:3px">As of date</label>
-              <input type="date" name="adjustment_date" id="adjDate" style="width:160px">
-            </div>
-            <div style="display:flex;flex-direction:column;justify-content:flex-end">
-              <button type="submit" class="btn-gold">Adjust</button>
-            </div>
-          </form>
-        </div>
-        {% endif %}
-
-        <!-- PAYCHECK SECTIONS — individual collapsible widgets (NEW) -->
+                <!-- PAYCHECK SECTIONS — individual collapsible widgets -->
         {% for pk in paycheck_plan %}
-        {% set is_current_pk = (pk['index'] > 0 and (not loop.nextitem or loop.nextitem['index'] == 0)) or (pk['index'] == paycheck_plan|length - 1) %}
+        {# Determine which paycheck period contains today.
+           A paycheck "owns" dates from its pay_date up to (but not including) the next paycheck's pay_date.
+           If today is before the first paycheck, show the first one as current.
+           If today is after all paychecks, show the last one as current. #}
+        {% if pk['index'] == 0 %}
+          {% set is_current_pk = false %}
+        {% else %}
+          {% set next_pk_date = loop.nextitem['date'] if (loop.nextitem and loop.nextitem['index'] > 0) else '' %}
+          {% if next_pk_date %}
+            {% set is_current_pk = (pk['date'] <= today_str and today_str < next_pk_date) %}
+          {% else %}
+            {# Last paycheck in the list — current if today is on or after its date #}
+            {% set is_current_pk = (pk['date'] <= today_str) %}
+          {% endif %}
+          {# Fallback: if today is before ALL paychecks, mark the first real one current #}
+          {% if not is_current_pk and loop.first and pk['index'] > 0 and today_str < pk['date'] %}
+            {% set is_current_pk = true %}
+          {% endif %}
+        {% endif %}
         <div class="paycheck-section" id="paycheck-section-{{loop.index}}">
           <div class="paycheck-section-header {% if is_current_pk %}is-current{% endif %}"
                onclick="togglePaycheckSection('paycheck-section-{{loop.index}}')">
@@ -1224,29 +1248,46 @@
               {% if is_current_pk %}<span class="badge badge-paid" style="font-size:10px">CURRENT</span>{% endif %}
               {% if pk['goes_negative'] %}<span class="badge badge-due">Needs attention</span>{% else %}<span class="badge badge-paid">OK</span>{% endif %}
             </div>
-            <span class="paycheck-section-chevron {% if is_current_pk %}open{% endif %}" id="paycheck-chevron-{{loop.index}}">▼</span>
+            <div style="display:flex;align-items:center;gap:8px;flex-shrink:0" onclick="event.stopPropagation()">
+              {% if is_current_pk %}
+              {% set paid_total = namespace(v=0) %}
+              {% for it in pk['items'] %}
+                {% if it['is_paid'] and not it.get('is_adjustment') %}
+                  {% set paid_total.v = paid_total.v + it['amount'] %}
+                {% endif %}
+              {% endfor %}
+              {% set pk_actual = fmt_money(pk['starting_available'] - paid_total.v) %}
+              <button type="button" class="btn-reconcile"
+                onclick="openReconcile('{{pk_actual}}')">
+                ⚖ Reconcile to Bank
+              </button>
+              {% endif %}
+              <span class="paycheck-section-chevron {% if is_current_pk %}open{% endif %}" id="paycheck-chevron-{{loop.index}}"
+                    onclick="event.stopPropagation(); togglePaycheckSection('paycheck-section-{{loop.index}}')">▼</span>
+            </div>
           </div>
           <div class="paycheck-section-body {% if is_current_pk %}open{% endif %}" id="paycheck-body-{{loop.index}}">
             <div style="padding-top:10px">
             <p style="margin:0 0 10px"><b>{{pk['display_label']}}</b>{% if pk['date'] %} — {{fmt_date(pk['date'])}} ({{pk['owner']}}){% endif %} | Amount: <b>${{fmt_money(pk['paycheck_amount'])}}</b> | Available: <b>${{fmt_money(pk['starting_available'])}}</b>{% if pk['income_type']=='last_month' %} <button type="button" class="btn-sm" onclick="openStartOverride('{{month}}','{{fmt_money(pk['starting_available'])}}')">Edit</button>{% endif %}</p>
+            <div style="overflow-x:auto">
             <table class="planner-table">
-              <tr><th>Due / Planned</th><th>Name</th><th>Category</th><th>Amount</th><th>Running Balance</th><th>Recurring</th><th>Status</th><th>AutoPay</th><th>Edit</th><th>Action</th></tr>
+              <tr><th>Due / Planned</th><th>Name</th><th>Amount</th><th>Running Balance</th><th>Recurring</th><th>Status</th><th>AutoPay</th><th>Edit</th><th>Action</th></tr>
               {% for pass_paid in [1,0] %}{% for it in pk['items'] %}
               {% if (pass_paid == 1 and it['is_paid'] and not it.get('is_adjustment')) or (pass_paid == 0 and (not it['is_paid'] or it.get('is_adjustment'))) %}
               {% if it.get('is_adjustment') %}
               <tr style="background:rgba(160,160,180,0.1)">
                 <td>{{fmt_date(it['bill']['due_date'])}}</td>
                 <td><span style="font-weight:600;color:var(--gold)">⚖ Balance Adjustment</span>{% if it['bill']['note'] %}<div style="font-size:11px;color:#3a1f6e">{{it['bill']['note']}}</div>{% endif %}</td>
-                <td><span class="badge" style="background:rgba(160,160,180,0.2);color:#a0a0c0;font-size:10px">ADJ</span></td>
-                <td style="color:{% if it['amount'] >= 0 %}var(--good){% else %}var(--bad){% endif %};font-weight:700">{{'+' if it['amount'] >= 0 else ''}}${{fmt_money(it['amount'])}}</td>
+                <td style="color:var(--bad);font-weight:700">-${{fmt_money(it['amount'])}}</td>
                 <td><strong>${{fmt_money(it['running_after'])}}</strong></td>
                 <td>—</td><td>—</td><td>—</td><td>—</td>
                 <td>
-                  <form method="post" action="/ledger/delete/{{ (it['bill']['id']|int) - 2000000 }}" onsubmit="return confirm('Delete this balance adjustment?')" style="margin:0">
+                  <form method="post" action="/bills/delete/{{it['bill']['id']}}" style="margin:0"
+                        onsubmit="return confirm('Remove this balance adjustment?')">
                     <input type="hidden" name="month" value="{{month}}">
                     <input type="hidden" name="view" value="{{view}}">
                     <input type="hidden" name="page" value="{{page}}">
-                    <button type="submit" class="btn-sm btn-danger" style="background:#f8d7da;color:#721c24;border:1px solid #f5c2c7">🗑 Delete</button>
+                    <button type="submit" class="btn-sm btn-danger">Delete</button>
                   </form>
                 </td>
               </tr>
@@ -1254,7 +1295,6 @@
               <tr {% if it['is_paid'] %}style="background:#e9f9ee"{% elif it['is_postponed'] %}style="background:#fffde7"{% endif %}>
                 <td><div>{{fmt_date(it['bill']['due_date'])}}</div>{% if it['bill']['planned_pay_date'] and it['bill']['planned_pay_date'] != it['bill']['due_date'] %}<div style="font-size:11px;color:#7a5a00">Planned: {{fmt_date(it['bill']['planned_pay_date'])}}</div>{% endif %}</td>
                 <td>{{it['bill']['name']}}{% if it['bill']['note'] %}<div style="font-size:11px;color:#7a5a00">📝 {{it['bill']['note']}}</div>{% endif %}</td>
-                <td>{{it['bill']['category']}}</td>
                 <td>${{fmt_money(it['amount'])}}</td>
                 <td>${{fmt_money(it['running_after'])}}</td>
                 <td>{% if it['bill']['recurring'] %}YES{% else %}NO{% endif %}</td>
@@ -1272,7 +1312,7 @@
                     <span class="badge badge-paid">✓</span>
                   {% elif not it['is_paid'] %}
                     <div style="display:grid;gap:4px">
-                      <form method="post" action="/bills/toggle/{{it['bill']['id']}}" style="margin:0"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><button type="submit" class="btn-sm" style="background:#dff6df;color:#1f5d1f;border:1px solid #bde7bd;width:100%">☑ Paid</button></form>
+                      <form method="post" action="/bills/toggle/{{it['bill']['id']}}" style="margin:0"><input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}"><input type="hidden" name="anchor" value="paycheck-section-{{loop.index}}"><button type="submit" class="btn-sm" style="background:#dff6df;color:#1f5d1f;border:1px solid #bde7bd;width:100%">☑ Paid</button></form>
                       <button type="button" class="btn-sm" onclick="openPostponeModal('{{it['bill']['id']}}','{{it['bill']['planned_pay_date'] or it['bill']['due_date']}}')" style="background:#fff9d9;color:#7a5a00;border:1px solid #f2e4a3">Postpone</button>
                     </div>
                   {% else %}
@@ -1283,6 +1323,7 @@
               {% endif %}
               {% endif %}{% endfor %}{% endfor %}
             </table>
+            </div>
             <p style="margin-top:10px"><b>End of {{pk['display_label']|lower}} projected:</b> ${{fmt_money(pk['ending_balance'])}} {% if pk['goes_negative'] %}<span class="badge badge-due">Needs adjustment</span>{% else %}<span class="badge badge-paid">Good</span>{% endif %}</p>
             </div>
           </div>
@@ -1319,17 +1360,17 @@
           <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
           <select id="entryType" name="entry_type" onchange="onEntryTypeChange()"><option value="income">Income</option><option value="bill" selected>Bill/Debt</option><option value="trip_contribution">Trip Contribution</option></select>
           <div id="incomeFields" style="display:none"><select name="income_kind" id="incomeKind" onchange="onIncomeKindChange()"><option value="paycheck">Paycheck</option><option value="other">Other Income</option></select><input name="owner" id="incomeOwner" placeholder="Owner"><span class="date-hint-wrap" id="incomePayDateWrap"><input type="date" id="incomePayDate" name="pay_date"><span class="date-hint"></span></span><input type="number" step="0.01" name="income_amount" placeholder="Amount"></div>
-          <div id="billFields" style="display:none"><input name="name" placeholder="Name"><input type="date" name="due_date"><input type="number" step="0.01" name="bill_amount" placeholder="Amount"><select name="category" id="billCategory"><option value="bill">bill</option>{% for c in categories %}<option value="{{c.name}}">{{c.name}}</option>{% endfor %}</select><label><input type="checkbox" name="recurring" onchange="toggleEntryRecurringEnd(this)"> recurring</label><span class="entry-recurring-end" style="display:none"><input type="date" name="recurring_end_date"></span><label><input type="checkbox" name="autopay"> autopay</label></div>
+          <div id="billFields" style="display:none"><input name="name" placeholder="Name"><input type="date" name="due_date"><input type="number" step="0.01" name="bill_amount" placeholder="Amount"><input type="hidden" name="category" value="bill"><label><input type="checkbox" name="recurring" onchange="toggleEntryRecurringEnd(this)"> recurring</label><span class="entry-recurring-end" style="display:none"><input type="date" name="recurring_end_date"></span><label><input type="checkbox" name="autopay"> autopay</label></div>
           <div id="tripContributionFields" style="display:none"><select name="contrib_trip_id">{% for t in trips %}<option value="{{t.id}}">{{t.name}}</option>{% endfor %}</select><input type="date" name="contrib_date"><input type="number" step="0.01" name="contrib_amount" placeholder="Amount"></div>
           <button class="btn-gold">Add</button>
         </form>
+        <div style="overflow-x:auto">
         <table class="planner-table">
-          <tr><th>Due</th><th>Name</th><th>Category</th><th>Recurring</th><th>Amount</th><th>Status</th><th>Paycheck</th><th>AutoPay</th><th>Edit</th><th>Mark Paid</th></tr>
+          <tr><th>Due</th><th>Name</th><th>Recurring</th><th>Amount</th><th>Status</th><th>Paycheck</th><th>AutoPay</th><th>Edit</th><th>Mark Paid</th></tr>
           {% for b in unpaid_bills_all %}
           <tr {% if b.is_postponed %}style="background:#fffde7"{% endif %}>
             <td>{{fmt_date(b.due_date)}}</td>
             <td>{{b.name}}{% if b.note %}<div style="font-size:11px;color:#7a5a00">📝 {{b.note}}</div>{% endif %}</td>
-            <td>{{b.category}}</td>
             <td>{% if b.recurring %}YES{% else %}NO{% endif %}</td>
             <td>${{fmt_money(b.amount)}}</td>
             <td>{% if b.is_postponed %}<span class="badge" style="background:#fff1a8;color:#7a5a00">POSTPONED</span>{% else %}<span class="badge badge-due">DUE</span>{% endif %}</td>
@@ -1345,6 +1386,7 @@
           </tr>
           {% endfor %}
         </table>
+        </div>
         <p style="margin-top:10px;font-size:12.5px"><span class="badge badge-paid">PAID</span> items disappear from this checklist and stay logged in History.</p>
       </div>
       {% endif %}
@@ -1416,7 +1458,8 @@
           </div>
           <div class="actions"><button class="btn-gold">Add Promotion</button></div>
         </form>
-        <table class="adaptive-table" style="margin-top:14px">
+        <div style="overflow-x:auto;margin-top:14px">
+        <table class="adaptive-table">
           <colgroup><col><col><col><col><col><col><col style="width:72px"><col style="width:90px"></colgroup>
           <tr><th>Account</th><th>Promotion</th><th>Start</th><th>End</th><th>Total</th><th>Status</th><th>Edit</th><th>Complete</th></tr>
           {% for p in promotions %}
@@ -1447,9 +1490,8 @@
           </tr>
           {% endfor %}
         </table>
+        </div>
       </div>
-
-      <!-- DEBT WIDGETS STACKED -->
       <div>
 
         <!-- Credit Card Tracker — own widget -->
@@ -1462,7 +1504,8 @@
             <div class="field-row"><label>Credit Limit</label><input type="number" step="0.01" name="credit_limit" placeholder="0.00"></div>
             <div class="actions"><button class="btn-gold">Add Credit Account</button></div>
           </form>
-          <table class="adaptive-table" style="margin-top:12px">
+          <div style="overflow-x:auto;margin-top:12px">
+          <table class="adaptive-table">
             <colgroup><col><col><col><col><col style="width:72px"><col style="width:90px"></colgroup>
             <tr><th>Card Name</th><th>Interest Rate</th><th>Credit Limit</th><th>Status</th><th>Edit</th><th>Action</th></tr>
             {% for cc in credit_accounts %}
@@ -1474,6 +1517,7 @@
             </tr>
             {% endfor %}
           </table>
+          </div>
         </div>
 
         <!-- Loans Tracker — own widget -->
@@ -1488,7 +1532,8 @@
             <div class="field-row"><label>Note</label><input type="text" name="note" maxlength="24" placeholder="Optional note (24 max)"></div>
             <div class="actions"><button class="btn-gold">Add Loan</button></div>
           </form>
-          <table class="adaptive-table" style="margin-top:12px">
+          <div style="overflow-x:auto;margin-top:12px">
+          <table class="adaptive-table">
             <colgroup><col><col><col><col><col><col><col style="width:72px"><col style="width:90px"></colgroup>
             <tr><th>Loan Name</th><th>Interest Rate</th><th>Loan Amount</th><th>End Date</th><th>Note</th><th>Status</th><th>Edit</th><th>Action</th></tr>
             {% for ln in loans %}{% if not ln.paid_off %}
@@ -1501,6 +1546,7 @@
             </tr>
             {% endif %}{% endfor %}
           </table>
+          </div>
         </div>
 
       </div><!-- end debt-widgets-grid -->
@@ -1567,7 +1613,7 @@
           <div class="field-row"><label>Subscription Name</label><input name="name" required></div>
           <div class="field-row"><label>Day Due</label><input type="number" min="1" max="31" name="day_due" required></div>
           <div class="field-row"><label>Payment</label><input type="number" step="0.01" name="payment" required></div>
-          <div class="field-row"><label>Recurring</label><div><input type="checkbox" name="recurring" checked onchange="toggleSubscriptionRecurring(this)"> recurring</div></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><label style="margin:0">Recurring</label><input type="checkbox" name="recurring" checked onchange="toggleSubscriptionRecurring(this)"></div>
           <div class="field-row sub-recurring-fields"><label>Timeframe</label><select name="recurring_timeframe" onchange="toggleSubscriptionTimeframe(this)"><option value="monthly" selected>Monthly</option><option value="yearly">Yearly</option><option value="specified_months">Every X Months</option></select></div>
           <div class="field-row sub-yearly-month" style="display:none"><label>Yearly Month</label><select name="yearly_month"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
           <div class="field-row sub-recurring-months" style="display:none">
@@ -1588,7 +1634,8 @@
           <div class="actions"><button class="btn-gold">Add Subscription</button></div>
         </form>
 
-        <table class="adaptive-table" style="margin-top:14px">
+        <div style="overflow-x:auto;margin-top:14px">
+        <table class="adaptive-table">
           <tr><th>Name</th><th>Day Due</th><th>Payment</th><th>Recurring</th><th>Type / Schedule</th><th>Edit</th></tr>
           {% for s in subscriptions %}
           <tr>
@@ -1601,10 +1648,11 @@
               {% else %}Monthly (day {{s.day_due}})
               {% endif %}
             </td>
-            <td><button class="btn-sm" type="button" onclick="openSubscriptionEdit('{{s.id}}','{{s.name|replace("'","\\'")}}','{{s.day_due}}','{{'%.2f'|format(s.payment or 0)}}',{{1 if (s.recurring or 0) else 0}},'{{s.recurring_timeframe or "monthly"}}','{{s.recurring_every_months or ""}}','{{s.yearly_month or ""}}')">Edit</button></td>
+            <td><button class="btn-sm" type="button" onclick="openSubscriptionEdit('{{s.id}}','{{s.name|replace("'","\\'")}}','{{s.day_due}}','{{'%.2f'|format(s.payment or 0)}}',{{1 if (s.recurring or 0) else 0}},'{{s.recurring_timeframe or "monthly"}}','{{s.recurring_every_months or ""}}','{{s.yearly_month or ""}}','{{s.start_month or ""}}')">Edit</button></td>
           </tr>
           {% endfor %}
         </table>
+        </div>
       </div>
       {% endif %}
       <!-- END SUBSCRIPTIONS PAGE -->
@@ -1691,6 +1739,7 @@
           </div>
           <button class="btn-gold">Add Entry</button>
         </form>
+        <div style="overflow-x:auto">
         <table class="adaptive-table">
           <tr><th>Date</th><th>Label</th><th>Amount</th><th>Note</th><th>Running Balance</th><th>Edit</th></tr>
           {% for t in ledger_running %}
@@ -1702,7 +1751,7 @@
                 <span class="badge" style="background:rgba(160,160,180,0.2);color:#8a8aaa;font-size:10px">ADJ</span>
               {% endif %}
             </td>
-            <td style="color:{% if t[3] >= 0 %}var(--good){% else %}var(--bad){% endif %};font-weight:600">
+            <td style="color:{% if t[3] >= 0 %}var(--ok){% else %}var(--bad){% endif %};font-weight:600">
               {{'%+.2f'|format(t[3])}}
             </td>
             <td style="font-size:12px;color:var(--muted)">{{t[4] or '—'}}</td>
@@ -1720,7 +1769,8 @@
           </tr>
           {% endfor %}
         </table>
-        <p style="margin-top:10px;font-size:14px"><b>Ending Balance:</b> ${{fmt_money(balance)}}</p>
+        </div>
+        <p style="margin-top:12px;font-size:14px"><b>Ending Balance:</b> ${{fmt_money(balance)}}</p>
       </div>
       {% endif %}
 
@@ -1890,7 +1940,7 @@
                 </div>
                 <div style="margin-bottom:12px">
                   <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Banner Text</label>
-                  <input type="text" name="banner_text" value="{{banner_text}}" placeholder="e.g. Update 3.2 is live!">
+                  <textarea name="banner_text" rows="5" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;color:#000;background:#fff;line-height:1.5;min-height:100px">{{banner_text}}</textarea>
                 </div>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
                   <div>
@@ -2096,9 +2146,70 @@
 
 <!-- ═══════ MODALS ═══════ -->
 
+<!-- Reconcile to Bank -->
+<div id="reconcileModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:460px">
+    <h3>⚖ Reconcile to Bank Balance</h3>
+    <p style="font-size:13px;color:#4a3a6a;margin-bottom:16px;line-height:1.6">
+      Enter what your bank account shows right now. NorthStar compares that against your paycheck minus only the bills you've already marked paid — unpaid bills aren't counted because they haven't left your account yet. The difference gets added as a correction entry.
+    </p>
+
+    <!-- NorthStar vs Bank comparison -->
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:14px">
+      <div style="background:var(--tint-soft);border:1px solid var(--tint-mid);border-radius:var(--radius-sm);padding:12px;text-align:center">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#7a6a9a;margin-bottom:4px">After Paid Bills</div>
+        <div id="reconcileNorthStarVal" style="font-family:'Cinzel',serif;font-size:18px;font-weight:900;color:var(--purple-deep)">$0.00</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:3px">what NorthStar expects</div>
+      </div>
+      <div style="font-size:18px;color:var(--muted);text-align:center">↔</div>
+      <div style="background:#eaf5ff;border:1px solid #cde6ff;border-radius:var(--radius-sm);padding:12px;text-align:center">
+        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#3b82c4;margin-bottom:4px">Bank Shows</div>
+        <div id="reconcileBankPreview" style="font-family:'Cinzel',serif;font-size:18px;font-weight:900;color:#1a5fa0">—</div>
+      </div>
+    </div>
+
+    <!-- Live diff indicator -->
+    <div id="reconcileDiffRow" style="display:none;padding:10px 14px;border-radius:var(--radius-sm);margin-bottom:14px;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <span id="reconcileDiffLabel" style="font-size:13px;font-weight:600"></span>
+      <span id="reconcileDiffVal" style="font-family:'Cinzel',serif;font-size:15px;font-weight:700"></span>
+    </div>
+
+    <form id="reconcileForm" class="stack-form" method="post" action="/balance/adjust">
+      <input type="hidden" name="_csrf" value="{{ csrf_token }}">
+      <input type="hidden" name="month" value="{{month}}">
+      <input type="hidden" name="view" value="{{view}}">
+      <input type="hidden" name="page" value="entries">
+      <input type="hidden" id="reconcilePlannerBalance" name="planner_balance" value="">
+
+      <div class="field-row">
+        <label>Bank Balance</label>
+        <input id="reconcileBankInput" type="number" step="0.01" name="new_balance"
+               placeholder="e.g. 63.00" required oninput="updateReconcilePreview()">
+      </div>
+      <div class="field-row">
+        <label>Date</label>
+        <input id="reconcileAdjDate" type="date" name="adjustment_date" required>
+      </div>
+      <div class="field-row">
+        <label>Note <span style="font-weight:400;color:var(--muted);font-size:11px">(optional)</span></label>
+        <input type="text" name="adjustment_note" placeholder="e.g. bank sync 03-26-2026">
+      </div>
+
+      <div style="background:#f8f5ff;border:1px solid var(--tint-mid);border-radius:var(--radius-sm);padding:11px 13px;margin-bottom:4px;font-size:12px;color:#4a3a6a;line-height:1.6">
+        This inserts a <strong>Balance Adjustment</strong> bill into your current paycheck bucket. The running balance will snap to match your bank from that date forward.
+      </div>
+
+      <div class="actions">
+        <button type="submit" id="reconcileSubmitBtn" class="btn-gold">Apply Adjustment</button>
+        <button type="button" onclick="closeReconcile()" class="btn-muted">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Edit Bill -->
 <div id="editModal" class="modal-overlay">
-  <div class="modal-box">
+  <div class="modal-box" style="max-height:90vh;overflow-y:auto">
     <h3>Edit Bill</h3>
     <form id="editForm" class="stack-form" method="post" action="">
       <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
@@ -2107,14 +2218,14 @@
       <div class="field-row"><label>Due Date</label><input id="editDue" type="date" name="due_date" required></div>
       <div class="field-row"><label>Planned Pay Date</label><input id="editPlannedPay" type="date" name="planned_pay_date"></div>
       <div class="field-row"><label>Amount</label><input id="editAmount" type="number" step="0.01" name="amount" required></div>
-      <div class="field-row"><label>Recurring</label><div><input id="editRecurring" type="checkbox" name="recurring" onchange="toggleBillRecurringOptions()"> recurring payment</div></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><label style="margin:0">Recurring</label><input id="editRecurring" type="checkbox" name="recurring" onchange="toggleBillRecurringOptions()" style="width:18px;height:18px;margin:0"></div>
       <div id="editRecurringOptions" style="display:none">
         <div class="field-row"><label>Timeframe</label><select id="editRecurringTimeframe" name="recurring_timeframe" onchange="toggleBillRecurringOptions()"><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="specified_months">Every X Months</option></select></div>
         <div class="field-row" id="editRecurringMonthsRow" style="display:none"><label>Every # Months</label><input id="editRecurringEveryMonths" type="number" min="1" step="1" name="recurring_every_months"></div>
         <div class="field-row" id="editRecurringEndDateRow" style="display:none"><label>End Date</label><input id="editRecurringEndDate" type="date" name="recurring_end_date"></div>
       </div>
-      <div class="field-row"><label>AutoPay</label><div><input id="editAutopay" type="checkbox" name="autopay"> autopay</div></div>
-      <div class="field-row"><label>Paid</label><div><input id="editPaid" type="checkbox" name="paid"> paid</div></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><label style="margin:0">AutoPay</label><input id="editAutopay" type="checkbox" name="autopay" style="width:18px;height:18px;margin:0"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><label style="margin:0">Paid</label><input id="editPaid" type="checkbox" name="paid" style="width:18px;height:18px;margin:0"></div>
       <div class="field-row"><label>Paid Date</label><input id="editPaidDate" type="date" name="paid_date"></div>
       <div class="actions"><button type="submit" class="btn-gold">Save</button><button type="button" onclick="closeEdit()" class="btn-muted">Cancel</button></div>
     </form>
@@ -2301,10 +2412,22 @@
       <div class="field-row"><label>Name</label><input id="subName" type="text" name="name" required></div>
       <div class="field-row"><label>Day Due</label><input id="subDayDue" type="number" min="1" max="31" name="day_due" required></div>
       <div class="field-row"><label>Payment</label><input id="subPayment" type="number" step="0.01" name="payment" required></div>
-      <div class="field-row"><label>Recurring</label><div><input id="subRecurring" type="checkbox" name="recurring" onchange="toggleSubscriptionRecurringEdit()"> recurring</div></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><label style="margin:0">Recurring</label><input id="subRecurring" type="checkbox" name="recurring" onchange="toggleSubscriptionRecurringEdit()"></div>
       <div class="field-row sub-recurring-edit-fields"><label>Timeframe</label><select id="subRecurringTimeframe" name="recurring_timeframe" onchange="toggleSubscriptionTimeframeEdit()"><option value="monthly">Monthly</option><option value="yearly">Yearly</option><option value="specified_months">Every X Months</option></select></div>
       <div class="field-row" id="subYearlyMonthRow" style="display:none"><label>Yearly Month</label><select id="subYearlyMonth" name="yearly_month"><option value="1">January</option><option value="2">February</option><option value="3">March</option><option value="4">April</option><option value="5">May</option><option value="6">June</option><option value="7">July</option><option value="8">August</option><option value="9">September</option><option value="10">October</option><option value="11">November</option><option value="12">December</option></select></div>
-      <div class="field-row" id="subRecurringMonthsRow" style="display:none"><label>Every # Months</label><input id="subRecurringEveryMonths" type="number" min="1" step="1" name="recurring_every_months"></div>
+      <div id="subRecurringMonthsRow" style="display:none">
+        <div class="field-row"><label>Starting Date</label><input id="subStartMonth" type="date" name="start_month" style="width:160px"></div>
+        <div class="field-row"><label>Every How Many Months</label>
+          <select id="subRecurringEveryMonths" name="recurring_every_months">
+            <option value="1">Every 1 month</option>
+            <option value="2">Every 2 months</option>
+            <option value="3">Every 3 months (quarterly)</option>
+            <option value="4">Every 4 months</option>
+            <option value="6">Every 6 months (bi-annual)</option>
+            <option value="12">Every 12 months (yearly)</option>
+          </select>
+        </div>
+      </div>
       <div class="actions"><button type="submit" class="btn-gold">Save</button><button type="button" onclick="closeSubscriptionEdit()" class="btn-muted">Cancel</button></div>
     </form>
     <form id="deleteSubscriptionForm" method="post" action="" style="margin-top:10px" onsubmit="return confirmDelete('this subscription')">
@@ -2567,32 +2690,42 @@
               <div class="sm-help-card">
                 <div class="sm-help-icon">⬡</div>
                 <div class="sm-help-title">Dashboard</div>
-                <div class="sm-help-text">Monthly overview of balance, income, and bills. Use Set Balance to enter your current account total. Quick Add lets you log an expense instantly.</div>
+                <div class="sm-help-text">Monthly snapshot of your projected ending balance, planned income, unpaid bills, and savings. Quick Add lets you log an unplanned expense instantly without leaving the page.</div>
               </div>
               <div class="sm-help-card">
                 <div class="sm-help-icon">◈</div>
-                <div class="sm-help-title">Bills</div>
-                <div class="sm-help-text">Add bills with due dates. The projection widget at the top warns you before your balance goes negative. Each paycheck period is its own collapsible section.</div>
+                <div class="sm-help-title">Bills — Paycheck Planner</div>
+                <div class="sm-help-text">Bills are organized by paycheck period. The section containing today is open and marked CURRENT. The Projection widget at the top warns you before your balance goes negative.</div>
+              </div>
+              <div class="sm-help-card">
+                <div class="sm-help-icon">⚖</div>
+                <div class="sm-help-title">Reconcile to Bank</div>
+                <div class="sm-help-text">Your current paycheck section has a blue Reconcile to Bank button. Enter your real bank balance and NorthStar calculates the difference using only paid bills, then inserts a correction entry automatically.</div>
               </div>
               <div class="sm-help-card">
                 <div class="sm-help-icon">✦</div>
                 <div class="sm-help-title">Trips / Savings</div>
-                <div class="sm-help-text">Create savings goals and log contributions over time. Add a bill with category "savings" to track monthly savings toward any goal.</div>
+                <div class="sm-help-text">Set savings goals and track contributions over time with a progress bar. Add a bill with category "savings" to count monthly contributions toward any goal automatically.</div>
               </div>
               <div class="sm-help-card">
                 <div class="sm-help-icon">◉</div>
                 <div class="sm-help-title">Debt Tracker</div>
-                <div class="sm-help-text">Track promotions, credit cards, and loans each in their own widget. Use the debt calculator at the top to plan payoff timelines.</div>
+                <div class="sm-help-text">Three tools: Promotions tracks 0% interest deadlines, Credit Cards tracks limits, and Loans tracks payoff dates. The debt calculator at the top helps plan payoff timelines.</div>
               </div>
               <div class="sm-help-card">
                 <div class="sm-help-icon">↻</div>
                 <div class="sm-help-title">Subscriptions</div>
-                <div class="sm-help-text">Manage recurring subscriptions. The summary at the top shows your combined monthly cost across all billing frequencies.</div>
+                <div class="sm-help-text">Log every recurring service — monthly, yearly, or custom interval. The summary card shows your combined estimated monthly cost across all billing frequencies.</div>
+              </div>
+              <div class="sm-help-card">
+                <div class="sm-help-icon">▦</div>
+                <div class="sm-help-title">Calendar</div>
+                <div class="sm-help-text">Every bill, paycheck, trip, promotion end date, and subscription shown on one monthly grid. Click any event to edit it directly.</div>
               </div>
               <div class="sm-help-card">
                 <div class="sm-help-icon">🔁</div>
                 <div class="sm-help-title">New Month Rollover</div>
-                <div class="sm-help-text">At the start of each month click "Add Recurring Bills/Income" in the top bar to auto-populate bills and paychecks from your rules.</div>
+                <div class="sm-help-text">At the start of each month click "Add Recurring Bills/Income" in the top bar. It auto-populates all recurring bills and generates paychecks from your saved rules — one click sets up the whole month.</div>
               </div>
             </div>
             <div style="margin-top:16px;text-align:center">
@@ -2748,7 +2881,82 @@ function rcEval(){
   saveCalculatorState();
 }
 
-// ── PAYCHECK SECTION ACCORDION (NEW) ──
+// ── RECONCILE TO BANK ──
+function openReconcile(northstarBalanceStr) {
+  const nsVal = parseFloat(String(northstarBalanceStr).replace(/[$,]/g, '')) || 0;
+  const nsEl = document.getElementById('reconcileNorthStarVal');
+  if(nsEl) nsEl.textContent = '$' + nsVal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const pb = document.getElementById('reconcilePlannerBalance');
+  if(pb) pb.value = nsVal.toFixed(2);
+  // reset fields
+  const bi = document.getElementById('reconcileBankInput');
+  if(bi){ bi.value = ''; }
+  const bp = document.getElementById('reconcileBankPreview');
+  if(bp) bp.textContent = '—';
+  const dr = document.getElementById('reconcileDiffRow');
+  if(dr) dr.style.display = 'none';
+  const sb = document.getElementById('reconcileSubmitBtn');
+  if(sb) sb.disabled = false;
+  // set today's date
+  const rad = document.getElementById('reconcileAdjDate');
+  if(rad && !rad.value) rad.value = new Date().toISOString().slice(0,10);
+  document.getElementById('reconcileModal').style.display = 'block';
+  setTimeout(()=>{ if(bi) bi.focus(); }, 120);
+}
+
+function closeReconcile() {
+  document.getElementById('reconcileModal').style.display = 'none';
+}
+
+function updateReconcilePreview() {
+  const bi = document.getElementById('reconcileBankInput');
+  const nsEl = document.getElementById('reconcileNorthStarVal');
+  const bp = document.getElementById('reconcileBankPreview');
+  const dr = document.getElementById('reconcileDiffRow');
+  const dl = document.getElementById('reconcileDiffLabel');
+  const dv = document.getElementById('reconcileDiffVal');
+  const sb = document.getElementById('reconcileSubmitBtn');
+  if(!bi || !nsEl || !bp || !dr || !dl || !dv) return;
+
+  const bankRaw = parseFloat(bi.value);
+  if(isNaN(bankRaw)) {
+    bp.textContent = '—';
+    dr.style.display = 'none';
+    return;
+  }
+
+  const nsVal = parseFloat(String(nsEl.textContent).replace(/[$,]/g, '')) || 0;
+  const diff = nsVal - bankRaw; // positive = NS higher than bank (need to reduce)
+  const absDiff = Math.abs(diff);
+
+  bp.textContent = '$' + bankRaw.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+  dr.style.display = 'flex';
+
+  if(absDiff < 0.01) {
+    dr.style.background = 'var(--ok-bg)';
+    dr.style.border = '1px solid var(--ok-border)';
+    dr.style.borderRadius = 'var(--radius-sm)';
+    dr.style.padding = '10px 14px';
+    dl.textContent = '✓ Balances already match — no adjustment needed';
+    dl.style.color = '#0a7a4a';
+    dv.textContent = '';
+    if(sb) sb.disabled = true;
+  } else {
+    dr.style.background = diff > 0 ? 'var(--bad-bg)' : 'var(--ok-bg)';
+    dr.style.border = diff > 0 ? '1px solid var(--bad-border)' : '1px solid var(--ok-border)';
+    dr.style.borderRadius = 'var(--radius-sm)';
+    dr.style.padding = '10px 14px';
+    dl.textContent = diff > 0
+      ? 'NorthStar is $' + absDiff.toFixed(2) + ' higher than your bank'
+      : 'Your bank is $' + absDiff.toFixed(2) + ' higher than NorthStar';
+    dl.style.color = diff > 0 ? '#9a0020' : '#0a7a4a';
+    dv.textContent = (diff > 0 ? '−' : '+') + '$' + absDiff.toFixed(2) + ' correction will be added';
+    dv.style.color = diff > 0 ? '#9a0020' : '#0a7a4a';
+    if(sb) sb.disabled = false;
+  }
+}
+
+// ── PAYCHECK SECTION ACCORDION ──
 function adminTab(tab){
   ['overview','versions','banner','users','feedback'].forEach(t=>{
     const el=document.getElementById('admtab-'+t);
@@ -2896,7 +3104,6 @@ function closePostponeModal(){ document.getElementById('postponeModal').style.di
 function submitRemovePostpone(){
   const form=document.getElementById('postponeForm');
   document.getElementById('removePostponeFlag').value='1';
-  try{ sessionStorage.setItem('ns_scroll_y',String(window.scrollY||0)); }catch(e){}
   if(form&&typeof form.requestSubmit==='function') form.requestSubmit(); else if(form) form.submit();
 }
 
@@ -2983,13 +3190,23 @@ function openPromotionEdit(id,card,promo,startDate,endDate,balance,note){
 }
 function closePromotionEdit(){ document.getElementById('promotionEditModal').style.display='none'; }
 
-function openSubscriptionEdit(id,name,dayDue,payment,recurring,timeframe,everyMonths,yearlyMonth){
+function openSubscriptionEdit(id,name,dayDue,payment,recurring,timeframe,everyMonths,yearlyMonth,startMonth){
   document.getElementById('subscriptionEditForm').action='/subscriptions/update/'+id;
   document.getElementById('deleteSubscriptionForm').action='/subscriptions/delete/'+id;
   document.getElementById('subName').value=name||''; document.getElementById('subDayDue').value=normalizeNumberForInput(dayDue)||'';
   document.getElementById('subPayment').value=normalizeNumberForInput(payment)||''; document.getElementById('subRecurring').checked=!!recurring;
   document.getElementById('subRecurringTimeframe').value=timeframe||'monthly';
-  document.getElementById('subRecurringEveryMonths').value=normalizeNumberForInput(everyMonths)||'';
+  // Populate Every X months dropdown
+  const everyMonthsSel = document.getElementById('subRecurringEveryMonths');
+  if(everyMonthsSel){
+    const evVal = String(parseInt(normalizeNumberForInput(everyMonths)||'1'));
+    let found = false;
+    for(let opt of everyMonthsSel.options){ if(opt.value===evVal){opt.selected=true;found=true;break;} }
+    if(!found) everyMonthsSel.options[0].selected=true;
+  }
+  // Populate start_month date field
+  const startMonthEl = document.getElementById('subStartMonth');
+  if(startMonthEl) startMonthEl.value = startMonth || '';
   document.getElementById('subYearlyMonth').value=normalizeNumberForInput(yearlyMonth)||'1';
   toggleSubscriptionRecurringEdit(); toggleSubscriptionTimeframeEdit();
   document.getElementById('subscriptionEditModal').style.display='block';
@@ -3019,7 +3236,10 @@ function toggleSubscriptionRecurringEdit(){
   if(on){ toggleSubscriptionTimeframeEdit(); } else { const row=document.getElementById('subRecurringMonthsRow'); const yr=document.getElementById('subYearlyMonthRow'); if(row) row.style.display='none'; if(yr) yr.style.display='none'; }
 }
 function toggleSubscriptionTimeframeEdit(){
-  const t=document.getElementById('subRecurringTimeframe'); const row=document.getElementById('subRecurringMonthsRow'); const yr=document.getElementById('subYearlyMonthRow'); if(!t) return;
+  const t=document.getElementById('subRecurringTimeframe');
+  const row=document.getElementById('subRecurringMonthsRow');
+  const yr=document.getElementById('subYearlyMonthRow');
+  if(!t) return;
   if(row) row.style.display=(t.value==='specified_months')?'':'none';
   if(yr) yr.style.display=(t.value==='yearly')?'':'none';
 }
@@ -3040,88 +3260,97 @@ function openLoanEdit(id,loanName,interestRate,loanAmount,note,endDate){
 }
 function closeLoanEdit(){ document.getElementById('loanEditModal').style.display='none'; }
 
-// ── TOUR ──
 // ── TOUR ──────────────────────────────────────────────────────────────────
 const TOUR_STEPS=[
   {
     title:'Welcome to NorthStar Ledger ★',
-    text:'This quick tour walks you through the key features. Hit Next to move through each section — the page will jump to what we are talking about. Hit Skip anytime to exit.',
+    text:'This quick tour walks you through every feature. Hit Next to move through each section — the page will jump to what we\'re talking about. Hit Skip anytime to exit.',
     nav:()=>{ tourGoPage('dashboard'); tourPosition(null,null); }
   },
   {
     title:'⬡ Dashboard — Your Home Base',
-    text:'The Dashboard gives you a full monthly snapshot: current balance, planned income, unpaid bills, and savings progress.',
+    text:'The Dashboard gives you a full monthly snapshot at a glance: projected ending balance, planned income, unpaid bills remaining, and how much you\'ve saved this month.',
     nav:()=>{ tourGoPage('dashboard'); tourPosition('.overview-grid-top',null); }
   },
   {
-    title:'⚡ Set Your Projected Ending Balance',
-    text:'Enter your real account balance here. NorthStar calculates projections, risk alerts, and paycheck planning from this number.',
-    nav:()=>{ tourGoPage('dashboard'); tourPosition('form[action="/settings/starting-balance"]',null); }
-  },
-  {
     title:'📅 Coming Up Next',
-    text:'Your next 5 unpaid bills with urgency dots — red means overdue, orange means due soon, green means you have time.',
+    text:'Your next 5 unpaid bills with urgency indicators — red means the due date has already passed, orange means it\'s coming up soon, green means you have time.',
     nav:()=>{ tourGoPage('dashboard'); tourPosition('.upcoming-bills-list',null); }
   },
   {
     title:'⚡ Quick Add Expense',
-    text:'Got an unplanned expense? Type a name and amount here — no date needed. It drops straight into your current month.',
+    text:'Got an unplanned expense? Type a name and amount here and hit Add — it drops straight into the current month without leaving the dashboard.',
     nav:()=>{ tourGoPage('dashboard'); tourPosition('.quick-add-row',null); }
   },
   {
+    title:'✦ Trip & Savings Progress',
+    text:'Any savings goals you\'ve set show up here with a live progress bar. You can set up goals in the Trips / Savings tab.',
+    nav:()=>{ tourGoPage('dashboard'); tourPosition(null,'Trip / Savings Progress'); }
+  },
+  {
     title:'◈ Bills — Paycheck Planner',
-    text:'The Bills page is where you manage everything you owe. Each paycheck period has its own collapsible section. Your current paycheck is open by default.',
+    text:'The Bills page organizes everything by paycheck period. Each paycheck gets its own collapsible section. The one that contains today\'s date is open and marked CURRENT automatically.',
     nav:()=>{ tourGoPage('entries'); tourPosition('.paycheck-section',null); }
   },
   {
     title:'📊 No-Negative Projection',
-    text:'At the top of the Bills page, the Projection widget runs through your income and bills and tells you if your balance will go negative before your next paycheck.',
+    text:'At the top of the Bills page, the Projection widget scans all your income and bills and warns you before your balance goes negative — before it happens, not after.',
     nav:()=>{ tourGoPage('entries'); tourPosition(null,'No-Negative Projection'); }
   },
   {
     title:'☑ Marking Bills Paid',
-    text:'Hit Paid to mark a bill done — it logs to History automatically. Use Postpone to push a bill to the next check.',
+    text:'Hit ☑ Paid on any bill to mark it done — it logs to History automatically and turns the row green. Use Postpone to push a bill to a later date without deleting it.',
     nav:()=>{ tourGoPage('entries'); tourPosition('.paycheck-section',null); }
   },
   {
-    title:'⚖ Balance Adjustment',
-    text:'Notice your bank balance doesn\'t match NorthStar? Use the Balance Adjustment widget at the top of the Bills page. Enter what your bank actually shows and pick the date — NorthStar calculates the difference and drops a correction entry into the planner on that date so the running balance snaps to match.',
-    nav:()=>{ tourGoPage('entries'); tourPosition('#subscriptions-on-bills',null); }
+    title:'⚖ Reconcile to Bank',
+    text:'Your current paycheck section has a blue ⚖ Reconcile to Bank button in the header. Click it, enter what your bank actually shows, and NorthStar calculates the difference using only your paid bills — unpaid ones aren\'t counted because they haven\'t left your account yet. It inserts a correction entry so both numbers match.',
+    nav:()=>{ tourGoPage('entries'); tourPosition('.paycheck-section.is-current .paycheck-section-header, .paycheck-section',null); }
+  },
+  {
+    title:'⚠ Alert Widgets',
+    text:'The top of the Bills page also shows three alert cards: promotions expiring within 60 days, bills due today, and past-due bills so nothing slips through the cracks.',
+    nav:()=>{ tourGoPage('entries'); tourPosition('#promotion-alerts',null); }
   },
   {
     title:'🔁 Add Recurring Bills / Income',
-    text:'At the start of each new month, click this button to roll over all repeating bills and generate paychecks based on your rules in Settings.',
+    text:'At the start of each new month, click this button in the top bar to auto-populate all your recurring bills and generate paychecks from your saved rules in Settings. One click sets up the whole month.',
     nav:()=>{ tourGoPage('dashboard'); tourPosition('#applyRecurringForm',null); }
   },
   {
     title:'✦ Trips & Savings Goals',
-    text:'Set savings goals for trips or big purchases. Track contributions over time and watch the progress bar fill up.',
+    text:'Create savings goals for trips or big purchases. Log contributions over time and watch the progress bar fill up. You can also add a bill with category "savings" to track monthly contributions automatically.',
     nav:()=>{ tourGoPage('trips'); tourPosition('.card',null); }
   },
   {
     title:'◉ Debt Tracker',
-    text:'Three sections: Promotions to track 0% promo deadlines, Credit Cards to track balances and limits, and Loans to track payoff dates.',
+    text:'Three tools in one page: Promotions tracks 0% interest deadlines so you never miss a payoff date, Credit Cards tracks limits and balances, and Loans tracks payoff dates. The debt calculator at the top helps you plan payoff timelines.',
     nav:()=>{ tourGoPage('promotions'); tourPosition('.card',null); }
   },
   {
     title:'↻ Subscriptions',
-    text:'Track every recurring service. The summary at the top shows your total monthly cost across all billing frequencies.',
+    text:'Log every recurring service — monthly, yearly, or on a custom interval. The summary at the top shows your combined estimated monthly cost across all billing frequencies.',
     nav:()=>{ tourGoPage('subscriptions'); tourPosition('.sub-summary-grid',null); }
   },
   {
     title:'▦ Calendar',
-    text:'All your bills, paychecks, trips, and subscriptions on one grid. Click any event to edit it directly.',
-    nav:()=>{ tourGoPage('calendar'); tourPosition('.calendar-grid, table',null); }
+    text:'Every bill, paycheck, trip deadline, promotion end date, and subscription lands on this calendar. Click any event to edit it directly without hunting through lists.',
+    nav:()=>{ tourGoPage('calendar'); tourPosition('.calendar-grid',null); }
   },
   {
     title:'⊞ History',
-    text:'A running ledger of everything paid. Also archives completed promotions and paid-off loans.',
-    nav:()=>{ tourGoPage('checkbook'); tourPosition('.card',null); }
+    text:'A running ledger of everything that\'s been paid or logged. Completed promotions and paid-off loans are also archived here so you have a full record.',
+    nav:()=>{ tourGoPage('checkbook'); tourPosition('#checkbook',null); }
   },
   {
-    title:'⚙ Settings',
-    text:'Set up Recurring Paychecks so they auto-generate each month, and Recurring Bills so they roll over automatically. Once configured, each new month is one click.',
+    title:'⚙ Settings — Set Up Your Rules',
+    text:'This is where you configure Recurring Paychecks (so income auto-generates each month based on your pay schedule) and Recurring Bills (so bills roll over automatically). Once these are set up, each new month takes one click.',
     nav:()=>{ tourGoPage('dashboard'); setTimeout(()=>{ openSettings(); smShow('paychecks'); tourPosition('#settingsModal .sm-body',null); },400); }
+  },
+  {
+    title:'You\'re all set! ★',
+    text:'That\'s the full tour. You can replay it anytime from Settings → Help. If something doesn\'t look right, use ⚖ Reconcile to Bank on your current paycheck to sync with your actual account. Good luck! 🌟',
+    nav:()=>{ tourGoPage('dashboard'); tourPosition(null,null); }
   },
 ];
 
@@ -3169,6 +3398,13 @@ function toggleRuleCadenceRow(selectEl){ if(!selectEl) return; const row=selectE
 function toggleRuleTimeframeRow(selectEl){ if(!selectEl) return; const row=selectEl.closest('tr')||selectEl.parentElement; const mi=row?row.querySelector('input[name="months_mask"]'):null; if(!mi) return; const is=(selectEl.value==='specified_months'); mi.style.display=is?'':'none'; mi.required=is; }
 function toggleRecurringBillMonths(selectEl){ if(!selectEl) return; const c=selectEl.closest('form')||selectEl.parentElement; const mi=c?c.querySelector('input[name="recurring_every_months"]'):null; const yr=c?c.querySelector('.sub-yearly-month'):null; const ys=c?c.querySelector('select[name="yearly_month"]'):null; const is=(selectEl.value==='specified_months'); const iy=(selectEl.value==='yearly'); if(mi){ mi.style.display=is?'':'none'; mi.required=is; } if(yr) yr.style.display=iy?'':'none'; if(ys) ys.required=iy; }
 function saveSettingsActiveTab(){
+  // Save scroll position and which tab we're on so we can restore after reload
+  try{
+    sessionStorage.setItem('ns_scroll_y', window.scrollY);
+    const activeTab = document.querySelector('#settingsModal .sm-nav-btn.active');
+    if(activeTab){ sessionStorage.setItem('ns_settings_reopen_tab', activeTab.id.replace('smnav-','')); }
+    sessionStorage.setItem('ns_settings_reopen', '1');
+  }catch(e){}
   const paychecksTab=document.getElementById('smtab-paychecks');
   if(paychecksTab&&paychecksTab.style.display!=='none'){ const f=document.getElementById('paycheck-rules-bulk-form'); if(f) return f.submit(); }
   const fallback=document.getElementById('paycheck-rules-bulk-form'); if(fallback) fallback.submit();
@@ -3380,8 +3616,9 @@ window.addEventListener('DOMContentLoaded', ()=>{
   // Set quick-add date to today
   const qad = document.getElementById('quickAddDate');
   if(qad){ const now = new Date(); qad.value = now.toISOString().slice(0,10); }
-  const adjDate = document.getElementById('adjDate');
-  if(adjDate){ const now = new Date(); adjDate.value = now.toISOString().slice(0,10); }
+  // pre-fill reconcile date to today (modal opened on demand)
+  const rad = document.getElementById('reconcileAdjDate');
+  if(rad){ const now = new Date(); rad.value = now.toISOString().slice(0,10); }
 
   try{ addCsrfToForms(); } catch(e){ console.error('addCsrfToForms failed',e); }
   try{ applyInputHints(); } catch(e){ console.error('applyInputHints failed',e); }
@@ -3396,10 +3633,25 @@ window.addEventListener('DOMContentLoaded', ()=>{
   document.querySelectorAll('select[name="recurring_timeframe"]').forEach(sel=>{ try{ toggleRecurringBillMonths(sel); toggleSubscriptionTimeframe(sel); }catch(e){} });
   document.querySelectorAll('input[name="recurring"]').forEach(cb=>{ try{ if(cb.closest('#subscriptions')) toggleSubscriptionRecurring(cb); }catch(e){} });
   try{
-    const forms=document.querySelectorAll('form');
-    forms.forEach(f=>{ f.addEventListener('submit',()=>{ sessionStorage.setItem('ns_scroll_y',String(window.scrollY||0)); }); });
     const savedY=sessionStorage.getItem('ns_scroll_y');
-    if(savedY!==null){ const y=parseInt(savedY,10); if(!Number.isNaN(y)) window.scrollTo(0,y); sessionStorage.removeItem('ns_scroll_y'); }
+    if(savedY!==null){
+      const y=parseInt(savedY,10);
+      if(!Number.isNaN(y)){
+        // Use requestAnimationFrame to restore after layout is complete
+        requestAnimationFrame(()=>{ window.scrollTo(0,y); });
+      }
+      sessionStorage.removeItem('ns_scroll_y');
+    }
+  }catch(e){}
+  // Reopen settings modal on correct tab if a settings form was just saved
+  try{
+    const reopenSettings = sessionStorage.getItem('ns_settings_reopen');
+    if(reopenSettings === '1'){
+      sessionStorage.removeItem('ns_settings_reopen');
+      const tab = sessionStorage.getItem('ns_settings_reopen_tab') || 'paychecks';
+      sessionStorage.removeItem('ns_settings_reopen_tab');
+      openSettings(); smShow(tab);
+    }
   }catch(e){}
   {% if show_tour %}openTour();{% else %}
   // Resume tour if a navigation happened mid-tour
