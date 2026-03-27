@@ -317,8 +317,8 @@
     .btn-sm { padding: 5px 11px; min-height: 30px; font-size: 12px; border-radius: 8px; }
     .btn-reconcile {
       background: linear-gradient(135deg, #4a90d9, #2a6abf);
-      color: #fff; font-size: 12px; font-weight: 700; padding: 5px 12px;
-      min-height: 30px; border-radius: 8px; border: none; gap: 4px;
+      color: #fff; font-size: 14px; font-weight: 700; padding: 9px 18px;
+      min-height: 38px; border-radius: var(--radius-sm); border: none; gap: 6px;
       white-space: nowrap; cursor: pointer; font-family: 'DM Sans', sans-serif;
       display: inline-flex; align-items: center; transition: filter 0.15s;
     }
@@ -744,16 +744,37 @@
 </head>
 <body>
 <script>
-// Save scroll position before ALL form submits (including modal forms) so we can restore after redirect
-document.addEventListener('submit', function(e){
-  try{ sessionStorage.setItem('ns_scroll_y', window.scrollY); }catch(ex){}
-  // If submitting from inside the settings modal, also save which tab was open
-  if(e.target.closest('#settingsModal')){
-    try{
+// ── SCROLL SAVE HELPERS ──
+let _nsFormSubmitting = false;
+
+// nsCheckSettingsModal: save settings tab state if submitting from within settings
+function nsCheckSettingsModal(form){
+  try{
+    if(form && form.closest && form.closest('#settingsModal')){
       const activeTab = document.querySelector('#settingsModal .sm-nav-btn.active');
       if(activeTab){ sessionStorage.setItem('ns_settings_reopen_tab', activeTab.id.replace('smnav-','')); }
       sessionStorage.setItem('ns_settings_reopen', '1');
-    }catch(ex){}
+    }
+  }catch(ex){}
+}
+// nsSubmit: use instead of form.submit() so scroll is always saved
+function nsSubmit(form){
+  try{ sessionStorage.setItem('ns_scroll_y', window.scrollY); }catch(ex){}
+  _nsFormSubmitting = true;
+  nsCheckSettingsModal(form);
+  if(form && typeof form.requestSubmit==='function') form.requestSubmit();
+  else if(form) form.submit();
+}
+// Global listener catches all normal submit button clicks
+document.addEventListener('submit', function(e){
+  try{ sessionStorage.setItem('ns_scroll_y', window.scrollY); }catch(ex){}
+  _nsFormSubmitting = true;
+  nsCheckSettingsModal(e.target);
+});
+// Safety net: only save on unload when a form submit triggered the navigation
+window.addEventListener('beforeunload', function(){
+  if(_nsFormSubmitting){
+    try{ sessionStorage.setItem('ns_scroll_y', window.scrollY); }catch(ex){}
   }
 });
 </script>
@@ -1204,7 +1225,10 @@ document.addEventListener('submit', function(e){
             <a class="pill" href="/?month={{month}}&view=paycheck&page={{page}}" style="font-size:12px;padding:4px 10px">Per Paycheck</a>
             <a class="pill" href="/?month={{month}}&view=checklist&page={{page}}" style="font-size:12px;padding:4px 10px">Checklist</a>
           </span>
-          <button type="button" onclick="openPaycheckManager()">Edit Paychecks/Income</button>
+          <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <button type="button" onclick="openPaycheckManager()">Edit Paychecks/Income</button>
+            <button type="button" class="btn-reconcile" onclick="openReconcile()">⚖ Reconcile to Bank</button>
+          </div>
         </h3>
         <p style="margin:0 0 14px"><span class="badge badge-paid">Rollover from {{fmt_month_label(prev_month)}}: ${{fmt_money(month_start)}}</span></p>
         <h3>Add Income / Debt</h3>
@@ -1249,19 +1273,6 @@ document.addEventListener('submit', function(e){
               {% if pk['goes_negative'] %}<span class="badge badge-due">Needs attention</span>{% else %}<span class="badge badge-paid">OK</span>{% endif %}
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0" onclick="event.stopPropagation()">
-              {% if is_current_pk %}
-              {% set paid_total = namespace(v=0) %}
-              {% for it in pk['items'] %}
-                {% if it['is_paid'] and not it.get('is_adjustment') %}
-                  {% set paid_total.v = paid_total.v + it['amount'] %}
-                {% endif %}
-              {% endfor %}
-              {% set pk_actual = fmt_money(pk['starting_available'] - paid_total.v) %}
-              <button type="button" class="btn-reconcile"
-                onclick="openReconcile('{{pk_actual}}')">
-                ⚖ Reconcile to Bank
-              </button>
-              {% endif %}
               <span class="paycheck-section-chevron {% if is_current_pk %}open{% endif %}" id="paycheck-chevron-{{loop.index}}"
                     onclick="event.stopPropagation(); togglePaycheckSection('paycheck-section-{{loop.index}}')">▼</span>
             </div>
@@ -1278,7 +1289,7 @@ document.addEventListener('submit', function(e){
               <tr style="background:rgba(160,160,180,0.1)">
                 <td>{{fmt_date(it['bill']['due_date'])}}</td>
                 <td><span style="font-weight:600;color:var(--gold)">⚖ Balance Adjustment</span>{% if it['bill']['note'] %}<div style="font-size:11px;color:#3a1f6e">{{it['bill']['note']}}</div>{% endif %}</td>
-                <td style="color:var(--bad);font-weight:700">-${{fmt_money(it['amount'])}}</td>
+                <td style="color:var(--muted);font-size:12px">{% if it['bill']['snap_balance'] is not none %}set to ${{fmt_money(it['bill']['snap_balance'])}}{% elif it['amount'] %}−${{fmt_money(it['amount'])}}{% else %}—{% endif %}</td>
                 <td><strong>${{fmt_money(it['running_after'])}}</strong></td>
                 <td>—</td><td>—</td><td>—</td><td>—</td>
                 <td>
@@ -1304,7 +1315,10 @@ document.addEventListener('submit', function(e){
                   {% if (it['bill']['id']|int) >= 1000000 and not it.get('is_adjustment') %}
                     <button class="btn-sm" type="button" onclick="openLedgerEdit('{{ (it['bill']['id']|int) - 1000000 }}','{{it['bill']['due_date']}}','{{it['bill']['name']|replace("'","\'")}}','-{{"%.2f"|format(it["amount"])}}','trip contribution')">Edit</button>
                   {% else %}
-                    <button class="btn-sm" type="button" onclick="openEdit('{{it['bill']['id']}}','{{it['bill']['due_date']}}','{{it['bill']['planned_pay_date'] or it['bill']['due_date']}}','{{"%.2f"|format(it["amount"])}}',{{1 if it['bill']['recurring'] else 0}},'{{it['bill']['recurring_timeframe'] or "monthly"}}','{{it['bill']['recurring_every_months'] or ""}}','{{it['bill']['recurring_end_date'] or ""}}',{{1 if it['bill']['autopay'] else 0}},'{{it['bill']['name']|replace("'","\'")}}','{{it['bill']['paycheck_bucket'] if it['bill']['paycheck_bucket'] is not none else ""}}',{{1 if it['bill']['paid'] else 0}},'{{it['bill']['paid_date'] or ""}}')">Edit</button>
+                    <div style="display:grid;gap:4px">
+                      <button class="btn-sm" type="button" style="background:#e8e0ff;color:#3d1f8a;border:1px solid #c8b8f5" onclick="openMoveModal('{{it['bill']['id']}}','{{it['bill']['paycheck_bucket'] if it['bill']['paycheck_bucket'] is not none else ""}}')">↕ Move</button>
+                      <button class="btn-sm" type="button" onclick="openEdit('{{it['bill']['id']}}','{{it['bill']['due_date']}}','{{it['bill']['planned_pay_date'] or it['bill']['due_date']}}','{{"%.2f"|format(it["amount"])}}',{{1 if it['bill']['recurring'] else 0}},'{{it['bill']['recurring_timeframe'] or "monthly"}}','{{it['bill']['recurring_every_months'] or ""}}','{{it['bill']['recurring_end_date'] or ""}}',{{1 if it['bill']['autopay'] else 0}},'{{it['bill']['name']|replace("'","\'")}}','{{it['bill']['paycheck_bucket'] if it['bill']['paycheck_bucket'] is not none else ""}}',{{1 if it['bill']['paid'] else 0}},'{{it['bill']['paid_date'] or ""}}')">Edit</button>
+                    </div>
                   {% endif %}
                 </td>
                 <td>
@@ -2098,7 +2112,7 @@ document.addEventListener('submit', function(e){
                       <input type="hidden" name="month" value="{{month}}">
                       <input type="hidden" name="view" value="{{view}}">
                       <input type="hidden" name="page" value="admin">
-                      <select name="feedback_type" onchange="this.form.submit()"
+                      <select name="feedback_type" onchange="nsSubmit(this.form)"
                         style="font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line-light);background:{% if fb.feedback_type == 'review' %}rgba(245,200,66,0.1){% elif fb.feedback_type == 'feedback' %}rgba(100,150,255,0.1){% else %}rgba(160,160,180,0.1){% endif %}">
                         <option value="" {% if not fb.feedback_type or fb.feedback_type not in ('feedback','review') %}selected{% endif %}>— Unread —</option>
                         <option value="feedback" {% if fb.feedback_type == 'feedback' %}selected{% endif %}>💬 Feedback</option>
@@ -2148,46 +2162,25 @@ document.addEventListener('submit', function(e){
 
 <!-- Reconcile to Bank -->
 <div id="reconcileModal" class="modal-overlay">
-  <div class="modal-box" style="max-width:460px">
-    <h3>⚖ Reconcile to Bank Balance</h3>
+  <div class="modal-box" style="max-width:420px">
+    <h3>⚖ Set Balance</h3>
     <p style="font-size:13px;color:#4a3a6a;margin-bottom:16px;line-height:1.6">
-      Enter what your bank account shows right now. NorthStar compares that against your paycheck minus only the bills you've already marked paid — unpaid bills aren't counted because they haven't left your account yet. The difference gets added as a correction entry.
+      Enter the balance your bank shows. NorthStar will insert a correction entry on that date so the running balance snaps exactly to that number — no math, no guessing.
     </p>
-
-    <!-- NorthStar vs Bank comparison -->
-    <div style="display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin-bottom:14px">
-      <div style="background:var(--tint-soft);border:1px solid var(--tint-mid);border-radius:var(--radius-sm);padding:12px;text-align:center">
-        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#7a6a9a;margin-bottom:4px">After Paid Bills</div>
-        <div id="reconcileNorthStarVal" style="font-family:'Cinzel',serif;font-size:18px;font-weight:900;color:var(--purple-deep)">$0.00</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:3px">what NorthStar expects</div>
-      </div>
-      <div style="font-size:18px;color:var(--muted);text-align:center">↔</div>
-      <div style="background:#eaf5ff;border:1px solid #cde6ff;border-radius:var(--radius-sm);padding:12px;text-align:center">
-        <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#3b82c4;margin-bottom:4px">Bank Shows</div>
-        <div id="reconcileBankPreview" style="font-family:'Cinzel',serif;font-size:18px;font-weight:900;color:#1a5fa0">—</div>
-      </div>
-    </div>
-
-    <!-- Live diff indicator -->
-    <div id="reconcileDiffRow" style="display:none;padding:10px 14px;border-radius:var(--radius-sm);margin-bottom:14px;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-      <span id="reconcileDiffLabel" style="font-size:13px;font-weight:600"></span>
-      <span id="reconcileDiffVal" style="font-family:'Cinzel',serif;font-size:15px;font-weight:700"></span>
-    </div>
 
     <form id="reconcileForm" class="stack-form" method="post" action="/balance/adjust">
       <input type="hidden" name="_csrf" value="{{ csrf_token }}">
       <input type="hidden" name="month" value="{{month}}">
       <input type="hidden" name="view" value="{{view}}">
       <input type="hidden" name="page" value="entries">
-      <input type="hidden" id="reconcilePlannerBalance" name="planner_balance" value="">
 
       <div class="field-row">
-        <label>Bank Balance</label>
+        <label>My balance is</label>
         <input id="reconcileBankInput" type="number" step="0.01" name="new_balance"
-               placeholder="e.g. 63.00" required oninput="updateReconcilePreview()">
+               placeholder="e.g. 50.00" required>
       </div>
       <div class="field-row">
-        <label>Date</label>
+        <label>As of date</label>
         <input id="reconcileAdjDate" type="date" name="adjustment_date" required>
       </div>
       <div class="field-row">
@@ -2196,12 +2189,40 @@ document.addEventListener('submit', function(e){
       </div>
 
       <div style="background:#f8f5ff;border:1px solid var(--tint-mid);border-radius:var(--radius-sm);padding:11px 13px;margin-bottom:4px;font-size:12px;color:#4a3a6a;line-height:1.6">
-        This inserts a <strong>Balance Adjustment</strong> bill into your current paycheck bucket. The running balance will snap to match your bank from that date forward.
+        A <strong>Balance Adjustment</strong> entry will be inserted. The running balance from that date forward will reflect the corrected amount.
       </div>
 
       <div class="actions">
-        <button type="submit" id="reconcileSubmitBtn" class="btn-gold">Apply Adjustment</button>
+        <button type="submit" id="reconcileSubmitBtn" class="btn-gold">Apply</button>
         <button type="button" onclick="closeReconcile()" class="btn-muted">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Move to Paycheck -->
+<div id="moveModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:380px">
+    <h3>↕ Move to Paycheck</h3>
+    <p style="font-size:13px;color:#4a3a6a;margin-bottom:16px;line-height:1.6">
+      Choose which paycheck this bill should be paid from. The due date stays unchanged.
+    </p>
+    <form id="moveForm" class="stack-form" method="post" action="">
+      <input type="hidden" name="month" value="{{month}}">
+      <input type="hidden" name="view" value="{{view}}">
+      <input type="hidden" name="page" value="{{page}}">
+      <div class="field-row">
+        <label>Paycheck</label>
+        <select id="moveBucket" name="paycheck_bucket">
+          <option value="">Auto (by due date)</option>
+          {% for p in paychecks %}
+          <option value="{{loop.index}}">#{{loop.index}} — {{fmt_date(p.pay_date)}} ({{p.owner}})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn-gold">Move</button>
+        <button type="button" onclick="closeMoveModal()" class="btn-muted">Cancel</button>
       </div>
     </form>
   </div>
@@ -2658,7 +2679,7 @@ document.addEventListener('submit', function(e){
                     </div>
                     <div style="display:flex;gap:5px;align-items:flex-end;padding-top:16px">
                       <button type="submit" class="btn-gold btn-sm">Save</button>
-                      <button type="button" class="btn-danger btn-sm" onclick="document.getElementById('rb-del-{{b.id}}').submit()">🗑</button>
+                      <button type="button" class="btn-danger btn-sm" onclick="nsSubmit(document.getElementById('rb-del-{{b.id}}'))">🗑</button>
                     </div>
                   </form>
                 </div>
@@ -2882,24 +2903,11 @@ function rcEval(){
 }
 
 // ── RECONCILE TO BANK ──
-function openReconcile(northstarBalanceStr) {
-  const nsVal = parseFloat(String(northstarBalanceStr).replace(/[$,]/g, '')) || 0;
-  const nsEl = document.getElementById('reconcileNorthStarVal');
-  if(nsEl) nsEl.textContent = '$' + nsVal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-  const pb = document.getElementById('reconcilePlannerBalance');
-  if(pb) pb.value = nsVal.toFixed(2);
-  // reset fields
+function openReconcile() {
   const bi = document.getElementById('reconcileBankInput');
-  if(bi){ bi.value = ''; }
-  const bp = document.getElementById('reconcileBankPreview');
-  if(bp) bp.textContent = '—';
-  const dr = document.getElementById('reconcileDiffRow');
-  if(dr) dr.style.display = 'none';
-  const sb = document.getElementById('reconcileSubmitBtn');
-  if(sb) sb.disabled = false;
-  // set today's date
+  if(bi) bi.value = '';
   const rad = document.getElementById('reconcileAdjDate');
-  if(rad && !rad.value) rad.value = new Date().toISOString().slice(0,10);
+  if(rad) rad.value = new Date().toISOString().slice(0,10);
   document.getElementById('reconcileModal').style.display = 'block';
   setTimeout(()=>{ if(bi) bi.focus(); }, 120);
 }
@@ -2908,52 +2916,15 @@ function closeReconcile() {
   document.getElementById('reconcileModal').style.display = 'none';
 }
 
-function updateReconcilePreview() {
-  const bi = document.getElementById('reconcileBankInput');
-  const nsEl = document.getElementById('reconcileNorthStarVal');
-  const bp = document.getElementById('reconcileBankPreview');
-  const dr = document.getElementById('reconcileDiffRow');
-  const dl = document.getElementById('reconcileDiffLabel');
-  const dv = document.getElementById('reconcileDiffVal');
-  const sb = document.getElementById('reconcileSubmitBtn');
-  if(!bi || !nsEl || !bp || !dr || !dl || !dv) return;
-
-  const bankRaw = parseFloat(bi.value);
-  if(isNaN(bankRaw)) {
-    bp.textContent = '—';
-    dr.style.display = 'none';
-    return;
-  }
-
-  const nsVal = parseFloat(String(nsEl.textContent).replace(/[$,]/g, '')) || 0;
-  const diff = nsVal - bankRaw; // positive = NS higher than bank (need to reduce)
-  const absDiff = Math.abs(diff);
-
-  bp.textContent = '$' + bankRaw.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
-  dr.style.display = 'flex';
-
-  if(absDiff < 0.01) {
-    dr.style.background = 'var(--ok-bg)';
-    dr.style.border = '1px solid var(--ok-border)';
-    dr.style.borderRadius = 'var(--radius-sm)';
-    dr.style.padding = '10px 14px';
-    dl.textContent = '✓ Balances already match — no adjustment needed';
-    dl.style.color = '#0a7a4a';
-    dv.textContent = '';
-    if(sb) sb.disabled = true;
-  } else {
-    dr.style.background = diff > 0 ? 'var(--bad-bg)' : 'var(--ok-bg)';
-    dr.style.border = diff > 0 ? '1px solid var(--bad-border)' : '1px solid var(--ok-border)';
-    dr.style.borderRadius = 'var(--radius-sm)';
-    dr.style.padding = '10px 14px';
-    dl.textContent = diff > 0
-      ? 'NorthStar is $' + absDiff.toFixed(2) + ' higher than your bank'
-      : 'Your bank is $' + absDiff.toFixed(2) + ' higher than NorthStar';
-    dl.style.color = diff > 0 ? '#9a0020' : '#0a7a4a';
-    dv.textContent = (diff > 0 ? '−' : '+') + '$' + absDiff.toFixed(2) + ' correction will be added';
-    dv.style.color = diff > 0 ? '#9a0020' : '#0a7a4a';
-    if(sb) sb.disabled = false;
-  }
+function openMoveModal(billId, currentBucket) {
+  const form = document.getElementById('moveForm');
+  if(form) form.action = '/bills/move/' + billId;
+  const sel = document.getElementById('moveBucket');
+  if(sel) sel.value = currentBucket || '';
+  document.getElementById('moveModal').style.display = 'block';
+}
+function closeMoveModal() {
+  document.getElementById('moveModal').style.display = 'none';
 }
 
 // ── PAYCHECK SECTION ACCORDION ──
@@ -3104,7 +3075,7 @@ function closePostponeModal(){ document.getElementById('postponeModal').style.di
 function submitRemovePostpone(){
   const form=document.getElementById('postponeForm');
   document.getElementById('removePostponeFlag').value='1';
-  if(form&&typeof form.requestSubmit==='function') form.requestSubmit(); else if(form) form.submit();
+  if(form) nsSubmit(form);
 }
 
 function toggleBillRecurringOptions(){
@@ -3406,8 +3377,8 @@ function saveSettingsActiveTab(){
     sessionStorage.setItem('ns_settings_reopen', '1');
   }catch(e){}
   const paychecksTab=document.getElementById('smtab-paychecks');
-  if(paychecksTab&&paychecksTab.style.display!=='none'){ const f=document.getElementById('paycheck-rules-bulk-form'); if(f) return f.submit(); }
-  const fallback=document.getElementById('paycheck-rules-bulk-form'); if(fallback) fallback.submit();
+  if(paychecksTab&&paychecksTab.style.display!=='none'){ const f=document.getElementById('paycheck-rules-bulk-form'); if(f) return nsSubmit(f); }
+  const fallback=document.getElementById('paycheck-rules-bulk-form'); if(fallback) nsSubmit(fallback);
 }
 function openTour(){
   closeSettings();
@@ -3616,9 +3587,6 @@ window.addEventListener('DOMContentLoaded', ()=>{
   // Set quick-add date to today
   const qad = document.getElementById('quickAddDate');
   if(qad){ const now = new Date(); qad.value = now.toISOString().slice(0,10); }
-  // pre-fill reconcile date to today (modal opened on demand)
-  const rad = document.getElementById('reconcileAdjDate');
-  if(rad){ const now = new Date(); rad.value = now.toISOString().slice(0,10); }
 
   try{ addCsrfToForms(); } catch(e){ console.error('addCsrfToForms failed',e); }
   try{ applyInputHints(); } catch(e){ console.error('applyInputHints failed',e); }
@@ -3636,11 +3604,22 @@ window.addEventListener('DOMContentLoaded', ()=>{
     const savedY=sessionStorage.getItem('ns_scroll_y');
     if(savedY!==null){
       const y=parseInt(savedY,10);
-      if(!Number.isNaN(y)){
-        // Use requestAnimationFrame to restore after layout is complete
-        requestAnimationFrame(()=>{ window.scrollTo(0,y); });
-      }
       sessionStorage.removeItem('ns_scroll_y');
+      if(!Number.isNaN(y) && y > 0){
+        // Retry scrolling until the page is tall enough to reach the target,
+        // or until we've waited long enough (covers slow font/image loads)
+        let attempts = 0;
+        const tryScroll = () => {
+          window.scrollTo(0, y);
+          attempts++;
+          const reached = Math.abs(window.scrollY - y) < 10
+                       || (window.scrollY + window.innerHeight >= document.body.scrollHeight - 20);
+          if(!reached && attempts < 12){
+            setTimeout(tryScroll, 80);
+          }
+        };
+        requestAnimationFrame(tryScroll);
+      }
     }
   }catch(e){}
   // Reopen settings modal on correct tab if a settings form was just saved

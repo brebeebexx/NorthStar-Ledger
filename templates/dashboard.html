@@ -394,13 +394,14 @@
 
     /* ── SETTINGS MODAL (rebuilt) ── */
     #settingsModal .modal-box { padding: 0; overflow: hidden; background: #3a1f6e; border: 1px solid rgba(200,170,255,0.15); }
-    .sm-layout { display: grid; grid-template-columns: 200px 1fr; min-height: 520px; }
+    .sm-layout { display: grid; grid-template-columns: 200px 1fr; min-height: 520px; flex: 1; overflow: hidden; }
     .sm-nav {
       background: #2e1658;
       border-right: 1px solid rgba(200,170,255,0.1);
       padding: 0;
       display: flex;
       flex-direction: column;
+      overflow-y: auto;
     }
     .sm-nav-header {
       padding: 20px 18px 14px;
@@ -478,7 +479,7 @@
       flex: 1;
       padding: 22px;
       overflow-y: auto;
-      max-height: calc(80vh - 120px);
+      max-height: calc(92vh - 120px);
       color: #ddd0f8;
     }
     .sm-section-label {
@@ -565,7 +566,9 @@
       border: 1px solid rgba(200,170,255,0.2);
       border-radius: var(--radius-xs);
       margin-bottom: 6px;
+      min-width: 580px;
     }
+    .sm-rb-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     @media(max-width:700px) {
       .sm-layout { grid-template-columns: 1fr; }
       .sm-nav { flex-direction: row; flex-wrap: wrap; border-right: none; border-bottom: 1px solid rgba(200,170,255,0.1); }
@@ -694,10 +697,10 @@
     }
     .sn-compose textarea {
       width: 100%; border: none; background: transparent; resize: none;
-      font-family: 'DM Sans', sans-serif; font-size: 13px; color: #1a0d2e;
+      font-family: 'DM Sans', sans-serif; font-size: 13px; color: #e8deff;
       outline: none; min-height: 52px;
     }
-    .sn-compose textarea::placeholder { color: rgba(160,140,192,0.55); }
+    .sn-compose textarea::placeholder { color: rgba(200,170,255,0.45); }
     .sn-compose-footer {
       display: flex; align-items: center; justify-content: space-between; margin-top: 6px;
     }
@@ -779,6 +782,10 @@ window.addEventListener('beforeunload', function(){
 });
 </script>
 <div class="wrap">
+  <!-- Bill name autocomplete suggestions -->
+  <datalist id="bill-names-list">
+    {% for n in bill_name_suggestions %}<option value="{{n}}">{% endfor %}
+  </datalist>
   <div class="layout">
 
     <!-- ═══════ SIDEBAR ═══════ -->
@@ -1026,7 +1033,7 @@ window.addEventListener('beforeunload', function(){
           <input type="hidden" name="due_date" id="quickAddDate" value="{{month}}-01">
           <input type="hidden" name="category" value="expense">
           <input type="hidden" name="recurring" value="">
-          <input name="name" placeholder="Expense name" required style="flex:1;min-width:160px">
+          <input name="name" placeholder="Expense name" required style="flex:1;min-width:160px" list="bill-names-list" autocomplete="off">
           <input type="number" step="0.01" name="bill_amount" placeholder="Amount" required style="width:130px">
           <button type="submit" class="btn-gold">+ Add</button>
         </form>
@@ -1236,7 +1243,7 @@ window.addEventListener('beforeunload', function(){
           <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
           <select id="entryType" name="entry_type" onchange="onEntryTypeChange()"><option value="income">Income</option><option value="bill" selected>Bill/Debt</option><option value="trip_contribution">Trip Contribution</option></select>
           <div id="incomeFields" style="display:none"><select name="income_kind" id="incomeKind" onchange="onIncomeKindChange()"><option value="paycheck">Paycheck</option><option value="other">Other Income</option></select><input name="owner" id="incomeOwner" placeholder="Owner"><span class="date-hint-wrap" id="incomePayDateWrap"><input type="date" id="incomePayDate" name="pay_date"><span class="date-hint"></span></span><input type="number" step="0.01" name="income_amount" placeholder="Amount"></div>
-          <div id="billFields" style="display:none"><input name="name" placeholder="Name"><input type="date" name="due_date"><input type="number" step="0.01" name="bill_amount" placeholder="Amount"><input type="hidden" name="category" value="bill"><label><input type="checkbox" name="recurring" onchange="toggleEntryRecurringEnd(this)"> recurring</label><span class="entry-recurring-end" style="display:none"><input type="date" name="recurring_end_date"></span><label><input type="checkbox" name="autopay"> autopay</label></div>
+          <div id="billFields" style="display:none"><input name="name" placeholder="Name" list="bill-names-list" autocomplete="off"><input type="date" name="due_date"><input type="number" step="0.01" name="bill_amount" placeholder="Amount"><input type="hidden" name="category" value="bill"><label><input type="checkbox" name="recurring" onchange="toggleEntryRecurringEnd(this)"> recurring</label><span class="entry-recurring-end-toggle" style="display:none"><a href="#" style="font-size:11px;color:var(--muted)" onclick="showEntryRecurringEnd(this);return false;">+ set end date</a></span><span class="entry-recurring-end" style="display:none"><input type="date" name="recurring_end_date"></span><label><input type="checkbox" name="autopay"> autopay</label></div>
           <div id="tripContributionFields" style="display:none"><select name="contrib_trip_id">{% for t in trips %}<option value="{{t.id}}">{{t.name}}</option>{% endfor %}</select><input type="date" name="contrib_date"><input type="number" step="0.01" name="contrib_amount" placeholder="Amount"></div>
           <button class="btn-gold">Add</button>
         </form>
@@ -1315,7 +1322,10 @@ window.addEventListener('beforeunload', function(){
                   {% if (it['bill']['id']|int) >= 1000000 and not it.get('is_adjustment') %}
                     <button class="btn-sm" type="button" onclick="openLedgerEdit('{{ (it['bill']['id']|int) - 1000000 }}','{{it['bill']['due_date']}}','{{it['bill']['name']|replace("'","\'")}}','-{{"%.2f"|format(it["amount"])}}','trip contribution')">Edit</button>
                   {% else %}
-                    <button class="btn-sm" type="button" onclick="openEdit('{{it['bill']['id']}}','{{it['bill']['due_date']}}','{{it['bill']['planned_pay_date'] or it['bill']['due_date']}}','{{"%.2f"|format(it["amount"])}}',{{1 if it['bill']['recurring'] else 0}},'{{it['bill']['recurring_timeframe'] or "monthly"}}','{{it['bill']['recurring_every_months'] or ""}}','{{it['bill']['recurring_end_date'] or ""}}',{{1 if it['bill']['autopay'] else 0}},'{{it['bill']['name']|replace("'","\'")}}','{{it['bill']['paycheck_bucket'] if it['bill']['paycheck_bucket'] is not none else ""}}',{{1 if it['bill']['paid'] else 0}},'{{it['bill']['paid_date'] or ""}}')">Edit</button>
+                    <div style="display:grid;gap:4px">
+                      <button class="btn-sm" type="button" style="background:#e8e0ff;color:#3d1f8a;border:1px solid #c8b8f5" onclick="openMoveModal('{{it['bill']['id']}}','{{it['bill']['paycheck_bucket'] if it['bill']['paycheck_bucket'] is not none else ""}}')">↕ Move</button>
+                      <button class="btn-sm" type="button" onclick="openEdit('{{it['bill']['id']}}','{{it['bill']['due_date']}}','{{it['bill']['planned_pay_date'] or it['bill']['due_date']}}','{{"%.2f"|format(it["amount"])}}',{{1 if it['bill']['recurring'] else 0}},'{{it['bill']['recurring_timeframe'] or "monthly"}}','{{it['bill']['recurring_every_months'] or ""}}','{{it['bill']['recurring_end_date'] or ""}}',{{1 if it['bill']['autopay'] else 0}},'{{it['bill']['name']|replace("'","\'")}}','{{it['bill']['paycheck_bucket'] if it['bill']['paycheck_bucket'] is not none else ""}}',{{1 if it['bill']['paid'] else 0}},'{{it['bill']['paid_date'] or ""}}')">Edit</button>
+                    </div>
                   {% endif %}
                 </td>
                 <td>
@@ -1371,7 +1381,7 @@ window.addEventListener('beforeunload', function(){
           <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
           <select id="entryType" name="entry_type" onchange="onEntryTypeChange()"><option value="income">Income</option><option value="bill" selected>Bill/Debt</option><option value="trip_contribution">Trip Contribution</option></select>
           <div id="incomeFields" style="display:none"><select name="income_kind" id="incomeKind" onchange="onIncomeKindChange()"><option value="paycheck">Paycheck</option><option value="other">Other Income</option></select><input name="owner" id="incomeOwner" placeholder="Owner"><span class="date-hint-wrap" id="incomePayDateWrap"><input type="date" id="incomePayDate" name="pay_date"><span class="date-hint"></span></span><input type="number" step="0.01" name="income_amount" placeholder="Amount"></div>
-          <div id="billFields" style="display:none"><input name="name" placeholder="Name"><input type="date" name="due_date"><input type="number" step="0.01" name="bill_amount" placeholder="Amount"><input type="hidden" name="category" value="bill"><label><input type="checkbox" name="recurring" onchange="toggleEntryRecurringEnd(this)"> recurring</label><span class="entry-recurring-end" style="display:none"><input type="date" name="recurring_end_date"></span><label><input type="checkbox" name="autopay"> autopay</label></div>
+          <div id="billFields" style="display:none"><input name="name" placeholder="Name" list="bill-names-list" autocomplete="off"><input type="date" name="due_date"><input type="number" step="0.01" name="bill_amount" placeholder="Amount"><input type="hidden" name="category" value="bill"><label><input type="checkbox" name="recurring" onchange="toggleEntryRecurringEnd(this)"> recurring</label><span class="entry-recurring-end-toggle" style="display:none"><a href="#" style="font-size:11px;color:var(--muted)" onclick="showEntryRecurringEnd(this);return false;">+ set end date</a></span><span class="entry-recurring-end" style="display:none"><input type="date" name="recurring_end_date"></span><label><input type="checkbox" name="autopay"> autopay</label></div>
           <div id="tripContributionFields" style="display:none"><select name="contrib_trip_id">{% for t in trips %}<option value="{{t.id}}">{{t.name}}</option>{% endfor %}</select><input type="date" name="contrib_date"><input type="number" step="0.01" name="contrib_amount" placeholder="Amount"></div>
           <button class="btn-gold">Add</button>
         </form>
@@ -2197,13 +2207,41 @@ window.addEventListener('beforeunload', function(){
   </div>
 </div>
 
+<!-- Move to Paycheck -->
+<div id="moveModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:380px">
+    <h3>↕ Move to Paycheck</h3>
+    <p style="font-size:13px;color:#4a3a6a;margin-bottom:16px;line-height:1.6">
+      Choose which paycheck this bill should be paid from. The due date stays unchanged.
+    </p>
+    <form id="moveForm" class="stack-form" method="post" action="">
+      <input type="hidden" name="month" value="{{month}}">
+      <input type="hidden" name="view" value="{{view}}">
+      <input type="hidden" name="page" value="{{page}}">
+      <div class="field-row">
+        <label>Paycheck</label>
+        <select id="moveBucket" name="paycheck_bucket">
+          <option value="">Auto (by due date)</option>
+          {% for p in paychecks %}
+          <option value="{{loop.index}}">#{{loop.index}} — {{fmt_date(p.pay_date)}} ({{p.owner}})</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn-gold">Move</button>
+        <button type="button" onclick="closeMoveModal()" class="btn-muted">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Edit Bill -->
 <div id="editModal" class="modal-overlay">
   <div class="modal-box" style="max-height:90vh;overflow-y:auto">
     <h3>Edit Bill</h3>
     <form id="editForm" class="stack-form" method="post" action="">
       <input type="hidden" name="month" value="{{month}}"><input type="hidden" name="view" value="{{view}}"><input type="hidden" name="page" value="{{page}}">
-      <div class="field-row"><label>Name</label><input id="editName" type="text" name="name" required></div>
+      <div class="field-row"><label>Name</label><input id="editName" type="text" name="name" required list="bill-names-list" autocomplete="off"></div>
       <div class="field-row"><label>Paycheck Bucket</label><select id="editPaycheck" name="paycheck_bucket"><option value="">Auto (by due date)</option>{% for p in paychecks %}<option value="{{loop.index}}">#{{loop.index}} — {{fmt_date(p.pay_date)}} ({{p.owner}})</option>{% endfor %}</select></div>
       <div class="field-row"><label>Due Date</label><input id="editDue" type="date" name="due_date" required></div>
       <div class="field-row"><label>Planned Pay Date</label><input id="editPlannedPay" type="date" name="planned_pay_date"></div>
@@ -2430,7 +2468,7 @@ window.addEventListener('beforeunload', function(){
 
 <!-- SETTINGS MODAL -->
 <div id="settingsModal" class="modal-overlay">
-  <div class="modal-box modal-wide" style="max-width:1000px;width:96vw;margin:4vh auto;padding:0;background:#3a1f6e;border:1px solid rgba(200,170,255,0.25);border-radius:var(--radius)">
+  <div class="modal-box modal-wide" style="max-width:1000px;width:96vw;margin:4vh auto;padding:0;background:#3a1f6e;border:1px solid rgba(200,170,255,0.25);border-radius:var(--radius);max-height:92vh;display:flex;flex-direction:column;overflow:hidden">
     <div class="sm-layout">
 
       <!-- LEFT NAV -->
@@ -2587,24 +2625,27 @@ window.addEventListener('beforeunload', function(){
                 <input type="hidden" name="settings_tab" value="recurringBills">
                 <input type="hidden" name="entry_type" value="bill">
                 <input type="hidden" name="recurring" value="on">
-                <div class="sm-form-row" style="margin-bottom:10px">
-                  <div><label>Bill Name</label><input type="text" name="name" placeholder="e.g. Rent" required></div>
-                  <div><label>Start Date</label><input type="date" name="due_date" required></div>
-                  <div><label>End Date</label><input type="date" name="recurring_end_date"></div>
-                  <div><label>Amount ($)</label><input type="number" step="0.01" name="bill_amount" placeholder="0.00" required></div>
-                  <div><label>Frequency</label>
-                    <select name="recurring_timeframe" onchange="toggleRecurringBillMonths(this)">
-                      <option value="monthly" selected>Monthly</option>
-                      <option value="yearly">Yearly</option>
-                      <option value="specified_months">Every X months</option>
-                    </select>
-                  </div>
-                  <div style="display:flex;align-items:flex-end;padding-bottom:2px;gap:6px">
-                    <input type="checkbox" name="autopay" style="width:16px;height:16px;margin-bottom:10px">
-                    <label style="margin:0;padding-bottom:10px">AutoPay</label>
+                <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:10px">
+                  <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr 1fr auto;gap:8px;align-items:end;min-width:580px">
+                    <div><label>Bill Name</label><input type="text" name="name" placeholder="e.g. Rent" required style="width:100%"></div>
+                    <div><label>Start Date</label><input type="date" name="due_date" required style="width:100%"></div>
+                    <div><label>Amount ($)</label><input type="number" step="0.01" name="bill_amount" placeholder="0.00" required style="width:100%"></div>
+                    <div><label>Frequency</label>
+                      <select name="recurring_timeframe" onchange="toggleRecurringBillMonths(this)" style="width:100%">
+                        <option value="monthly" selected>Monthly</option>
+                        <option value="yearly">Yearly</option>
+                        <option value="specified_months">Every X months</option>
+                      </select>
+                    </div>
+                    <div style="display:flex;align-items:flex-end;gap:5px;padding-bottom:2px">
+                      <input type="checkbox" name="autopay" style="width:14px;height:14px;margin-bottom:3px">
+                      <label style="margin:0;font-size:11px">Auto</label>
+                    </div>
+                    <div style="display:flex;align-items:flex-end;padding-bottom:2px">
+                      <button type="submit" class="btn-gold btn-sm">+ Add</button>
+                    </div>
                   </div>
                 </div>
-                <button type="submit" class="btn-gold">+ Add Bill</button>
               </form>
             </div>
 
@@ -2613,6 +2654,7 @@ window.addEventListener('beforeunload', function(){
               {% if recurring_bills|length == 0 %}
                 <div class="sm-hint">No recurring bills set up yet.</div>
               {% else %}
+                <div class="sm-rb-scroll">
                 {% for b in recurring_bills %}
                 <div class="sm-rb-row">
                   <form method="post" action="/bills/update/{{b.id}}" style="display:contents">
@@ -2660,6 +2702,7 @@ window.addEventListener('beforeunload', function(){
                   <input type="hidden" name="settings_tab" value="recurringBills">
                 </form>
                 {% endfor %}
+                </div>
               {% endif %}
             </div>
           </div>
@@ -2883,6 +2926,17 @@ function openReconcile() {
 
 function closeReconcile() {
   document.getElementById('reconcileModal').style.display = 'none';
+}
+
+function openMoveModal(billId, currentBucket) {
+  const form = document.getElementById('moveForm');
+  if(form) form.action = '/bills/move/' + billId;
+  const sel = document.getElementById('moveBucket');
+  if(sel) sel.value = currentBucket || '';
+  document.getElementById('moveModal').style.display = 'block';
+}
+function closeMoveModal() {
+  document.getElementById('moveModal').style.display = 'none';
 }
 
 // ── PAYCHECK SECTION ACCORDION ──
@@ -3521,7 +3575,8 @@ function calcCreditCard(){
   out.innerHTML=`Needed Monthly Payment: <b>$${pay.toFixed(2)}</b><br>Total Paid by ${n} months: <b>$${(pay*n).toFixed(2)}</b><br>Total Interest: <b>$${(pay*n-b).toFixed(2)}</b>`;
 }
 function resetCreditCalc(){ ['ccBalance','ccApr','ccMonths','ccMonthlyPay'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; }); const out=document.getElementById('ccResult'); if(out) out.innerHTML='Enter values and click Calculate Debt.'; }
-function toggleEntryRecurringEnd(cb){ const container=cb?cb.closest('#billFields'):null; if(!container) return; const endWrap=container.querySelector('.entry-recurring-end'); const endInput=container.querySelector('input[name="recurring_end_date"]'); const on=!!cb.checked; if(endWrap) endWrap.style.display=on?'inline-block':'none'; if(endInput&&!on) endInput.value=''; }
+function toggleEntryRecurringEnd(cb){ const container=cb?cb.closest('#billFields'):null; if(!container) return; const endWrap=container.querySelector('.entry-recurring-end'); const endInput=container.querySelector('input[name="recurring_end_date"]'); const endToggle=container.querySelector('.entry-recurring-end-toggle'); const on=!!cb.checked; if(endToggle) endToggle.style.display=on?'inline':'none'; if(!on && endWrap){ endWrap.style.display='none'; if(endInput) endInput.value=''; } }
+function showEntryRecurringEnd(link){ const container=link?link.closest('#billFields'):null; if(!container) return; const endWrap=container.querySelector('.entry-recurring-end'); if(endWrap) endWrap.style.display='inline-block'; link.style.display='none'; }
 function onEntryTypeChange(){
   const type=document.getElementById('entryType'); const income=document.getElementById('incomeFields'); const bill=document.getElementById('billFields'); const tripContribution=document.getElementById('tripContributionFields');
   if(!type||!income||!bill||!tripContribution) return;

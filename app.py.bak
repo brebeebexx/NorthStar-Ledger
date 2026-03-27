@@ -331,6 +331,7 @@ def init_db():
     ensure_column(c, "bills", "recurring_every_months", "recurring_every_months integer")
     ensure_column(c, "bills", "recurring_end_date", "recurring_end_date text")
     ensure_column(c, "bills", "note", "note text")
+    ensure_column(c, "bills", "snap_balance", "snap_balance real")
     ensure_column(c, "paychecks", "income_type", "income_type text default 'paycheck'")
     ensure_column(c, "paychecks", "household_id", "household_id integer")
     ensure_column(c, "ledger", "household_id", "household_id integer")
@@ -825,7 +826,11 @@ def build_paycheck_plan(bills_for_month, paychecks, starting_balance, buckets):
                 is_prior_month_carry = bool(b.get("is_prior_month_carry"))
                 is_adjustment = bool(b.get("is_adjustment"))
                 if is_adjustment:
-                    running += amt
+                    snap = b["snap_balance"] if b["snap_balance"] is not None else None
+                    if snap is not None:
+                        running = float(snap)
+                    else:
+                        running += amt
                     items.append({"bill": b, "amount": amt, "can_pay": True, "is_paid": True,
                                   "is_postponed": False, "is_prior_month_carry": False,
                                   "is_adjustment": True, "running_after": running})
@@ -867,7 +872,11 @@ def build_paycheck_plan(bills_for_month, paychecks, starting_balance, buckets):
             is_prior_month_carry = bool(b.get("is_prior_month_carry"))
             is_adjustment = bool(b.get("is_adjustment"))
             if is_adjustment:
-                running -= amt
+                snap = b["snap_balance"] if b["snap_balance"] is not None else None
+                if snap is not None:
+                    running = float(snap)
+                else:
+                    running -= amt
                 items.append({"bill": b, "amount": amt, "can_pay": True, "is_paid": False,
                               "is_postponed": False, "is_prior_month_carry": False,
                               "is_adjustment": True, "running_after": running})
@@ -1873,6 +1882,16 @@ def bills_toggle_get_fallback(item_id):
     view = request.args.get("view", "paycheck"); page = request.args.get("page", "entries")
     return redirect(url_for("dashboard", month=month, view=view, page=page, r=int(datetime.now().timestamp() * 1000)))
 
+@app.post("/bills/move/<int:item_id>")
+def bills_move(item_id):
+    if not authed(): return redirect(url_for("login"))
+    c = conn(); household_id = active_household_id()
+    bucket_raw = request.form.get("paycheck_bucket", "").strip()
+    new_bucket = int(bucket_raw) if bucket_raw.isdigit() else None
+    c.execute("update bills set paycheck_bucket=? where id=? and household_id=? and deleted_at is null",
+              (new_bucket, item_id, household_id))
+    c.commit(); c.close()
+    return redirect_dashboard_from_form(request.form)
 
 @app.post("/paychecks/add")
 def paychecks_add():
@@ -2468,24 +2487,15 @@ def balance_adjust():
     except Exception:
         adj_date = local_now().strftime("%Y-%m-%d")
 
-    # Use the selected paycheck ending balance from the dropdown
-    try:
-        northstar_balance = float(request.form.get("planner_balance", "0") or "0")
-    except Exception:
-        northstar_balance = 0.0
-
-    difference = northstar_balance - new_balance  # amount to deduct as a bill
-
-    if abs(difference) > 0.005:
-        full_note = f"Adjusted from ${northstar_balance:,.2f} to ${new_balance:,.2f}"
-        if note:
-            full_note += f" — {note}"
-        # Write as a real bill so the planner deducts it naturally like any other bill
-        c.execute(
-            "insert into bills(name,due_date,planned_pay_date,amount,paid,category,note,recurring,autopay,household_id) "
-            "values(?,?,?,?,0,'adjustment',?,0,0,?)",
-            ("Balance Adjustment", adj_date, adj_date, round(abs(difference), 2), full_note, household_id)
-        )
+    # Store the target balance directly as snap_balance — the planner will teleport running to this value
+    full_note = f"Balance set to ${new_balance:,.2f}"
+    if note:
+        full_note += f" — {note}"
+    c.execute(
+        "insert into bills(name,due_date,planned_pay_date,amount,paid,paid_date,category,note,snap_balance,recurring,autopay,household_id) "
+        "values(?,?,?,0,1,?,'adjustment',?,?,0,0,?)",
+        ("Balance Adjustment", adj_date, adj_date, adj_date, full_note, round(new_balance, 2), household_id)
+    )
 
     c.commit(); c.close()
     return redirect(url_for("dashboard", month=month, view=view, page="entries", r=int(datetime.now().timestamp() * 1000)))
