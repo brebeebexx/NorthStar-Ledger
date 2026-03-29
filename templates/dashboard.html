@@ -1861,11 +1861,35 @@ window.addEventListener('beforeunload', function(){
         details.pa-log-entry[open] > summary { background: var(--tint-soft); border-radius: 6px 6px 0 0; }
         /* Hidden utility */
         .pa-hide { display:none !important; }
-        /* Fix inputs/textarea for light card background */
-        .pa-wrap input[type=text],.pa-wrap input[type=email],.pa-wrap input[type=date],.pa-wrap input[type=month],.pa-wrap select { width:100%; }
-        .pa-wrap textarea { width:100%; background:var(--input-bg); border:1.5px solid var(--input-bd); color:var(--ink); border-radius:var(--radius-sm); padding:10px 12px; font-size:13.5px; font-family:'DM Sans',sans-serif; resize:vertical; outline:none; line-height:1.6; transition:border-color .2s; }
-        .pa-wrap textarea:focus { border-color:var(--purple-lite); box-shadow:0 0 0 3px rgba(61,32,112,.1); }
+        /* Fix inputs/textarea for light card background — clean white like PawChart+ */
+        .pa-wrap input[type=text],
+        .pa-wrap input[type=email],
+        .pa-wrap input[type=date],
+        .pa-wrap input[type=month],
+        .pa-wrap select {
+          width:100%; background:#fff; border:1.5px solid var(--tint-mid); color:var(--ink);
+          border-radius:var(--radius-sm); padding:8px 12px; font-size:13px;
+          font-family:'DM Sans',sans-serif; outline:none; transition:border-color .2s;
+          box-sizing:border-box;
+        }
+        .pa-wrap input[type=text]:focus,
+        .pa-wrap input[type=email]:focus,
+        .pa-wrap input[type=date]:focus,
+        .pa-wrap input[type=month]:focus,
+        .pa-wrap select:focus {
+          border-color:var(--purple-lite); box-shadow:0 0 0 3px rgba(61,32,112,.08);
+        }
+        .pa-wrap input::placeholder { color:#b0a0cc; }
+        .pa-wrap textarea {
+          width:100%; background:#fff; border:1.5px solid var(--tint-mid); color:var(--ink);
+          border-radius:var(--radius-sm); padding:10px 12px; font-size:13px;
+          font-family:'DM Sans',sans-serif; resize:vertical; outline:none; line-height:1.6;
+          transition:border-color .2s; box-sizing:border-box;
+        }
+        .pa-wrap textarea:focus { border-color:var(--purple-lite); box-shadow:0 0 0 3px rgba(61,32,112,.08); }
         .pa-wrap textarea::placeholder { color:#b0a0cc; }
+        /* Form section background: soft warm tint like PawChart+'s blush-pale */
+        .pa-fsec { background:#fdf5ff; border-color:var(--tint-mid); }
       </style>
 
       <div class="card pa-wrap" style="margin-bottom:16px">
