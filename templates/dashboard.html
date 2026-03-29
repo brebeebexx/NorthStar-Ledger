@@ -1836,6 +1836,14 @@ window.addEventListener('beforeunload', function(){
         .nsa-card-lbl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:#9a8abf; margin-bottom:8px; }
         /* Section box */
         .nsa-section { background:var(--tint-soft); border:1px solid var(--tint-mid); border-radius:var(--radius-sm); padding:18px; margin-bottom:20px; }
+        .hidden { display:none !important; }
+        /* Versions tracker */
+        .nsa-vt-header { display:flex; align-items:center; justify-content:space-between; padding-bottom:14px; margin-bottom:4px; border-bottom:1px solid var(--tint-mid); }
+        .nsa-vt-title { font-family:'Cinzel',serif; font-size:15px; font-weight:700; color:var(--purple-deep); }
+        .nsa-vt-row { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--tint-soft); }
+        .nsa-vt-row:last-of-type { border-bottom:none; }
+        .nsa-vbadge { background:linear-gradient(135deg,var(--gold),var(--bar-orange)); color:var(--purple-deep); font-weight:700; font-size:13px; border-radius:8px; padding:5px 12px; flex-shrink:0; font-family:'Cinzel',serif; letter-spacing:.3px; }
+        .nsa-edit-form { background:var(--tint-soft); border-radius:var(--radius-sm); padding:16px; margin-top:10px; border:1px solid var(--tint-mid); }
       </style>
 
       <div class="card nsa-wrap" style="margin-bottom:16px;padding:0;overflow:hidden">
@@ -1918,20 +1926,26 @@ window.addEventListener('beforeunload', function(){
 
         <!-- ══ VERSIONS TAB ══ -->
         <div id="nsapane-versions" class="nsa-pane">
-          <div class="nsa-section">
-            <div class="nsa-lbl" style="margin-bottom:14px">Add New Version</div>
-            <form method="post" action="/admin/update-log/add">
+          <!-- Card header -->
+          <div class="nsa-vt-header">
+            <div class="nsa-vt-title">📌 Version Tracker</div>
+            <button type="button" class="btn-gold btn-sm" onclick="document.getElementById('nsa-add-ver-form').classList.toggle('hidden')">+ Add Version</button>
+          </div>
+
+          <!-- Add Version form (hidden by default) -->
+          <div id="nsa-add-ver-form" class="hidden" style="background:var(--tint-soft);border-radius:var(--radius-sm);padding:16px;margin-bottom:16px;border:1px solid var(--tint-mid)">
+            <form method="post" action="/admin/update-log/add" style="display:flex;flex-direction:column;gap:12px">
               <input type="hidden" name="month" value="{{month}}">
               <input type="hidden" name="view" value="{{view}}">
               <input type="hidden" name="page" value="admin">
-              <div style="display:grid;grid-template-columns:110px 1fr 150px auto;gap:10px;align-items:flex-end">
+              <div style="display:grid;grid-template-columns:1fr 1fr 160px;gap:10px">
                 <div>
                   <label class="nsa-lbl">Version</label>
-                  <input type="text" name="version" placeholder="e.g. v3.2">
+                  <input type="text" name="version" placeholder="e.g. v3.2" required>
                 </div>
                 <div>
                   <label class="nsa-lbl">Title</label>
-                  <input type="text" name="title" placeholder="Short title for this release">
+                  <input type="text" name="title" placeholder="Short title for this release" required>
                 </div>
                 <div>
                   <label class="nsa-lbl">Stage</label>
@@ -1941,30 +1955,51 @@ window.addEventListener('beforeunload', function(){
                     <option value="Implemented">✅ Implemented</option>
                   </select>
                 </div>
-                <button type="submit" class="btn-gold">+ Add</button>
+              </div>
+              <div>
+                <label class="nsa-lbl">Release Notes <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+                <textarea name="body" rows="4" style="min-height:100px" placeholder="What changed in this version?"></textarea>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button type="submit" class="btn-gold btn-sm">Save Version</button>
+                <button type="button" onclick="document.getElementById('nsa-add-ver-form').classList.add('hidden')" style="padding:5px 14px;font-size:12px;background:#fff;border:1px solid var(--tint-mid);border-radius:8px;color:#9a8abf;cursor:pointer;font-family:'DM Sans',sans-serif;min-height:30px">Cancel</button>
               </div>
             </form>
           </div>
 
           {% if admin_update_log %}
-          <div style="display:flex;flex-direction:column;gap:8px">
+          <div>
             {% for entry in admin_update_log %}
-            <div class="nsa-ver">
-              <div class="nsa-ver-hdr" onclick="nsaVer({{entry.id}},this)">
-                <span style="font-family:'Cinzel',serif;font-weight:700;color:var(--gold);font-size:14px;min-width:56px;flex-shrink:0">{{entry.version}}</span>
-                <span style="font-weight:600;color:var(--ink);flex:1;font-size:14px">{{entry.title}}</span>
-                {% if entry.stage %}
-                <span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap;flex-shrink:0;{% if entry.stage=='Implemented' %}background:var(--ok-bg);color:#0a7a4a;border:1px solid var(--ok-border){% else %}background:var(--warn-bg);color:var(--warn);border:1px solid rgba(240,160,48,.3){% endif %}">{% if entry.stage=='Implemented' %}✅{% else %}🧪{% endif %} {{entry.stage}}</span>
-                {% endif %}
-                <span style="font-size:11px;color:#9a8abf;white-space:nowrap;flex-shrink:0">{{entry.created_at[5:7]}}-{{entry.created_at[8:10]}}-{{entry.created_at[:4]}}</span>
-                <span id="nsavr-arrow-{{entry.id}}" style="font-size:10px;color:#9a8abf;flex-shrink:0;transition:transform .2s;display:inline-block">▼</span>
+            <div>
+              <!-- Entry row -->
+              <div class="nsa-vt-row">
+                <span class="nsa-vbadge">{{entry.version}}</span>
+                <div style="flex:1;min-width:0">
+                  <div style="font-weight:600;color:var(--ink);font-size:14px">{{entry.title}}</div>
+                  <div style="display:flex;align-items:center;gap:8px;margin-top:3px;flex-wrap:wrap">
+                    {% if entry.stage %}
+                    <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;{% if entry.stage=='Implemented' %}background:var(--ok-bg);color:#0a7a4a;border:1px solid var(--ok-border){% else %}background:var(--warn-bg);color:var(--warn);border:1px solid rgba(240,160,48,.3){% endif %}">{% if entry.stage=='Implemented' %}✅{% else %}🧪{% endif %} {{entry.stage}}</span>
+                    {% endif %}
+                    <span style="font-size:11px;color:#9a8abf">Added {{entry.created_at[5:7]}}-{{entry.created_at[8:10]}}-{{entry.created_at[:4]}}</span>
+                  </div>
+                </div>
+                <div style="display:flex;gap:6px;flex-shrink:0">
+                  <button type="button" onclick="document.getElementById('nsaev-{{entry.id}}').classList.toggle('hidden')" style="font-size:11px;padding:3px 10px;border:1px solid var(--tint-mid);background:#fff;border-radius:6px;cursor:pointer;color:var(--ink);font-family:'DM Sans',sans-serif;min-height:28px">Edit</button>
+                  <form method="post" action="/admin/update-log/delete/{{entry.id}}" onsubmit="return confirm('Delete this version?')" style="margin:0">
+                    <input type="hidden" name="month" value="{{month}}">
+                    <input type="hidden" name="view" value="{{view}}">
+                    <input type="hidden" name="page" value="admin">
+                    <button type="submit" style="font-size:11px;padding:3px 9px;border:1px solid #fca5a5;background:#fee2e2;color:#dc2626;border-radius:6px;cursor:pointer;min-height:28px">✕</button>
+                  </form>
+                </div>
               </div>
-              <div id="nsavr-body-{{entry.id}}" class="nsa-ver-body">
-                <form method="post" action="/admin/update-log/update/{{entry.id}}" style="margin-bottom:16px">
+              <!-- Inline edit form (hidden by default) -->
+              <div id="nsaev-{{entry.id}}" class="hidden nsa-edit-form" style="margin-bottom:8px">
+                <form method="post" action="/admin/update-log/update/{{entry.id}}" style="display:flex;flex-direction:column;gap:12px">
                   <input type="hidden" name="month" value="{{month}}">
                   <input type="hidden" name="view" value="{{view}}">
                   <input type="hidden" name="page" value="admin">
-                  <div style="display:grid;grid-template-columns:110px 1fr 150px;gap:10px;margin-bottom:14px">
+                  <div style="display:grid;grid-template-columns:1fr 1fr 160px;gap:10px">
                     <div>
                       <label class="nsa-lbl">Version</label>
                       <input type="text" name="version" value="{{entry.version}}" required>
@@ -1982,17 +2017,14 @@ window.addEventListener('beforeunload', function(){
                       </select>
                     </div>
                   </div>
-                  <div style="margin-bottom:14px">
+                  <div>
                     <label class="nsa-lbl">Release Notes</label>
-                    <textarea name="body" rows="6" style="min-height:140px">{{entry.body or ''}}</textarea>
+                    <textarea name="body" rows="7" style="min-height:160px">{{entry.body or ''}}</textarea>
                   </div>
-                  <button type="submit" class="btn-gold btn-sm">💾 Save Changes</button>
-                </form>
-                <form method="post" action="/admin/update-log/delete/{{entry.id}}" onsubmit="return confirm('Delete this entry?')">
-                  <input type="hidden" name="month" value="{{month}}">
-                  <input type="hidden" name="view" value="{{view}}">
-                  <input type="hidden" name="page" value="admin">
-                  <button type="submit" class="btn-danger btn-sm">Delete</button>
+                  <div style="display:flex;gap:8px">
+                    <button type="submit" class="btn-gold btn-sm">💾 Save Changes</button>
+                    <button type="button" onclick="document.getElementById('nsaev-{{entry.id}}').classList.add('hidden')" style="padding:5px 14px;font-size:12px;background:#fff;border:1px solid var(--tint-mid);border-radius:8px;color:#9a8abf;cursor:pointer;font-family:'DM Sans',sans-serif;min-height:30px">Cancel</button>
+                  </div>
                 </form>
               </div>
             </div>
@@ -2000,9 +2032,9 @@ window.addEventListener('beforeunload', function(){
           </div>
           {% else %}
           <div style="text-align:center;padding:40px;border:1.5px dashed var(--tint-mid);border-radius:var(--radius-sm)">
-            <div style="font-size:32px;margin-bottom:8px">📋</div>
+            <div style="font-size:32px;margin-bottom:8px">📌</div>
             <div style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px">No versions logged yet</div>
-            <div style="font-size:12px;color:#9a8abf">Add your first version entry above.</div>
+            <div style="font-size:12px;color:#9a8abf">Click "+ Add Version" above to log your first release.</div>
           </div>
           {% endif %}
         </div>
