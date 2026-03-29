@@ -370,6 +370,7 @@ def init_db():
     ensure_column(c, "users", "security_q2", "security_q2 text")
     ensure_column(c, "users", "security_a2_hash", "security_a2_hash text")
     ensure_column(c, "users", "is_admin", "is_admin integer default 0")
+    ensure_column(c, "update_log", "stage", "stage text")
 
     c.executescript("""
         create table if not exists update_log (
@@ -2649,11 +2650,12 @@ def admin_update_log_add():
     version = (request.form.get("version", "") or "").strip()
     title = (request.form.get("title", "") or "").strip()
     body = (request.form.get("body", "") or "").strip()
+    stage = (request.form.get("stage", "") or "").strip() or None
     if version and title:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         c = conn()
-        c.execute("insert into update_log(version,title,body,created_at) values(?,?,?,?)",
-                  (version, title, body, now))
+        c.execute("insert into update_log(version,title,body,stage,created_at) values(?,?,?,?,?)",
+                  (version, title, body, stage, now))
         c.commit(); c.close()
     return redirect_dashboard_from_form(request.form)
 
@@ -2664,10 +2666,11 @@ def admin_update_log_update(item_id):
     version = (request.form.get("version", "") or "").strip()
     title = (request.form.get("title", "") or "").strip()
     body = (request.form.get("body", "") or "").strip()
+    stage = (request.form.get("stage", "") or "").strip() or None
     if version and title:
         c = conn()
-        c.execute("update update_log set version=?, title=?, body=? where id=?",
-                  (version, title, body, item_id))
+        c.execute("update update_log set version=?, title=?, body=?, stage=? where id=?",
+                  (version, title, body, stage, item_id))
         c.commit(); c.close()
     return redirect_dashboard_from_form(request.form)
 

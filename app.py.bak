@@ -1660,6 +1660,17 @@ def dashboard():
         dkey = f"{year:04d}-{mon:02d}-{day_due:02d}"
         add_event(dkey, "subscription", s["name"], float(s["payment"] or 0), {"id": int(s["id"]), "name": s["name"], "day_due": int(s["day_due"] or 1), "payment": float(s["payment"] or 0), "recurring": int(s["recurring"] or 0), "recurring_timeframe": timeframe, "recurring_every_months": s["recurring_every_months"] or "", "yearly_month": s["yearly_month"] or ""})
 
+    bill_name_suggestions = [r[0] for r in c.execute(
+        "select distinct name from bills where household_id=? and deleted_at is null and coalesce(category,'bill') not in ('adjustment','savings') order by name collate nocase",
+        (household_id,)).fetchall()]
+    # For autofill: latest settings per bill name (recurring, autopay)
+    bill_name_meta = {}
+    for r in c.execute(
+        "select name, recurring, autopay from bills where household_id=? and deleted_at is null and coalesce(category,'bill') not in ('adjustment','savings') order by recurring desc, id desc",
+        (household_id,)).fetchall():
+        if r[0] not in bill_name_meta:
+            bill_name_meta[r[0]] = {"recurring": bool(r[1]), "autopay": bool(r[2])}
+
     c.close()
     return render_template(
         "dashboard.html",
@@ -1683,6 +1694,8 @@ def dashboard():
         show_tour=show_tour, today_str=today.strftime('%Y-%m-%d'),
         user_is_admin=user_is_admin, banner_enabled=banner_enabled, banner_text=banner_text, banner_start_date=banner_start_date, banner_end_date=banner_end_date,
         admin_users=admin_users, admin_update_log=admin_update_log, admin_stats=admin_stats if user_is_admin else {}, admin_feedback=admin_feedback if user_is_admin else [], banner_history=banner_history if user_is_admin else [],
+        bill_name_suggestions=bill_name_suggestions,
+        bill_name_meta=bill_name_meta,
     )
 
 
@@ -1731,6 +1744,9 @@ def entries_add():
     due_date_val = request.form["due_date"]
     planned_pay_date_val = (request.form.get("planned_pay_date", "") or "").strip() or due_date_val
     recurring_flag = 1 if request.form.get("recurring") == "on" else 0
+    if recurring_flag == 1:
+        dupe = c.execute("select id from bills where household_id=? and deleted_at is null and recurring=1 and lower(name)=lower(?)", (household_id, name)).fetchone()
+        if dupe: recurring_flag = 0
     recurring_timeframe = (request.form.get("recurring_timeframe", "monthly") or "monthly").strip().lower()
     if recurring_timeframe not in ("monthly", "yearly", "specified_months"): recurring_timeframe = "monthly"
     try:
@@ -1766,6 +1782,10 @@ def bills_update(item_id):
         row_planned = row["planned_pay_date"] if "planned_pay_date" in row.keys() else ""
         new_planned = planned_raw or row_planned or new_due
         new_recurring = 1 if request.form.get("recurring") == "on" else 0
+        if new_recurring == 1 and int(row["recurring"] or 0) == 0:
+            # Only block if a DIFFERENT bill already has this name as recurring
+            dupe = c.execute("select id from bills where household_id=? and deleted_at is null and recurring=1 and lower(name)=lower(?) and id!=?", (household_id, new_name, item_id)).fetchone()
+            if dupe: new_recurring = 0
         recurring_timeframe = (request.form.get("recurring_timeframe", "monthly") or "monthly").strip().lower()
         if recurring_timeframe not in ("monthly", "yearly", "specified_months"): recurring_timeframe = "monthly"
         try:
@@ -1882,6 +1902,7 @@ def bills_toggle_get_fallback(item_id):
     view = request.args.get("view", "paycheck"); page = request.args.get("page", "entries")
     return redirect(url_for("dashboard", month=month, view=view, page=page, r=int(datetime.now().timestamp() * 1000)))
 
+
 @app.post("/bills/move/<int:item_id>")
 def bills_move(item_id):
     if not authed(): return redirect(url_for("login"))
@@ -1892,6 +1913,7 @@ def bills_move(item_id):
               (new_bucket, item_id, household_id))
     c.commit(); c.close()
     return redirect_dashboard_from_form(request.form)
+
 
 @app.post("/paychecks/add")
 def paychecks_add():

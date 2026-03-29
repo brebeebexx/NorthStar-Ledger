@@ -1,7 +1,231 @@
-<!doctype html><html><head><meta name="viewport" content="width=device-width, initial-scale=1" />
-<style>body{font-family:system-ui;background:#eef1f4;display:grid;place-items:center;min-height:100vh;margin:0}.card{background:#fff;border:1px solid #d1d5db;border-radius:12px;padding:20px;max-width:560px;width:92%}</style></head><body>
-<div class="card"><h3>Invite created</h3>
-<p>Share this link with the invited user:</p>
-<p><a href="/household/accept/{{token}}">/household/accept/{{token}}</a></p>
-<p><a href="/">Back to dashboard</a></p></div>
-</body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, viewport-fit=cover" />
+<title>NorthStar Ledger — Invite Created</title>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --gold:        #f5c842;
+    --gold-lt:     #ffe78a;
+    --gold-dk:     #c99a00;
+    --purple-deep: #1a0d2e;
+    --purple-mid:  #2d1654;
+    --purple-lite: #3d2070;
+    --ring-pink:   #c96dd8;
+    --bar-blue:    #4a90d9;
+    --bar-teal:    #2bc4c4;
+    --bar-orange:  #f0a030;
+    --ok:          #22c97a;
+    --muted:       #a08cc0;
+    --input-bg:    #f8f5ff;
+    --input-bd:    #ddd0f5;
+    --radius-sm:   10px;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--purple-deep);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  /* Starfield */
+  .stars { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
+  .star {
+    position: absolute; background: #fff; border-radius: 50%; opacity: 0;
+    animation: twinkle var(--d,3s) var(--delay,0s) infinite ease-in-out;
+  }
+  @keyframes twinkle {
+    0%,100%{opacity:0;transform:scale(0.8);}
+    50%{opacity:var(--op,0.6);transform:scale(1.2);}
+  }
+
+  /* Ambient glow */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 50% at 20% 50%, rgba(90,40,160,0.4) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 40% at 80% 20%, rgba(200,100,220,0.1) 0%, transparent 60%);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* Card */
+  .card {
+    position: relative; z-index: 1;
+    background: #fff;
+    border-radius: 18px;
+    width: 100%; max-width: 480px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.35), 0 0 0 1px rgba(245,200,66,0.1);
+    overflow: hidden;
+    animation: fadeUp 0.5s ease both;
+  }
+  .card::before {
+    content: '';
+    display: block; height: 4px;
+    background: linear-gradient(90deg, var(--ok), var(--bar-teal), var(--bar-blue), var(--ring-pink), var(--gold));
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-inner { padding: 32px 36px 36px; }
+
+  /* Brand */
+  .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+  .brand img { width: 42px; height: 42px; object-fit: contain; }
+  .brand-name { font-family: 'Cinzel', serif; font-size: 16px; font-weight: 700; color: var(--purple-deep); }
+  .brand-name span { color: var(--gold-dk); }
+
+  /* Success badge */
+  .success-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(34,201,122,0.1); border: 1px solid rgba(34,201,122,0.3);
+    border-radius: 999px; padding: 6px 16px;
+    font-size: 13px; font-weight: 700; color: #0a7a4a;
+    margin-bottom: 18px;
+  }
+  .success-badge svg { width: 14px; height: 14px; }
+
+  .card-title {
+    font-family: 'Cinzel', serif; font-size: 22px; font-weight: 900;
+    color: var(--purple-deep); margin-bottom: 6px;
+  }
+  .card-sub { font-size: 13.5px; color: #7a6d99; margin-bottom: 24px; line-height: 1.5; }
+
+  /* Link box */
+  .link-box {
+    background: var(--input-bg); border: 1.5px solid var(--input-bd);
+    border-radius: var(--radius-sm); padding: 12px 14px;
+    font-size: 13px; font-family: 'DM Sans', monospace;
+    color: var(--purple-lite); word-break: break-all; line-height: 1.5;
+    margin-bottom: 10px; user-select: all;
+  }
+
+  /* Copy button */
+  .btn-copy {
+    width: 100%; padding: 11px;
+    background: linear-gradient(135deg, var(--purple-lite), var(--purple-mid));
+    color: #fff; border: none; border-radius: var(--radius-sm);
+    font-size: 13.5px; font-weight: 700; font-family: 'DM Sans', sans-serif;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px;
+    transition: filter 0.15s, transform 0.12s;
+    margin-bottom: 12px;
+  }
+  .btn-copy:hover { filter: brightness(1.12); transform: translateY(-1px); }
+  .btn-copy svg { width: 14px; height: 14px; }
+
+  /* Copied toast */
+  .copied-msg {
+    display: none; text-align: center; font-size: 13px;
+    color: #0a7a4a; font-weight: 600; margin-bottom: 10px;
+  }
+
+  /* Notice */
+  .notice {
+    background: rgba(245,200,66,0.08); border: 1px solid rgba(245,200,66,0.2);
+    border-radius: var(--radius-sm); padding: 12px 14px;
+    font-size: 12.5px; color: #5a4a00; line-height: 1.5;
+    margin-bottom: 20px;
+  }
+  .notice strong { color: #3a2e00; }
+
+  /* Divider */
+  .divider { height: 1px; background: #ede5f8; margin: 20px 0; }
+
+  /* Back link */
+  .back-link {
+    display: block; text-align: center;
+    font-size: 13px; color: #8a7aaa;
+  }
+  .back-link a {
+    color: var(--purple-lite); font-weight: 700; text-decoration: none;
+    transition: color 0.15s;
+  }
+  .back-link a:hover { color: var(--ring-pink); }
+</style>
+</head>
+<body>
+
+<div class="stars" id="stars"></div>
+
+<div class="card">
+  <div class="card-inner">
+
+    <div class="brand">
+      <img src="/static/brand_logo_transparent.png" alt="NorthStar Ledger logo">
+      <div class="brand-name">NorthStar <span>Ledger</span></div>
+    </div>
+
+    <div class="success-badge">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+      Invite Created
+    </div>
+
+    <h2 class="card-title">Share the Invite Link</h2>
+    <p class="card-sub">Send this link to the person you invited. They'll need to sign in (or create an account) before the link will work.</p>
+
+    <!-- Full URL built in JS so it always includes the correct domain -->
+    <div class="link-box" id="inviteLink">Loading…</div>
+
+    <button class="btn-copy" onclick="copyLink()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      Copy Link
+    </button>
+    <div class="copied-msg" id="copiedMsg">✓ Copied to clipboard!</div>
+
+    <div class="notice">
+      <strong>Heads up:</strong> This invite expires in <strong>7 days</strong>. The invited person must sign in with the email address you entered.
+    </div>
+
+    <div class="divider"></div>
+
+    <p class="back-link"><a href="/">← Back to dashboard</a></p>
+
+  </div>
+</div>
+
+<script>
+// Starfield
+(function(){
+  const c = document.getElementById('stars');
+  for (let i = 0; i < 55; i++) {
+    const s = document.createElement('div');
+    s.className = 'star';
+    const sz = Math.random() * 2 + 1;
+    s.style.cssText = `width:${sz}px;height:${sz}px;left:${Math.random()*100}%;top:${Math.random()*100}%;--d:${(Math.random()*4+2).toFixed(1)}s;--delay:${(Math.random()*5).toFixed(1)}s;--op:${(Math.random()*0.5+0.2).toFixed(2)}`;
+    c.appendChild(s);
+  }
+})();
+
+// Build the full invite URL from the current domain
+const TOKEN = "{{ token }}";
+const fullLink = window.location.origin + "/household/accept/" + TOKEN;
+document.getElementById('inviteLink').textContent = fullLink;
+
+// Copy to clipboard
+function copyLink() {
+  navigator.clipboard.writeText(fullLink).then(function() {
+    const msg = document.getElementById('copiedMsg');
+    msg.style.display = 'block';
+    setTimeout(function() { msg.style.display = 'none'; }, 2500);
+  }).catch(function() {
+    // Fallback: select the text box
+    const box = document.getElementById('inviteLink');
+    const range = document.createRange();
+    range.selectNodeContents(box);
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+  });
+}
+</script>
+</body>
+</html>

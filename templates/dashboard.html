@@ -1879,7 +1879,7 @@ window.addEventListener('beforeunload', function(){
 
           <!-- ── VERSIONS TAB ── -->
           <div id="admtab-versions" style="display:none">
-            <form method="post" action="/admin/update-log/add" style="display:grid;grid-template-columns:120px 1fr auto;gap:8px;align-items:end;margin-bottom:6px;width:100%">
+            <form method="post" action="/admin/update-log/add" style="display:grid;grid-template-columns:100px 1fr 130px auto;gap:8px;align-items:end;margin-bottom:6px;width:100%">
               <input type="hidden" name="month" value="{{month}}">
               <input type="hidden" name="view" value="{{view}}">
               <input type="hidden" name="page" value="admin">
@@ -1890,6 +1890,14 @@ window.addEventListener('beforeunload', function(){
               <div>
                 <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Title</label>
                 <input type="text" name="title" placeholder="Short title for this release">
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Stage</label>
+                <select name="stage" style="font-size:12px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);color:inherit;width:100%">
+                  <option value="">— Not set —</option>
+                  <option value="Testing">🧪 Testing</option>
+                  <option value="Implemented">✅ Implemented</option>
+                </select>
               </div>
               <button type="submit" class="btn-gold" style="align-self:end">+ Add</button>
             </form>
@@ -1902,6 +1910,9 @@ window.addEventListener('beforeunload', function(){
                 <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(255,255,255,0.03);cursor:pointer" onclick="toggleAdminEntry({{entry.id}})">
                   <span style="font-family:'Cinzel',serif;font-weight:700;color:var(--gold);font-size:14px;min-width:60px">{{entry.version}}</span>
                   <span style="font-weight:600;color:#1a0d2e;flex:1">{{entry.title}}</span>
+                  {% if entry.stage %}
+                  <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap;{% if entry.stage=='Implemented' %}background:#d1fae5;color:#065f46;{% else %}background:#fef3c7;color:#92400e;{% endif %}">{% if entry.stage=='Implemented' %}✅{% else %}🧪{% endif %} {{entry.stage}}</span>
+                  {% endif %}
                   <span style="font-size:11px;color:#4a2a7a">{{entry.created_at[5:7]}}-{{entry.created_at[8:10]}}-{{entry.created_at[:4]}}</span>
                   <span style="font-size:11px;color:#4a2a7a">▼</span>
                 </div>
@@ -1912,13 +1923,21 @@ window.addEventListener('beforeunload', function(){
                     <input type="hidden" name="view" value="{{view}}">
                     <input type="hidden" name="page" value="admin">
                     <div style="display:flex;gap:8px;margin-bottom:8px">
-                      <div style="width:120px;flex-shrink:0">
+                      <div style="width:100px;flex-shrink:0">
                         <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Version</label>
                         <input type="text" name="version" value="{{entry.version}}" required>
                       </div>
                       <div style="flex:1">
                         <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Title</label>
                         <input type="text" name="title" value="{{entry.title}}" required style="width:100%">
+                      </div>
+                      <div style="width:140px;flex-shrink:0">
+                        <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Stage</label>
+                        <select name="stage" style="font-size:12px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);color:inherit;width:100%">
+                          <option value="" {% if not entry.stage %}selected{% endif %}>— Not set —</option>
+                          <option value="Testing" {% if entry.stage=='Testing' %}selected{% endif %}>🧪 Testing</option>
+                          <option value="Implemented" {% if entry.stage=='Implemented' %}selected{% endif %}>✅ Implemented</option>
+                        </select>
                       </div>
                     </div>
                     <div style="margin-bottom:10px;width:100%">
