@@ -588,6 +588,9 @@ def redirect_dashboard_from_form(form):
     settings_tab = (form.get("settings_tab", "") or "").strip()
     if settings_tab:
         params["settings_tab"] = settings_tab
+    admin_tab = (form.get("tab", "") or "").strip()
+    if admin_tab:
+        params["tab"] = admin_tab
     target = url_for("dashboard", **params)
     anchor = (form.get("anchor", "") or "").strip().lstrip("#")
     if anchor:
