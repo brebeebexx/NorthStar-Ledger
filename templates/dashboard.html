@@ -1800,168 +1800,179 @@ window.addEventListener('beforeunload', function(){
            ADMIN PAGE
       ══════════════════════════════ -->
       {% if page == 'admin' and user_is_admin %}
-      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden">
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;border:1px solid var(--line-light)">
 
         <!-- Admin Header -->
-        <div style="background:linear-gradient(135deg,rgba(245,200,66,0.12),rgba(201,109,216,0.08));padding:16px 20px;border-bottom:1px solid var(--line-light);display:flex;align-items:center;gap:12px">
-          <span style="font-family:'Cinzel',serif;font-size:18px;font-weight:900;color:var(--gold)">⚙ Admin Panel</span>
-          <span style="font-size:11px;font-weight:700;background:rgba(245,200,66,0.2);color:var(--gold);padding:2px 10px;border-radius:999px;border:1px solid rgba(245,200,66,0.3)">ADMIN ONLY</span>
+        <div style="background:linear-gradient(135deg,#1e0c3a 0%,#2a1050 100%);padding:18px 24px;border-bottom:1px solid var(--line-light);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:38px;height:38px;background:linear-gradient(135deg,rgba(245,200,66,0.22),rgba(201,109,216,0.14));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">⚙</div>
+            <div>
+              <div style="font-family:'Cinzel',serif;font-size:17px;font-weight:900;color:var(--gold);line-height:1.2">Admin Panel</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">NorthStar Ledger Control Center</div>
+            </div>
+          </div>
+          <span style="font-size:10px;font-weight:800;background:rgba(245,200,66,0.14);color:var(--gold);padding:4px 13px;border-radius:999px;border:1px solid rgba(245,200,66,0.25);letter-spacing:.6px">ADMIN ONLY</span>
         </div>
 
         <!-- Admin Tab Nav -->
-        <div style="display:flex;gap:0;border-bottom:1px solid var(--line-light);background:rgba(0,0,0,0.1);padding:0 16px">
-          <button type="button" class="admin-tab-btn active" id="admtab-btn-overview" onclick="adminTab('overview')" style="padding:10px 16px;border:none;background:transparent;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid var(--gold);font-family:'DM Sans',sans-serif">📊 Overview</button>
-          <button type="button" class="admin-tab-btn" id="admtab-btn-versions" onclick="adminTab('versions')" style="padding:10px 16px;border:none;background:transparent;color:#8a7aaa;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">📋 Versions</button>
-          <button type="button" class="admin-tab-btn" id="admtab-btn-banner" onclick="adminTab('banner')" style="padding:10px 16px;border:none;background:transparent;color:#8a7aaa;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">📢 Banner</button>
-          <button type="button" class="admin-tab-btn" id="admtab-btn-users" onclick="adminTab('users')" style="padding:10px 16px;border:none;background:transparent;color:#8a7aaa;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">👥 Users</button>
-          <button type="button" class="admin-tab-btn" id="admtab-btn-feedback" onclick="adminTab('feedback')" style="padding:10px 16px;border:none;background:transparent;color:#8a7aaa;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">
-            💬 Feedback{% if admin_stats.get('unread_feedback',0) > 0 %} <span style="background:var(--bad);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px">{{admin_stats.get('unread_feedback',0)}}</span>{% endif %}
+        <div style="display:flex;gap:0;border-bottom:2px solid var(--line-light);background:rgba(0,0,0,0.14);padding:0 20px;overflow-x:auto">
+          <button type="button" class="admin-tab-btn active" id="admtab-btn-overview" onclick="adminTab('overview')" style="padding:12px 18px;border:none;background:transparent;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid var(--gold);margin-bottom:-2px;white-space:nowrap;font-family:'DM Sans',sans-serif">📊 Overview</button>
+          <button type="button" class="admin-tab-btn" id="admtab-btn-versions" onclick="adminTab('versions')" style="padding:12px 18px;border:none;background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;font-family:'DM Sans',sans-serif">📋 Versions</button>
+          <button type="button" class="admin-tab-btn" id="admtab-btn-banner" onclick="adminTab('banner')" style="padding:12px 18px;border:none;background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;font-family:'DM Sans',sans-serif">📢 Banner</button>
+          <button type="button" class="admin-tab-btn" id="admtab-btn-users" onclick="adminTab('users')" style="padding:12px 18px;border:none;background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;font-family:'DM Sans',sans-serif">👥 Users</button>
+          <button type="button" class="admin-tab-btn" id="admtab-btn-feedback" onclick="adminTab('feedback')" style="padding:12px 18px;border:none;background:transparent;color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;font-family:'DM Sans',sans-serif">
+            💬 Feedback{% if admin_stats.get('unread_feedback',0) > 0 %} <span style="background:var(--bad);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;margin-left:3px">{{admin_stats.get('unread_feedback',0)}}</span>{% endif %}
           </button>
         </div>
 
-        <div style="padding:20px">
+        <div style="padding:24px">
 
           <!-- ── OVERVIEW TAB ── -->
           <div id="admtab-overview">
-            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:20px">
-              <div class="stat-card" style="text-align:center;padding:14px">
-                <div style="font-size:26px;font-weight:700;color:var(--gold)">{{admin_stats.get('total_users',0)}}</div>
-                <div style="font-size:11px;color:#3a1f6e;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Total Users</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:24px">
+              <div style="background:linear-gradient(135deg,rgba(245,200,66,0.09),rgba(245,200,66,0.04));border:1px solid rgba(245,200,66,0.2);border-radius:var(--radius-sm);padding:18px;text-align:center">
+                <div style="font-family:'Cinzel',serif;font-size:30px;font-weight:700;color:var(--gold);line-height:1">{{admin_stats.get('total_users',0)}}</div>
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.9px;margin-top:8px">Total Users</div>
               </div>
-              <div class="stat-card" style="text-align:center;padding:14px">
-                <div style="font-size:26px;font-weight:700;color:var(--gold)">{{admin_stats.get('total_households',0)}}</div>
-                <div style="font-size:11px;color:#3a1f6e;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Households</div>
+              <div style="background:linear-gradient(135deg,rgba(74,144,217,0.09),rgba(74,144,217,0.04));border:1px solid rgba(74,144,217,0.2);border-radius:var(--radius-sm);padding:18px;text-align:center">
+                <div style="font-family:'Cinzel',serif;font-size:30px;font-weight:700;color:var(--bar-blue);line-height:1">{{admin_stats.get('total_households',0)}}</div>
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.9px;margin-top:8px">Households</div>
               </div>
-              <div class="stat-card" style="text-align:center;padding:14px">
-                <div style="font-size:26px;font-weight:700;color:var(--gold)">{{admin_stats.get('logins_today',0)}}</div>
-                <div style="font-size:11px;color:#3a1f6e;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Logins Today</div>
+              <div style="background:linear-gradient(135deg,rgba(34,201,122,0.09),rgba(34,201,122,0.04));border:1px solid rgba(34,201,122,0.2);border-radius:var(--radius-sm);padding:18px;text-align:center">
+                <div style="font-family:'Cinzel',serif;font-size:30px;font-weight:700;color:var(--ok);line-height:1">{{admin_stats.get('logins_today',0)}}</div>
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.9px;margin-top:8px">Logins Today</div>
               </div>
-              <div class="stat-card" style="text-align:center;padding:14px">
-                <div style="font-size:26px;font-weight:700;color:{% if admin_stats.get('unread_feedback',0) > 0 %}var(--bad){% else %}var(--gold){% endif %}">{{admin_stats.get('unread_feedback',0)}}</div>
-                <div style="font-size:11px;color:#3a1f6e;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Unread Feedback</div>
+              <div style="background:linear-gradient(135deg,{% if admin_stats.get('unread_feedback',0) > 0 %}rgba(255,91,114,0.1),rgba(255,91,114,0.05));border:1px solid rgba(255,91,114,0.25){% else %}rgba(160,140,192,0.06),rgba(160,140,192,0.03));border:1px solid var(--line-light){% endif %};border-radius:var(--radius-sm);padding:18px;text-align:center">
+                <div style="font-family:'Cinzel',serif;font-size:30px;font-weight:700;color:{% if admin_stats.get('unread_feedback',0) > 0 %}var(--bad){% else %}var(--muted){% endif %};line-height:1">{{admin_stats.get('unread_feedback',0)}}</div>
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.9px;margin-top:8px">Unread Feedback</div>
               </div>
             </div>
 
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:14px">
-                <div style="font-size:11px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Current Version</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+              <div style="background:rgba(255,255,255,0.03);border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:16px">
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Current Version</div>
                 {% if admin_stats.get('latest_version') %}
-                <div style="font-family:'Cinzel',serif;font-size:20px;font-weight:700;color:var(--gold)">{{admin_stats['latest_version']['version']}}</div>
-                <div style="font-size:13px;color:#c0a8e0;margin-top:2px">{{admin_stats['latest_version']['title']}}</div>
-                <div style="font-size:11px;color:#4a2a7a;margin-top:4px">Released {{fmt_date(admin_stats['latest_version']['created_at'][:10])}}</div>
+                <div style="font-family:'Cinzel',serif;font-size:22px;font-weight:700;color:var(--gold)">{{admin_stats['latest_version']['version']}}</div>
+                <div style="font-size:13px;color:var(--ink);font-weight:500;margin-top:3px">{{admin_stats['latest_version']['title']}}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:5px">Released {{fmt_date(admin_stats['latest_version']['created_at'][:10])}}</div>
                 {% else %}
-                <div style="font-size:13px;color:#4a2a7a">No versions logged yet.</div>
+                <div style="font-size:13px;color:var(--muted)">No versions logged yet.</div>
                 {% endif %}
               </div>
-              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:14px">
-                <div style="font-size:11px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Newest User</div>
+              <div style="background:rgba(255,255,255,0.03);border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:16px">
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Newest User</div>
                 {% if admin_stats.get('newest_user') %}
-                <div style="font-size:14px;font-weight:600;color:#1a0d2e;word-break:break-all">{{admin_stats['newest_user']['email']}}</div>
-                <div style="font-size:11px;color:#4a2a7a;margin-top:4px">Joined {{fmt_date(admin_stats['newest_user']['created_at'][:10])}}</div>
+                <div style="font-size:14px;font-weight:600;color:var(--ink);word-break:break-all">{{admin_stats['newest_user']['email']}}</div>
+                <div style="font-size:11px;color:var(--muted);margin-top:5px">Joined {{fmt_date(admin_stats['newest_user']['created_at'][:10])}}</div>
                 {% else %}
-                <div style="font-size:13px;color:#4a2a7a">No users yet.</div>
+                <div style="font-size:13px;color:var(--muted)">No users yet.</div>
                 {% endif %}
               </div>
-              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:14px">
-                <div style="font-size:11px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Banner Status</div>
+              <div style="background:rgba(255,255,255,0.03);border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:16px">
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Banner Status</div>
                 {% if admin_stats.get('banner_enabled') %}
-                <span style="background:rgba(46,160,67,0.15);color:#2ea043;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px">● Active</span>
+                <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(34,201,122,0.12);color:var(--ok);font-size:13px;font-weight:600;padding:5px 13px;border-radius:999px;border:1px solid rgba(34,201,122,0.25)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span> Active</span>
                 {% else %}
-                <span style="background:rgba(160,160,180,0.1);color:#8a7aaa;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px">● Off</span>
+                <span style="display:inline-flex;align-items:center;gap:6px;background:rgba(160,140,192,0.08);color:var(--muted);font-size:13px;font-weight:600;padding:5px 13px;border-radius:999px;border:1px solid var(--line-light)"><span style="width:7px;height:7px;border-radius:50%;background:var(--muted)"></span> Off</span>
                 {% endif %}
               </div>
-              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:14px">
-                <div style="font-size:11px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Total Versions Logged</div>
-                <div style="font-family:'Cinzel',serif;font-size:20px;font-weight:700;color:var(--gold)">{{admin_update_log|length}}</div>
+              <div style="background:rgba(255,255,255,0.03);border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:16px">
+                <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px">Versions Logged</div>
+                <div style="font-family:'Cinzel',serif;font-size:22px;font-weight:700;color:var(--gold)">{{admin_update_log|length}}</div>
               </div>
             </div>
           </div>
 
           <!-- ── VERSIONS TAB ── -->
           <div id="admtab-versions" style="display:none">
-            <form method="post" action="/admin/update-log/add" style="display:grid;grid-template-columns:100px 1fr 130px auto;gap:8px;align-items:end;margin-bottom:6px;width:100%">
-              <input type="hidden" name="month" value="{{month}}">
-              <input type="hidden" name="view" value="{{view}}">
-              <input type="hidden" name="page" value="admin">
-              <div>
-                <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Version</label>
-                <input type="text" name="version" placeholder="e.g. v3.2">
-              </div>
-              <div>
-                <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Title</label>
-                <input type="text" name="title" placeholder="Short title for this release">
-              </div>
-              <div>
-                <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Stage</label>
-                <select name="stage" style="font-size:12px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);color:inherit;width:100%">
-                  <option value="">— Not set —</option>
-                  <option value="Testing">🧪 Testing</option>
-                  <option value="Implemented">✅ Implemented</option>
-                </select>
-              </div>
-              <button type="submit" class="btn-gold" style="align-self:end">+ Add</button>
-            </form>
-            <div style="font-size:11px;color:#4a2a7a;margin-bottom:14px">After adding, expand the row to write detailed notes.</div>
+            <div style="background:rgba(255,255,255,0.03);border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:18px;margin-bottom:20px">
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px">Add New Version</div>
+              <form method="post" action="/admin/update-log/add" style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+                <input type="hidden" name="month" value="{{month}}">
+                <input type="hidden" name="view" value="{{view}}">
+                <input type="hidden" name="page" value="admin">
+                <div style="width:110px;flex-shrink:0">
+                  <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Version</label>
+                  <input type="text" name="version" placeholder="e.g. v3.2">
+                </div>
+                <div style="flex:1;min-width:180px">
+                  <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Title</label>
+                  <input type="text" name="title" placeholder="Short title for this release">
+                </div>
+                <div style="width:150px;flex-shrink:0">
+                  <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Stage</label>
+                  <select name="stage" style="width:100%">
+                    <option value="">— Not set —</option>
+                    <option value="Testing">🧪 Testing</option>
+                    <option value="Implemented">✅ Implemented</option>
+                  </select>
+                </div>
+                <button type="submit" class="btn-gold" style="flex-shrink:0">+ Add</button>
+              </form>
+            </div>
 
             {% if admin_update_log %}
             <div style="display:grid;gap:8px">
               {% for entry in admin_update_log %}
-              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);overflow:hidden">
-                <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(255,255,255,0.03);cursor:pointer" onclick="toggleAdminEntry({{entry.id}})">
-                  <span style="font-family:'Cinzel',serif;font-weight:700;color:var(--gold);font-size:14px;min-width:60px">{{entry.version}}</span>
-                  <span style="font-weight:600;color:#1a0d2e;flex:1">{{entry.title}}</span>
+              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);overflow:hidden;background:rgba(255,255,255,0.02)">
+                <div style="display:flex;align-items:center;gap:12px;padding:13px 16px;cursor:pointer;transition:background .15s" onclick="toggleAdminEntry({{entry.id}})" onmouseover="this.style.background='rgba(245,200,66,0.04)'" onmouseout="this.style.background=''">
+                  <span style="font-family:'Cinzel',serif;font-weight:700;color:var(--gold);font-size:14px;min-width:54px">{{entry.version}}</span>
+                  <span style="font-weight:600;color:var(--ink);flex:1;font-size:14px">{{entry.title}}</span>
                   {% if entry.stage %}
-                  <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap;{% if entry.stage=='Implemented' %}background:#d1fae5;color:#065f46;{% else %}background:#fef3c7;color:#92400e;{% endif %}">{% if entry.stage=='Implemented' %}✅{% else %}🧪{% endif %} {{entry.stage}}</span>
+                  <span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:999px;white-space:nowrap;letter-spacing:.3px;{% if entry.stage=='Implemented' %}background:rgba(34,201,122,0.14);color:var(--ok);border:1px solid rgba(34,201,122,0.25){% else %}background:rgba(240,160,48,0.14);color:var(--warn);border:1px solid rgba(240,160,48,0.25){% endif %}">{% if entry.stage=='Implemented' %}✅{% else %}🧪{% endif %} {{entry.stage}}</span>
                   {% endif %}
-                  <span style="font-size:11px;color:#4a2a7a">{{entry.created_at[5:7]}}-{{entry.created_at[8:10]}}-{{entry.created_at[:4]}}</span>
-                  <span style="font-size:11px;color:#4a2a7a">▼</span>
+                  <span style="font-size:11px;color:var(--muted);white-space:nowrap">{{entry.created_at[5:7]}}-{{entry.created_at[8:10]}}-{{entry.created_at[:4]}}</span>
+                  <span style="font-size:11px;color:var(--muted)">▼</span>
                 </div>
-                <div id="admin-entry-{{entry.id}}" style="display:none;padding:14px;border-top:1px solid var(--line-light)">
-                  <div style="display:flex;flex-direction:column;gap:10px;width:100%">
-                  <form method="post" action="/admin/update-log/update/{{entry.id}}" style="width:100%">
-                    <input type="hidden" name="month" value="{{month}}">
-                    <input type="hidden" name="view" value="{{view}}">
-                    <input type="hidden" name="page" value="admin">
-                    <div style="display:flex;gap:8px;margin-bottom:8px">
-                      <div style="width:100px;flex-shrink:0">
-                        <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Version</label>
-                        <input type="text" name="version" value="{{entry.version}}" required>
+                <div id="admin-entry-{{entry.id}}" style="display:none;padding:18px;border-top:1px solid var(--line-light);background:rgba(0,0,0,0.06)">
+                  <div style="display:flex;flex-direction:column;gap:12px;width:100%">
+                    <form method="post" action="/admin/update-log/update/{{entry.id}}" style="width:100%">
+                      <input type="hidden" name="month" value="{{month}}">
+                      <input type="hidden" name="view" value="{{view}}">
+                      <input type="hidden" name="page" value="admin">
+                      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+                        <div style="width:110px;flex-shrink:0">
+                          <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Version</label>
+                          <input type="text" name="version" value="{{entry.version}}" required>
+                        </div>
+                        <div style="flex:1;min-width:180px">
+                          <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Title</label>
+                          <input type="text" name="title" value="{{entry.title}}" required>
+                        </div>
+                        <div style="width:150px;flex-shrink:0">
+                          <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Stage</label>
+                          <select name="stage" style="width:100%">
+                            <option value="" {% if not entry.stage %}selected{% endif %}>— Not set —</option>
+                            <option value="Testing" {% if entry.stage=='Testing' %}selected{% endif %}>🧪 Testing</option>
+                            <option value="Implemented" {% if entry.stage=='Implemented' %}selected{% endif %}>✅ Implemented</option>
+                          </select>
+                        </div>
                       </div>
-                      <div style="flex:1">
-                        <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Title</label>
-                        <input type="text" name="title" value="{{entry.title}}" required style="width:100%">
+                      <div style="margin-bottom:12px">
+                        <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px">Release Notes</label>
+                        <textarea name="body" style="width:100%;box-sizing:border-box;min-height:200px;resize:vertical;font-size:13px;line-height:1.7">{{entry.body or ''}}</textarea>
                       </div>
-                      <div style="width:140px;flex-shrink:0">
-                        <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Stage</label>
-                        <select name="stage" style="font-size:12px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);color:inherit;width:100%">
-                          <option value="" {% if not entry.stage %}selected{% endif %}>— Not set —</option>
-                          <option value="Testing" {% if entry.stage=='Testing' %}selected{% endif %}>🧪 Testing</option>
-                          <option value="Implemented" {% if entry.stage=='Implemented' %}selected{% endif %}>✅ Implemented</option>
-                        </select>
+                      <div style="display:flex;gap:8px">
+                        <button type="submit" class="btn-gold btn-sm">Save Changes</button>
                       </div>
-                    </div>
-                    <div style="margin-bottom:10px;width:100%">
-                      <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Notes — describe exactly what changed in this version</label>
-                      <textarea name="body" style="width:100%;box-sizing:border-box;min-height:220px;resize:vertical;font-size:13px;line-height:1.6;color:#000;background:#fff">{{entry.body or ''}}</textarea>
-                    </div>
-                    <div style="display:flex;gap:8px">
-                      <button type="submit" class="btn-gold btn-sm">Save Changes</button>
-                    </div>
-                  </form>
-                  <form method="post" action="/admin/update-log/delete/{{entry.id}}" onsubmit="return confirm('Delete this entry?')" style="margin:0">
-                    <input type="hidden" name="month" value="{{month}}">
-                    <input type="hidden" name="view" value="{{view}}">
-                    <input type="hidden" name="page" value="admin">
-                    <button type="submit" class="btn-danger btn-sm">Delete</button>
-                  </form>
-                </div>
-
+                    </form>
+                    <form method="post" action="/admin/update-log/delete/{{entry.id}}" onsubmit="return confirm('Delete this entry?')" style="margin:0">
+                      <input type="hidden" name="month" value="{{month}}">
+                      <input type="hidden" name="view" value="{{view}}">
+                      <input type="hidden" name="page" value="admin">
+                      <button type="submit" class="btn-danger btn-sm">Delete</button>
+                    </form>
+                  </div>
                 </div>
               </div>
               {% endfor %}
             </div>
             {% else %}
-            <div style="font-size:13px;color:#4a2a7a;padding:20px;text-align:center">No version entries yet. Add your first one above.</div>
+            <div style="padding:32px;text-align:center;border:1px dashed rgba(200,170,255,0.15);border-radius:var(--radius-sm)">
+              <div style="font-size:28px;margin-bottom:8px">📋</div>
+              <div style="font-size:14px;font-weight:500;color:var(--ink);margin-bottom:4px">No versions logged yet</div>
+              <div style="font-size:12px;color:var(--muted)">Add your first version entry above.</div>
+            </div>
             {% endif %}
           </div>
 
@@ -1971,52 +1982,52 @@ window.addEventListener('beforeunload', function(){
               <input type="hidden" name="month" value="{{month}}">
               <input type="hidden" name="view" value="{{view}}">
               <input type="hidden" name="page" value="admin">
-              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:16px;margin-bottom:14px">
-                <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
-                  <label style="font-size:14px;color:#c0a8e0;display:flex;align-items:center;gap:8px;cursor:pointer">
-                    <input type="checkbox" name="banner_enabled" value="1" {% if banner_enabled %}checked{% endif %} style="width:16px;height:16px">
+              <div style="background:rgba(255,255,255,0.03);border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:20px;margin-bottom:16px">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid var(--line-light)">
+                  <label style="font-size:14px;font-weight:500;color:var(--ink);display:flex;align-items:center;gap:10px;cursor:pointer">
+                    <input type="checkbox" name="banner_enabled" value="1" {% if banner_enabled %}checked{% endif %} style="width:16px;height:16px;accent-color:var(--gold)">
                     Show banner to all users
                   </label>
                 </div>
-                <div style="margin-bottom:12px">
-                  <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Banner Text</label>
-                  <textarea name="banner_text" rows="5" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;color:#000;background:#fff;line-height:1.5;min-height:100px">{{banner_text}}</textarea>
+                <div style="margin-bottom:14px">
+                  <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Banner Text</label>
+                  <textarea name="banner_text" rows="3" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;line-height:1.6;min-height:90px">{{banner_text}}</textarea>
                 </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
                   <div>
-                    <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Show From <span style="font-weight:400;color:#6a5a8a">(optional)</span></label>
+                    <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Show From <span style="font-weight:400;text-transform:none;color:var(--muted)">(optional)</span></label>
                     <input type="date" name="banner_start_date" value="{{banner_start_date}}">
-                    <div style="font-size:11px;color:#4a2a7a;margin-top:3px">Banner starts showing on this date</div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px">Banner starts showing on this date</div>
                   </div>
                   <div>
-                    <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Hide After <span style="font-weight:400;color:#6a5a8a">(optional)</span></label>
+                    <label style="font-size:11px;font-weight:600;color:var(--muted);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Hide After <span style="font-weight:400;text-transform:none;color:var(--muted)">(optional)</span></label>
                     <input type="date" name="banner_end_date" value="{{banner_end_date}}">
-                    <div style="font-size:11px;color:#4a2a7a;margin-top:3px">Banner auto-hides after this date</div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px">Banner auto-hides after this date</div>
                   </div>
                 </div>
                 <button type="submit" class="btn-gold">Save Banner</button>
               </div>
             </form>
             {% if banner_enabled and banner_text %}
-            <div style="background:#fffbea;border:1.5px solid #f5c842;border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:10px">
-              <span style="background:#f5c842;color:#5a4000;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;white-space:nowrap">Preview</span>
-              <span style="font-size:13px;color:#5a4000">{{banner_text}}</span>
+            <div style="background:rgba(245,200,66,0.08);border:1.5px solid rgba(245,200,66,0.28);border-radius:var(--radius-sm);padding:12px 16px;display:flex;align-items:center;gap:10px;margin-bottom:16px">
+              <span style="background:var(--gold);color:#2a1200;font-size:10px;font-weight:800;padding:3px 10px;border-radius:999px;white-space:nowrap;letter-spacing:.5px">PREVIEW</span>
+              <span style="font-size:13px;color:var(--ink)">{{banner_text}}</span>
             </div>
             {% else %}
-            <div style="font-size:13px;color:#4a2a7a;padding:12px;text-align:center;border:1px dashed rgba(200,170,255,0.2);border-radius:8px">Banner is currently off. Enable it above to show a message to all users.</div>
+            <div style="font-size:13px;color:var(--muted);padding:14px;text-align:center;border:1px dashed rgba(200,170,255,0.15);border-radius:var(--radius-sm);margin-bottom:16px">Banner is currently off. Enable it above to show a message to all users.</div>
             {% endif %}
 
             {% if banner_history %}
-            <div style="margin-top:18px;border-top:1px solid var(--line-light);padding-top:14px">
-              <div style="font-size:12px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">📜 Banner History — click to reuse</div>
+            <div style="border-top:1px solid var(--line-light);padding-top:16px">
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">📜 Banner History — click to reuse</div>
               <div style="display:grid;gap:6px">
                 {% for h in banner_history %}
-                <div style="border:1px solid var(--line-light);border-radius:8px;padding:10px 12px;cursor:pointer;transition:background 0.15s"
+                <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:11px 14px;cursor:pointer;transition:background .15s;background:rgba(255,255,255,0.02)"
                      onclick="reuseAdminBanner('{{h.text|replace("'","\'")}}','{{h.start_date or ""}}','{{h.end_date or ""}}')"
-                     onmouseover="this.style.background='rgba(245,200,66,0.06)'"
-                     onmouseout="this.style.background=''">
-                  <div style="font-size:13px;color:#1a0d2e;margin-bottom:4px">{{h.text}}</div>
-                  <div style="font-size:11px;color:#4a2a7a">
+                     onmouseover="this.style.background='rgba(245,200,66,0.05)'"
+                     onmouseout="this.style.background='rgba(255,255,255,0.02)'">
+                  <div style="font-size:13px;color:var(--ink);margin-bottom:4px">{{h.text}}</div>
+                  <div style="font-size:11px;color:var(--muted)">
                     Saved {{h.saved_at[5:7]}}-{{h.saved_at[8:10]}}-{{h.saved_at[:4]}}
                     {% if h.start_date %} · From {{h.start_date[5:7]}}-{{h.start_date[8:10]}}-{{h.start_date[:4]}}{% endif %}
                     {% if h.end_date %} · Until {{h.end_date[5:7]}}-{{h.end_date[8:10]}}-{{h.end_date[:4]}}{% endif %}
@@ -2030,148 +2041,133 @@ window.addEventListener('beforeunload', function(){
 
           <!-- ── USERS TAB ── -->
           <div id="admtab-users" style="display:none">
-            <div style="margin-bottom:12px">
-              <input type="text" id="adminUserSearch" placeholder="Search by email..." oninput="filterAdminUsers()" style="max-width:320px">
+            <div style="margin-bottom:14px">
+              <input type="text" id="adminUserSearch" placeholder="🔍  Search by email or household..." oninput="filterAdminUsers()" style="max-width:340px">
             </div>
-            <div style="overflow-x:auto">
-            <table class="adaptive-table" id="adminUsersTable">
-              <tr><th>ID</th><th style="min-width:220px">Email</th><th>Household</th><th>Role</th><th>Joined</th><th>Last Login</th><th>Admin</th><th>Delete</th></tr>
-              {% for u in admin_users %}
-              <tr class="admin-user-row" data-search="{{u.email|lower}} {{(u.household_name or '')|lower}}" {% if u.is_admin %}style="background:rgba(245,200,66,0.05)"{% endif %}>
-                <td style="font-size:12px;color:#3a1f6e">{{u.id}}</td>
-                <td style="word-break:break-all">
-                  <span style="font-weight:600;color:#1a0d2e">{{u.email}}</span>
-                  {% if u.is_admin %}<span style="font-size:10px;background:rgba(245,200,66,0.2);color:var(--gold);padding:1px 6px;border-radius:999px;margin-left:4px">ADMIN</span>{% endif %}
-                </td>
-                <td style="font-size:12px">{{u.household_name or '—'}}</td>
-                <td style="font-size:12px;color:#3a1f6e">{{u.role or '—'}}</td>
-                <td style="font-size:12px;color:#3a1f6e;white-space:nowrap">
-                  {% if u.created_at %}{{u.created_at[5:7]}}-{{u.created_at[8:10]}}-{{u.created_at[:4]}}{% else %}—{% endif %}
-                </td>
-                <td style="font-size:12px;color:#3a1f6e;white-space:nowrap">
-                  {% if u.last_login_at %}{{u.last_login_at[5:7]}}-{{u.last_login_at[8:10]}}-{{u.last_login_at[:4]}}{% else %}Never{% endif %}
-                </td>
-                <td>
-                  {% if u.id != session.get('user_id') %}
-                  <form method="post" action="/admin/user/toggle-admin/{{u.id}}" style="margin:0">
-                    <input type="hidden" name="month" value="{{month}}">
-                    <input type="hidden" name="view" value="{{view}}">
-                    <input type="hidden" name="page" value="admin">
-                    <button type="submit" class="btn-sm" style="white-space:nowrap;{% if u.is_admin %}background:#fff3cd;color:#856404{% else %}background:rgba(255,255,255,0.07);color:#8a7aaa{% endif %}">
-                      {{'★ Admin' if u.is_admin else '☆ Grant'}}
-                    </button>
-                  </form>
-                  {% else %}
-                  <span style="font-size:11px;color:var(--gold)">★ You</span>
-                  {% endif %}
-                </td>
-                <td>
-                  {% if u.id != session.get('user_id') %}
-                  <form method="post" action="/admin/user/delete/{{u.id}}" onsubmit="return confirm('Delete {{u.email}}?')" style="margin:0">
-                    <input type="hidden" name="month" value="{{month}}">
-                    <input type="hidden" name="view" value="{{view}}">
-                    <input type="hidden" name="page" value="admin">
-                    <button type="submit" class="btn-danger btn-sm">Delete</button>
-                  </form>
-                  {% else %}
-                  <span style="font-size:11px;color:#4a2a7a">—</span>
-                  {% endif %}
-                </td>
-              </tr>
-              {% endfor %}
-            </table>
-            </div>
-          </div>
-
-          <!-- ── FEEDBACK TAB ── -->
-          <div id="admtab-feedback" style="display:none">
-
-            <!-- Filter tabs -->
-            <div style="display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid var(--line-light)">
-              <button type="button" onclick="filterFeedback('all')" id="fb-filter-all"
-                style="padding:7px 14px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:var(--gold);border-bottom:2px solid var(--gold);font-family:'DM Sans',sans-serif">
-                All
-              </button>
-              <button type="button" onclick="filterFeedback('unread')" id="fb-filter-unread"
-                style="padding:7px 14px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:#4a2a7a;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">
-                Unread
-              </button>
-              <button type="button" onclick="filterFeedback('feedback')" id="fb-filter-feedback"
-                style="padding:7px 14px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:#4a2a7a;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">
-                💬 Feedback
-              </button>
-              <button type="button" onclick="filterFeedback('review')" id="fb-filter-review"
-                style="padding:7px 14px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:#4a2a7a;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">
-                ⭐ Reviews
-              </button>
-            </div>
-
-            {% if admin_feedback %}
-            <table class="adaptive-table" id="feedbackTable">
-              <tr>
-                <th style="min-width:140px">From</th>
-                <th>Subject</th>
-                <th>Message</th>
-                <th style="min-width:130px">Type</th>
-                <th style="min-width:80px">Actions</th>
-              </tr>
-              {% for fb in admin_feedback %}
-              <tr class="fb-row"
-                  data-read="{{fb.is_read}}"
-                  data-type="{{fb.feedback_type or 'unread'}}"
-                  {% if not fb.is_read %}style="background:rgba(245,200,66,0.04)"{% endif %}>
-                <td style="font-size:12px">
-                  <div style="font-weight:600;color:#1a0d2e;word-break:break-all">{{fb.email or 'Anonymous'}}</div>
-                  <div style="color:#4a2a7a;font-size:11px;margin-top:2px">
-                    {{fb.created_at[5:7]}}-{{fb.created_at[8:10]}}-{{fb.created_at[:4]}}
-                    {% if not fb.is_read %}<span style="background:var(--bad);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;margin-left:4px">NEW</span>{% endif %}
-                  </div>
-                </td>
-                <td style="font-size:13px;font-weight:600;color:#1a0d2e;word-break:break-word;white-space:normal">{{fb.subject or '(no subject)'}}</td>
-                <td style="font-size:12px;color:#1a0d2e;max-width:300px">
-                  <div style="white-space:pre-wrap;background:rgba(0,0,0,0.04);padding:8px 10px;border-radius:5px;max-height:80px;overflow-y:auto">{{fb.message}}</div>
-                </td>
-                <td>
-                  <!-- Type toggle: Unread / Feedback / Review -->
-                  <div style="display:flex;flex-direction:column;gap:4px">
-                    <form method="post" action="/admin/feedback/settype/{{fb.id}}" style="margin:0">
+            <div style="overflow-x:auto;border-radius:var(--radius-sm);border:1px solid var(--line-light)">
+              <table class="adaptive-table" id="adminUsersTable" style="margin:0;border:none">
+                <tr>
+                  <th style="width:44px">ID</th>
+                  <th style="min-width:200px">Email</th>
+                  <th>Household</th>
+                  <th>Role</th>
+                  <th style="white-space:nowrap">Joined</th>
+                  <th style="white-space:nowrap">Last Login</th>
+                  <th style="width:90px">Admin</th>
+                  <th style="width:80px">Delete</th>
+                </tr>
+                {% for u in admin_users %}
+                <tr class="admin-user-row" data-search="{{u.email|lower}} {{(u.household_name or '')|lower}}" {% if u.is_admin %}style="background:rgba(245,200,66,0.04)"{% endif %}>
+                  <td style="font-size:12px;color:var(--muted);text-align:center">{{u.id}}</td>
+                  <td style="word-break:break-all">
+                    <span style="font-weight:600;color:var(--ink);font-size:13px">{{u.email}}</span>
+                    {% if u.is_admin %}<span style="font-size:9px;background:rgba(245,200,66,0.18);color:var(--gold);padding:2px 7px;border-radius:999px;margin-left:5px;font-weight:700;letter-spacing:.3px">ADMIN</span>{% endif %}
+                  </td>
+                  <td style="font-size:12px;color:var(--ink)">{{u.household_name or '—'}}</td>
+                  <td style="font-size:12px;color:var(--muted)">{{u.role or '—'}}</td>
+                  <td style="font-size:12px;color:var(--muted);white-space:nowrap">{% if u.created_at %}{{u.created_at[5:7]}}-{{u.created_at[8:10]}}-{{u.created_at[:4]}}{% else %}—{% endif %}</td>
+                  <td style="font-size:12px;color:var(--muted);white-space:nowrap">{% if u.last_login_at %}{{u.last_login_at[5:7]}}-{{u.last_login_at[8:10]}}-{{u.last_login_at[:4]}}{% else %}Never{% endif %}</td>
+                  <td>
+                    {% if u.id != session.get('user_id') %}
+                    <form method="post" action="/admin/user/toggle-admin/{{u.id}}" style="margin:0">
                       <input type="hidden" name="month" value="{{month}}">
                       <input type="hidden" name="view" value="{{view}}">
                       <input type="hidden" name="page" value="admin">
-                      <select name="feedback_type" onchange="nsSubmit(this.form)"
-                        style="font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line-light);background:{% if fb.feedback_type == 'review' %}rgba(245,200,66,0.1){% elif fb.feedback_type == 'feedback' %}rgba(100,150,255,0.1){% else %}rgba(160,160,180,0.1){% endif %}">
-                        <option value="" {% if not fb.feedback_type or fb.feedback_type not in ('feedback','review') %}selected{% endif %}>— Unread —</option>
-                        <option value="feedback" {% if fb.feedback_type == 'feedback' %}selected{% endif %}>💬 Feedback</option>
-                        <option value="review" {% if fb.feedback_type == 'review' %}selected{% endif %}>⭐ Review</option>
-                      </select>
+                      <button type="submit" class="btn-sm" style="white-space:nowrap;width:100%;{% if u.is_admin %}background:rgba(245,200,66,0.15);color:var(--gold);border:1px solid rgba(245,200,66,0.25){% else %}background:rgba(255,255,255,0.05);color:var(--muted);border:1px solid var(--line-light){% endif %}">{{'★ Admin' if u.is_admin else '☆ Grant'}}</button>
                     </form>
-                  </div>
-                </td>
-                <td>
-                  <div style="display:flex;flex-direction:column;gap:4px">
-                    {% if not fb.is_read %}
-                    <form method="post" action="/admin/feedback/read/{{fb.id}}" style="margin:0">
-                      <input type="hidden" name="month" value="{{month}}">
-                      <input type="hidden" name="view" value="{{view}}">
-                      <input type="hidden" name="page" value="admin">
-                      <button type="submit" class="btn-sm" style="background:rgba(46,160,67,0.15);color:#2ea043;border:1px solid rgba(46,160,67,0.3);width:100%">✓ Read</button>
-                    </form>
+                    {% else %}
+                    <span style="font-size:11px;color:var(--gold);font-weight:600">★ You</span>
                     {% endif %}
-                    <form method="post" action="/admin/feedback/delete/{{fb.id}}" onsubmit="return confirm('Delete this message?')" style="margin:0">
+                  </td>
+                  <td>
+                    {% if u.id != session.get('user_id') %}
+                    <form method="post" action="/admin/user/delete/{{u.id}}" onsubmit="return confirm('Delete {{u.email}}?')" style="margin:0">
                       <input type="hidden" name="month" value="{{month}}">
                       <input type="hidden" name="view" value="{{view}}">
                       <input type="hidden" name="page" value="admin">
                       <button type="submit" class="btn-danger btn-sm" style="width:100%">Delete</button>
                     </form>
-                  </div>
-                </td>
-              </tr>
-              {% endfor %}
-            </table>
+                    {% else %}
+                    <span style="font-size:11px;color:var(--muted)">—</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </table>
+            </div>
+          </div>
+
+          <!-- ── FEEDBACK TAB ── -->
+          <div id="admtab-feedback" style="display:none">
+            <div style="display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid var(--line-light)">
+              <button type="button" onclick="filterFeedback('all')" id="fb-filter-all" style="padding:8px 16px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:var(--gold);border-bottom:2px solid var(--gold);margin-bottom:-1px;white-space:nowrap;font-family:'DM Sans',sans-serif">All</button>
+              <button type="button" onclick="filterFeedback('unread')" id="fb-filter-unread" style="padding:8px 16px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;font-family:'DM Sans',sans-serif">Unread</button>
+              <button type="button" onclick="filterFeedback('feedback')" id="fb-filter-feedback" style="padding:8px 16px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;font-family:'DM Sans',sans-serif">💬 Feedback</button>
+              <button type="button" onclick="filterFeedback('review')" id="fb-filter-review" style="padding:8px 16px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;font-family:'DM Sans',sans-serif">⭐ Reviews</button>
+            </div>
+
+            {% if admin_feedback %}
+            <div style="overflow-x:auto;border-radius:var(--radius-sm);border:1px solid var(--line-light)">
+              <table class="adaptive-table" id="feedbackTable" style="margin:0;border:none">
+                <tr>
+                  <th style="min-width:140px">From</th>
+                  <th style="min-width:140px">Subject</th>
+                  <th>Message</th>
+                  <th style="min-width:130px">Type</th>
+                  <th style="min-width:90px">Actions</th>
+                </tr>
+                {% for fb in admin_feedback %}
+                <tr class="fb-row" data-read="{{fb.is_read}}" data-type="{{fb.feedback_type or 'unread'}}" {% if not fb.is_read %}style="background:rgba(245,200,66,0.03)"{% endif %}>
+                  <td>
+                    <div style="font-weight:600;color:var(--ink);word-break:break-all;font-size:13px">{{fb.email or 'Anonymous'}}</div>
+                    <div style="color:var(--muted);font-size:11px;margin-top:3px;display:flex;align-items:center;gap:5px">
+                      {{fb.created_at[5:7]}}-{{fb.created_at[8:10]}}-{{fb.created_at[:4]}}
+                      {% if not fb.is_read %}<span style="background:var(--bad);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px">NEW</span>{% endif %}
+                    </div>
+                  </td>
+                  <td style="font-size:13px;font-weight:600;color:var(--ink);word-break:break-word;white-space:normal">{{fb.subject or '(no subject)'}}</td>
+                  <td style="max-width:280px">
+                    <div style="white-space:pre-wrap;background:rgba(0,0,0,0.06);padding:8px 10px;border-radius:var(--radius-xs);max-height:80px;overflow-y:auto;font-size:12px;color:var(--ink);line-height:1.5">{{fb.message}}</div>
+                  </td>
+                  <td>
+                    <form method="post" action="/admin/feedback/settype/{{fb.id}}" style="margin:0">
+                      <input type="hidden" name="month" value="{{month}}">
+                      <input type="hidden" name="view" value="{{view}}">
+                      <input type="hidden" name="page" value="admin">
+                      <select name="feedback_type" onchange="nsSubmit(this.form)" style="font-size:12px;width:100%">
+                        <option value="" {% if not fb.feedback_type or fb.feedback_type not in ('feedback','review') %}selected{% endif %}>— Unread —</option>
+                        <option value="feedback" {% if fb.feedback_type == 'feedback' %}selected{% endif %}>💬 Feedback</option>
+                        <option value="review" {% if fb.feedback_type == 'review' %}selected{% endif %}>⭐ Review</option>
+                      </select>
+                    </form>
+                  </td>
+                  <td>
+                    <div style="display:flex;flex-direction:column;gap:5px">
+                      {% if not fb.is_read %}
+                      <form method="post" action="/admin/feedback/read/{{fb.id}}" style="margin:0">
+                        <input type="hidden" name="month" value="{{month}}">
+                        <input type="hidden" name="view" value="{{view}}">
+                        <input type="hidden" name="page" value="admin">
+                        <button type="submit" class="btn-sm" style="background:rgba(34,201,122,0.12);color:var(--ok);border:1px solid rgba(34,201,122,0.25);width:100%">✓ Read</button>
+                      </form>
+                      {% endif %}
+                      <form method="post" action="/admin/feedback/delete/{{fb.id}}" onsubmit="return confirm('Delete this message?')" style="margin:0">
+                        <input type="hidden" name="month" value="{{month}}">
+                        <input type="hidden" name="view" value="{{view}}">
+                        <input type="hidden" name="page" value="admin">
+                        <button type="submit" class="btn-danger btn-sm" style="width:100%">Delete</button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </table>
+            </div>
             {% else %}
-            <div style="text-align:center;padding:40px">
-              <div style="font-size:32px;margin-bottom:10px">💬</div>
-              <div style="font-size:14px;color:#4a2a7a">No messages yet. Users can submit via the 💬 Feedback button in the top bar.</div>
+            <div style="text-align:center;padding:48px 20px">
+              <div style="font-size:36px;margin-bottom:10px">💬</div>
+              <div style="font-size:15px;font-weight:600;color:var(--ink);margin-bottom:5px">No messages yet</div>
+              <div style="font-size:13px;color:var(--muted)">Users can submit via the 💬 Feedback button in the top bar.</div>
             </div>
             {% endif %}
           </div>
