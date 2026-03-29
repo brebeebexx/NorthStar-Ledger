@@ -1852,6 +1852,13 @@ window.addEventListener('beforeunload', function(){
         /* Feedback sub-filter buttons */
         .pa-fb-btn { padding:7px 14px; border:none; background:transparent; font-size:12px; font-weight:700; cursor:pointer; color:#9a8abf; border-bottom:2px solid transparent; margin-bottom:-1px; white-space:nowrap; font-family:'DM Sans',sans-serif; transition:.12s; }
         .pa-fb-btn:hover { color:var(--purple-lite); transform:none; filter:none; }
+        /* Version filter pills for maintenance log */
+        .pa-ver-pill { font-size:11px; font-weight:600; padding:3px 11px; border-radius:20px; border:1px solid var(--tint-mid); background:#fff; color:#9a8abf; cursor:pointer; transition:all .15s; white-space:nowrap; font-family:'DM Sans',sans-serif; }
+        .pa-ver-pill:hover { background:var(--tint-soft); color:var(--purple-lite); transform:none; filter:none; }
+        .pa-ver-pill.active { background:var(--gold); color:var(--purple-deep); border-color:var(--gold); }
+        /* Maintenance log accordion chevron rotation */
+        details.pa-log-entry[open] .pa-log-chev { transform: rotate(90deg); }
+        details.pa-log-entry[open] > summary { background: var(--tint-soft); border-radius: 6px 6px 0 0; }
         /* Hidden utility */
         .pa-hide { display:none !important; }
         /* Fix inputs/textarea for light card background */
@@ -1866,6 +1873,7 @@ window.addEventListener('beforeunload', function(){
         <!-- Tab nav (PawChart+ style) -->
         <div class="pa-tabs">
           <button type="button" id="patab-overview" class="pa-tab pa-act" onclick="paTab('overview',this)">📊 Overview</button>
+          <button type="button" id="patab-maintenance" class="pa-tab" onclick="paTab('maintenance',this)">🛠️ Maintenance</button>
           <button type="button" id="patab-versions" class="pa-tab" onclick="paTab('versions',this)">📌 Versions</button>
           <button type="button" id="patab-banner"   class="pa-tab" onclick="paTab('banner',this)">📢 Banner</button>
           <button type="button" id="patab-users"    class="pa-tab" onclick="paTab('users',this)">👥 Users</button>
@@ -1921,6 +1929,212 @@ window.addEventListener('beforeunload', function(){
               <div style="font-family:'Cinzel',serif;font-size:20px;font-weight:700;color:var(--gold)">{{admin_update_log|length}}</div>
             </div>
           </div>
+        </div>
+
+        <!-- ══ MAINTENANCE LOG ══ -->
+        <div id="papane-maintenance" class="pa-panel">
+          <div class="pa-ch">
+            <div class="pa-ct">🛠️ Maintenance Log</div>
+            <button type="button" class="btn-gold btn-sm" onclick="document.getElementById('pa-newlog').classList.toggle('pa-hide')">+ Add Entry</button>
+          </div>
+          <!-- Add entry form (hidden by default) -->
+          <div id="pa-newlog" class="pa-hide pa-fsec">
+            <form method="post" action="/admin/site-log/add" style="display:flex;flex-direction:column;gap:12px">
+              <input type="hidden" name="month" value="{{month}}">
+              <input type="hidden" name="view" value="{{view}}">
+              <input type="hidden" name="page" value="admin">
+              <div class="pa-grid2">
+                <div class="pa-fg"><label class="pa-flbl">Title *</label><input type="text" name="title" placeholder="e.g. Fixed login bug" required></div>
+                <div class="pa-fg"><label class="pa-flbl">Category</label>
+                  <select name="category">
+                    <option value="Bug Fix">Bug Fix</option>
+                    <option value="Feature">Feature</option>
+                    <option value="Update">Update</option>
+                    <option value="Security">Security</option>
+                    <option value="DNS / Server">DNS / Server</option>
+                    <option value="Other" selected>Other</option>
+                  </select>
+                </div>
+                <div class="pa-fg"><label class="pa-flbl">Status</label>
+                  <select name="status">
+                    <option value="New" selected>🔵 New</option>
+                    <option value="Investigating">🟡 Investigating</option>
+                    <option value="Reviewing">🟣 Reviewing</option>
+                    <option value="Complete">🟢 Complete</option>
+                  </select>
+                </div>
+                <div class="pa-fg"><label class="pa-flbl">Version</label>
+                  <select name="version_id">
+                    <option value="">— No version —</option>
+                    {% for v in admin_update_log %}<option value="{{v.id}}">{{v.version}}</option>{% endfor %}
+                  </select>
+                </div>
+                <div class="pa-fg"><label class="pa-flbl">Stage</label>
+                  <select name="stage">
+                    <option value="">— Not set —</option>
+                    <option value="Testing">🧪 Testing</option>
+                    <option value="Implemented">✅ Implemented</option>
+                  </select>
+                </div>
+              </div>
+              <div class="pa-fg"><label class="pa-flbl">Notes <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+                <textarea name="notes" rows="2" placeholder="Optional details..."></textarea>
+              </div>
+              <div style="display:flex;gap:8px">
+                <button type="submit" class="btn-gold btn-sm">Save Entry</button>
+                <button type="button" class="pa-btn-cancel" onclick="document.getElementById('pa-newlog').classList.add('pa-hide')">Cancel</button>
+              </div>
+            </form>
+          </div>
+          <!-- Version filter pills -->
+          {% if admin_update_log %}
+          <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:16px;padding:10px 0;border-bottom:1px solid var(--tint-mid)">
+            <span style="font-size:11px;color:#9a8abf;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-right:2px">Filter:</span>
+            <button class="pa-ver-pill active" data-ver="all" onclick="paMlogFilter('all',this)">All</button>
+            {% for v in admin_update_log %}
+            <button class="pa-ver-pill" data-ver="{{v.id}}" onclick="paMlogFilter('{{v.id}}',this)">{{v.version}}</button>
+            {% endfor %}
+            <button class="pa-ver-pill" data-ver="none" onclick="paMlogFilter('none',this)">Untagged</button>
+          </div>
+          {% endif %}
+          <!-- Log entries grouped by status -->
+          {% if site_logs %}
+          {% set status_groups = [
+            ('New',          '🔵 New',          '#dbeafe', '#1d4ed8'),
+            ('Investigating','🟡 Investigating', '#fef3c7', '#92400e'),
+            ('Reviewing',    '🟣 Reviewing',     '#ede9fe', '#5b21b6'),
+            ('Complete',     '🟢 Complete',      '#d1fae5', '#065f46'),
+          ] %}
+          {% for grp_status, grp_label, grp_bg, grp_color in status_groups %}
+            {% set grp_entries = site_logs | selectattr('status','equalto', grp_status) | list %}
+            {% if grp_entries %}
+            <div class="pa-log-grp-hdr" style="display:flex;align-items:center;gap:10px;margin:20px 0 8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#9a8abf">
+              <span style="flex:1;height:1px;background:var(--tint-mid)"></span>
+              <span style="background:{{grp_bg}};color:{{grp_color}};border-radius:20px;padding:2px 11px;font-size:11px;font-weight:700">{{grp_label}}</span>
+              <span style="font-size:10px;color:#9a8abf">{{grp_entries|length}} entr{{ 'y' if grp_entries|length==1 else 'ies' }}</span>
+              <span style="flex:1;height:1px;background:var(--tint-mid)"></span>
+            </div>
+            {% for entry in grp_entries %}
+            {% set entry_comments = comments_by_log.get(entry.id, []) %}
+            <details class="pa-log-entry" id="log-{{entry.id}}" data-version-id="{{entry.version_id or 'none'}}" style="border-bottom:1px solid var(--tint-mid)">
+              <summary style="list-style:none;display:flex;align-items:center;gap:8px;padding:11px 4px;cursor:pointer;border-radius:6px;transition:.1s" onmouseover="this.style.background='var(--tint-soft)'" onmouseout="this.style.background=''">
+                <span style="font-size:11px;color:#9a8abf;flex-shrink:0;transition:transform .2s" class="pa-log-chev">▶</span>
+                <!-- Inline status changer -->
+                <form method="post" action="/admin/site-log/status/{{entry.id}}" style="margin:0" onclick="event.stopPropagation()">
+                  <input type="hidden" name="month" value="{{month}}">
+                  <input type="hidden" name="view" value="{{view}}">
+                  <input type="hidden" name="page" value="admin">
+                  <select name="status" style="font-size:11px;padding:3px 6px;border-radius:6px;border:1px solid var(--tint-mid);background:#fff;color:var(--ink);cursor:pointer" onchange="this.form.submit()" title="Change status">
+                    {% for sv, sl in [('New','🔵 New'),('Investigating','🟡 Investigating'),('Reviewing','🟣 Reviewing'),('Complete','🟢 Complete')] %}
+                    <option value="{{sv}}" {% if entry.status==sv %}selected{% endif %}>{{sl}}</option>
+                    {% endfor %}
+                  </select>
+                </form>
+                <!-- Category badge -->
+                <span class="pa-bdg {% if entry.category in ('Bug Fix','Security') %}pa-bdg-bad{% else %}pa-bdg-mute{% endif %}" style="font-size:10px;white-space:nowrap">{{entry.category}}</span>
+                <!-- Version badge -->
+                {% if entry.get('version_label') %}<span style="font-size:10px;background:rgba(245,200,66,.15);color:var(--gold);border:1px solid rgba(245,200,66,.3);border-radius:5px;padding:2px 7px;white-space:nowrap;font-weight:700">{{entry.version_label}}</span>{% endif %}
+                <!-- Stage badge -->
+                {% if entry.stage %}<span style="font-size:10px;white-space:nowrap;border-radius:5px;padding:2px 7px;font-weight:600;{% if entry.stage=='Implemented' %}background:#d1fae5;color:#065f46;{% else %}background:#fef3c7;color:#92400e;{% endif %}">{% if entry.stage=='Implemented' %}✅{% else %}🧪{% endif %} {{entry.stage}}</span>{% endif %}
+                <!-- Title -->
+                <span style="font-weight:600;color:var(--ink);font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{entry.title}}</span>
+                <span style="font-size:11px;color:#9a8abf;white-space:nowrap">{{entry.created_at[5:7]}}-{{entry.created_at[8:10]}}-{{entry.created_at[:4]}}</span>
+                {% if entry_comments %}<span style="font-size:11px;color:#9a8abf;white-space:nowrap">💬 {{entry_comments|length}}</span>{% endif %}
+                <!-- Delete button -->
+                <form method="post" action="/admin/site-log/delete/{{entry.id}}" onsubmit="return confirm('Delete this entry?')" style="margin:0" onclick="event.stopPropagation()">
+                  <input type="hidden" name="month" value="{{month}}">
+                  <input type="hidden" name="view" value="{{view}}">
+                  <input type="hidden" name="page" value="admin">
+                  <button type="submit" class="pa-btn-x" style="font-size:11px;padding:2px 7px;min-height:24px">✕</button>
+                </form>
+              </summary>
+              <!-- Expanded body -->
+              <div style="padding:10px 8px 14px 8px;background:var(--tint-soft);border-radius:0 0 6px 6px;margin-bottom:2px">
+                {% if entry.notes %}<div style="font-size:12px;color:#9a8abf;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--tint-mid)">{{entry.notes}}</div>{% endif %}
+                <!-- Edit form (collapsed by default) -->
+                <details style="margin-bottom:10px">
+                  <summary style="font-size:12px;font-weight:600;color:#9a8abf;cursor:pointer;list-style:none;padding:4px 0">✏️ Edit entry</summary>
+                  <div style="margin-top:8px">
+                    <form method="post" action="/admin/site-log/update/{{entry.id}}" style="display:flex;flex-direction:column;gap:10px">
+                      <input type="hidden" name="month" value="{{month}}">
+                      <input type="hidden" name="view" value="{{view}}">
+                      <input type="hidden" name="page" value="admin">
+                      <div class="pa-grid2">
+                        <div class="pa-fg"><label class="pa-flbl" style="font-size:11px">Title</label><input type="text" name="title" value="{{entry.title}}" required></div>
+                        <div class="pa-fg"><label class="pa-flbl" style="font-size:11px">Category</label>
+                          <select name="category">
+                            {% for cat in ['Bug Fix','Feature','Update','Security','DNS / Server','Other'] %}
+                            <option value="{{cat}}" {% if entry.category==cat %}selected{% endif %}>{{cat}}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                        <div class="pa-fg"><label class="pa-flbl" style="font-size:11px">Status</label>
+                          <select name="status">
+                            {% for sv, sl in [('New','🔵 New'),('Investigating','🟡 Investigating'),('Reviewing','🟣 Reviewing'),('Complete','🟢 Complete')] %}
+                            <option value="{{sv}}" {% if entry.status==sv %}selected{% endif %}>{{sl}}</option>
+                            {% endfor %}
+                          </select>
+                        </div>
+                        <div class="pa-fg"><label class="pa-flbl" style="font-size:11px">Version</label>
+                          <select name="version_id">
+                            <option value="">— No version —</option>
+                            {% for v in admin_update_log %}<option value="{{v.id}}" {% if entry.version_id and entry.version_id==v.id %}selected{% endif %}>{{v.version}}</option>{% endfor %}
+                          </select>
+                        </div>
+                        <div class="pa-fg"><label class="pa-flbl" style="font-size:11px">Stage</label>
+                          <select name="stage">
+                            <option value="" {% if not entry.stage %}selected{% endif %}>— Not set —</option>
+                            <option value="Testing" {% if entry.stage=='Testing' %}selected{% endif %}>🧪 Testing</option>
+                            <option value="Implemented" {% if entry.stage=='Implemented' %}selected{% endif %}>✅ Implemented</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div class="pa-fg"><label class="pa-flbl" style="font-size:11px">Notes</label><textarea name="notes" rows="2">{{entry.notes or ''}}</textarea></div>
+                      <div style="display:flex;gap:8px">
+                        <button type="submit" class="btn-gold btn-sm">Save</button>
+                      </div>
+                    </form>
+                  </div>
+                </details>
+                <!-- Comments -->
+                <div style="font-size:12px;font-weight:600;color:#9a8abf;margin-bottom:6px">💬 Comments {% if entry_comments %}({{entry_comments|length}}){% endif %}</div>
+                {% if entry_comments %}
+                {% for c in entry_comments %}
+                <div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--tint-mid)">
+                  <div style="flex:1">
+                    <div style="font-size:12px;color:var(--ink)">{{c.comment}}</div>
+                    <div style="font-size:10px;color:#9a8abf;margin-top:2px">{{c.created_at[5:7]}}-{{c.created_at[8:10]}}-{{c.created_at[:4]}}</div>
+                  </div>
+                  <form method="post" action="/admin/site-log/comment/delete/{{c.id}}" style="margin:0">
+                    <input type="hidden" name="month" value="{{month}}">
+                    <input type="hidden" name="view" value="{{view}}">
+                    <input type="hidden" name="page" value="admin">
+                    <button type="submit" style="font-size:10px;padding:2px 6px;border:1px solid #fca5a5;background:#fee2e2;color:#dc2626;border-radius:4px;cursor:pointer">✕</button>
+                  </form>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p style="font-size:12px;color:#9a8abf;margin-bottom:6px">No comments yet.</p>
+                {% endif %}
+                <form method="post" action="/admin/site-log/comment/add/{{entry.id}}" style="margin-top:8px;display:flex;gap:8px">
+                  <input type="hidden" name="month" value="{{month}}">
+                  <input type="hidden" name="view" value="{{view}}">
+                  <input type="hidden" name="page" value="admin">
+                  <input type="text" name="comment" placeholder="Add a comment..." required style="font-size:12px;flex:1;padding:5px 10px">
+                  <button type="submit" class="btn-gold btn-sm" style="font-size:12px">Add</button>
+                </form>
+              </div>
+            </details>
+            {% endfor %}
+            {% endif %}
+          {% endfor %}
+          {% else %}
+          <div style="text-align:center;padding:36px;color:#9a8abf">
+            <div style="font-size:30px;margin-bottom:8px">🛠️</div>
+            <div style="font-size:14px;font-weight:600;color:var(--ink);margin-bottom:4px">No log entries yet</div>
+            <div style="font-size:12px">Click "+ Add Entry" above to track maintenance and changes.</div>
+          </div>
+          {% endif %}
         </div>
 
         <!-- ══ VERSIONS ══ -->
@@ -2007,6 +2221,23 @@ window.addEventListener('beforeunload', function(){
                   </div>
                 </form>
               </div>
+              <!-- Linked maintenance log entries -->
+              {% set ver_logs = site_logs | selectattr('version_id','equalto', entry.id) | list %}
+              {% if ver_logs %}
+              <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--tint-mid)">
+                <div style="font-size:10px;font-weight:700;color:#9a8abf;text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px">
+                  📋 {{ver_logs|length}} linked log entr{{ 'y' if ver_logs|length==1 else 'ies' }}
+                </div>
+                {% for e in ver_logs %}
+                <div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--tint-soft);{% if loop.last %}border-bottom:none;{% endif %}">
+                  <span class="pa-bdg {% if e.category in ('Bug Fix','Security') %}pa-bdg-bad{% else %}pa-bdg-mute{% endif %}" style="font-size:9px;padding:1px 5px">{{e.category}}</span>
+                  {% if e.stage %}<span style="font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600;{% if e.stage=='Implemented' %}background:#d1fae5;color:#065f46;{% else %}background:#fef3c7;color:#92400e;{% endif %}">{% if e.stage=='Implemented' %}✅{% else %}🧪{% endif %} {{e.stage}}</span>{% endif %}
+                  <span style="font-size:12px;color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{e.title}}</span>
+                  <a href="?month={{month}}&view={{view}}&page=admin&tab=maintenance#log-{{e.id}}" style="font-size:10px;color:#9a8abf;text-decoration:none;flex-shrink:0" title="View in Maintenance Log">🔗</a>
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
             </div>
             {% endfor %}
           </div>
@@ -2244,10 +2475,34 @@ window.addEventListener('beforeunload', function(){
         var ta=form.querySelector('[name="banner_text"]'), sd=form.querySelector('[name="banner_start_date"]'), ed=form.querySelector('[name="banner_end_date"]');
         if (ta) ta.value=text; if (sd) sd.value=start; if (ed) ed.value=end;
       }
+      function paMlogFilter(ver, btn) {
+        document.querySelectorAll('.pa-ver-pill').forEach(function(b){ b.classList.remove('active'); });
+        if (btn) btn.classList.add('active');
+        document.querySelectorAll('details.pa-log-entry').forEach(function(el) {
+          if (ver === 'all') { el.style.display = ''; return; }
+          var vid = el.dataset.versionId || 'none';
+          el.style.display = (ver === 'none' ? vid === 'none' : vid === String(ver)) ? '' : 'none';
+        });
+        document.querySelectorAll('.pa-log-grp-hdr').forEach(function(hdr) {
+          var sib = hdr.nextElementSibling;
+          var hasVisible = false;
+          while (sib && !sib.classList.contains('pa-log-grp-hdr')) {
+            if (sib.tagName === 'DETAILS' && sib.style.display !== 'none') hasVisible = true;
+            sib = sib.nextElementSibling;
+          }
+          hdr.style.display = hasVisible ? '' : 'none';
+        });
+      }
       document.addEventListener('DOMContentLoaded', function() {
         var tab = new URLSearchParams(window.location.search).get('tab') || 'overview';
         var btn = document.getElementById('patab-'+tab);
         if (btn) paTab(tab, btn);
+        // Open log entry if hash points to one
+        var hash = window.location.hash;
+        if (hash && hash.startsWith('#log-')) {
+          var el = document.querySelector(hash);
+          if (el) { el.setAttribute('open',''); setTimeout(function(){ el.scrollIntoView({behavior:'smooth',block:'center'}); }, 150); }
+        }
       });
       </script>
       {% endif %}
