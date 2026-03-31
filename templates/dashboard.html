@@ -875,6 +875,7 @@ window.addEventListener('beforeunload', function(){
             </div>
           </div>
           <div class="topbar-controls">
+            <button type="button" class="top-pill-btn" onclick="openFeedback()">💬 Feedback</button>
             <button type="button" class="top-pill-btn" onclick="openSettings()">⚙ Settings</button>
             <a class="top-pill-btn" href="/logout" onclick="clearCalculatorState()">↩ Logout</a>
           </div>
@@ -1796,547 +1797,388 @@ window.addEventListener('beforeunload', function(){
 
 
       <!-- ══════════════════════════════
+           ADMIN PAGE
       ══════════════════════════════ -->
-
       {% if page == 'admin' and user_is_admin %}
-      <!-- ═══════════════════════════ ADMIN PANEL ═══════════════════════════ -->
-      <style>
-        .admin-tabs { display:flex; gap:4px; margin-bottom:20px; border-bottom:2px solid var(--tint-mid); padding-bottom:0; }
-        .admin-tab  { padding:9px 18px; font-size:13px; font-weight:600; border-radius:10px 10px 0 0;
-                      border:1.5px solid transparent; border-bottom:none; cursor:pointer;
-                      color:#9a8abf; background:transparent; transition:.15s; }
-        .admin-tab:hover { background:var(--tint-soft); color:var(--purple-deep); }
-        .admin-tab.active { background:#fff; color:var(--gold); border-color:var(--tint-mid); border-bottom:2px solid #fff; margin-bottom:-2px; }
-        .admin-panel { display:none; } .admin-panel.active { display:block; }
-        .status-group-header { display:flex; align-items:center; gap:10px; margin:20px 0 8px;
-                               font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:#b8acd4; }
-        .status-group-header::before,.status-group-header::after { content:''; flex:1; height:1px; background:var(--tint-mid); }
-        details.log-entry { border-bottom:1px solid var(--tint-mid); }
-        details.log-entry > summary { list-style:none; display:flex; align-items:center; gap:10px;
-          padding:12px 4px; cursor:pointer; border-radius:6px; transition:.1s; }
-        details.log-entry > summary::-webkit-details-marker { display:none; }
-        details.log-entry > summary::marker { display:none; }
-        details.log-entry > summary:hover { background:var(--tint-soft); }
-        details.log-entry[open] > summary { background:var(--tint-soft); border-radius:6px 6px 0 0; }
-        .log-chevron { font-size:11px; color:#b8acd4; flex-shrink:0; transition:transform .2s; }
-        details.log-entry[open] .log-chevron { transform:rotate(90deg); }
-        .log-body { padding:10px 8px 14px 8px; background:var(--tint-soft); border-radius:0 0 6px 6px; margin-bottom:2px; }
-        .status-select { font-size:11px; padding:3px 6px; border-radius:6px; border:1px solid var(--tint-mid);
-          background:#fff; color:var(--purple-deep); cursor:pointer; }
-        .ver-filter-btn { font-size:11px; font-weight:600; padding:3px 11px; border-radius:20px;
-          border:1px solid var(--tint-mid); background:#fff; color:#9a8abf; cursor:pointer;
-          transition:all .15s; white-space:nowrap; }
-        .ver-filter-btn:hover { background:var(--tint-soft); color:var(--purple-deep); }
-        .ver-filter-btn.active { background:var(--gold); color:#fff; border-color:var(--gold); }
-        .adm-form { background:var(--tint-soft); border-radius:10px; padding:16px; margin-bottom:20px; }
-        .adm-form label { display:block; font-size:12px; font-weight:600; color:#9a8abf; margin-bottom:4px; }
-        .adm-form input[type=text], .adm-form input[type=date], .adm-form select, .adm-form textarea {
-          width:100%; box-sizing:border-box; background:#fff; border:1px solid var(--tint-mid);
-          border-radius:7px; padding:7px 10px; font-size:13px; color:var(--purple-deep);
-          font-family:inherit; outline:none; }
-        .adm-form textarea { resize:vertical; }
-        .adm-form .fg { margin-bottom:12px; }
-        .adm-form .fg-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
-        .adm-form .actions { display:flex; gap:8px; }
-        .adm-btn-cancel { font-size:13px; padding:6px 14px; background:#fff; border:1px solid var(--tint-mid); border-radius:8px; cursor:pointer; color:#9a8abf; }
-        .adm-btn-cancel:hover { background:var(--tint-soft); }
-      </style>
-      <script>
-      function showAdminTab(id, btn) {
-        document.querySelectorAll('.admin-panel').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'));
-        var panel = document.getElementById('admin-panel-'+id);
-        if (panel) panel.classList.add('active');
-        btn.classList.add('active');
-        var url = new URL(window.location);
-        url.searchParams.set('tab', id);
-        history.replaceState(null, '', url);
-      }
-      function filterLogByVersion(ver, btn) {
-        document.querySelectorAll('.ver-filter-btn').forEach(function(b){ b.classList.remove('active'); });
-        if (btn) btn.classList.add('active');
-        document.querySelectorAll('details.log-entry').forEach(function(el) {
-          if (ver === 'all') { el.style.display = ''; return; }
-          var vid = el.dataset.versionId || 'none';
-          el.style.display = (ver === 'none' ? vid === 'none' : vid === String(ver)) ? '' : 'none';
-        });
-        document.querySelectorAll('.status-group-header').forEach(function(hdr) {
-          var sib = hdr.nextElementSibling;
-          var hasVisible = false;
-          while (sib && !sib.classList.contains('status-group-header')) {
-            if (sib.tagName === 'DETAILS' && sib.style.display !== 'none') hasVisible = true;
-            sib = sib.nextElementSibling;
-          }
-          hdr.style.display = hasVisible ? '' : 'none';
-        });
-      }
-      document.addEventListener('DOMContentLoaded', function() {
-        var params = new URLSearchParams(window.location.search);
-        var tab = params.get('tab') || 'overview';
-        var btn = document.querySelector('[data-tab="'+tab+'"]');
-        if (btn) showAdminTab(tab, btn);
-        var hash = window.location.hash;
-        if (hash && hash.startsWith('#log-')) {
-          var el = document.querySelector(hash);
-          if (el) { el.setAttribute('open',''); setTimeout(function(){ el.scrollIntoView({behavior:'smooth',block:'center'}); }, 150); }
-        }
-      });
-      </script>
+      <div class="card" style="margin-bottom:16px;padding:0;overflow:hidden">
 
-      <div class="admin-tabs">
-        <button class="admin-tab" data-tab="overview"  onclick="showAdminTab('overview',this)">&#x1F4CA; Overview</button>
-        <button class="admin-tab" data-tab="users"     onclick="showAdminTab('users',this)">&#x1F465; Users</button>
-        <button class="admin-tab" data-tab="feedback"  onclick="showAdminTab('feedback',this)">&#x1F4AC; Feedback{% if admin_stats.unread_feedback %} <span style="background:var(--gold);color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;">{{ admin_stats.unread_feedback }}</span>{% endif %}</button>
-        <button class="admin-tab" data-tab="log"       onclick="showAdminTab('log',this)">&#x1F6E0; Maintenance</button>
-        <button class="admin-tab" data-tab="versions"  onclick="showAdminTab('versions',this)">&#x1F4CC; Versions</button>
-        <button class="admin-tab" data-tab="banner"    onclick="showAdminTab('banner',this)">&#x1F4E2; Banner</button>
-      </div>
+        <!-- Admin Header -->
+        <div style="background:linear-gradient(135deg,rgba(245,200,66,0.12),rgba(201,109,216,0.08));padding:16px 20px;border-bottom:1px solid var(--line-light);display:flex;align-items:center;gap:12px">
+          <span style="font-family:'Cinzel',serif;font-size:18px;font-weight:900;color:var(--gold)">⚙ Admin Panel</span>
+          <span style="font-size:11px;font-weight:700;background:rgba(245,200,66,0.2);color:var(--gold);padding:2px 10px;border-radius:999px;border:1px solid rgba(245,200,66,0.3)">ADMIN ONLY</span>
+        </div>
 
-      {# ── Tab: Overview ─────────────────────────────────────────────────── #}
-      <div id="admin-panel-overview" class="admin-panel active">
-      <div class="card" style="max-width:900px;margin-bottom:24px;">
-        <div class="card-header">
-          <div class="card-title">&#x1F4CA; Overview</div>
+        <!-- Admin Tab Nav -->
+        <div style="display:flex;gap:0;border-bottom:1px solid var(--line-light);background:rgba(0,0,0,0.1);padding:0 16px">
+          <button type="button" class="admin-tab-btn active" id="admtab-btn-overview" onclick="adminTab('overview')" style="padding:10px 16px;border:none;background:transparent;color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid var(--gold);font-family:'DM Sans',sans-serif">📊 Overview</button>
+          <button type="button" class="admin-tab-btn" id="admtab-btn-versions" onclick="adminTab('versions')" style="padding:10px 16px;border:none;background:transparent;color:#8a7aaa;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">📋 Versions</button>
+          <button type="button" class="admin-tab-btn" id="admtab-btn-banner" onclick="adminTab('banner')" style="padding:10px 16px;border:none;background:transparent;color:#8a7aaa;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">📢 Banner</button>
+          <button type="button" class="admin-tab-btn" id="admtab-btn-users" onclick="adminTab('users')" style="padding:10px 16px;border:none;background:transparent;color:#8a7aaa;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">👥 Users</button>
+          <button type="button" class="admin-tab-btn" id="admtab-btn-feedback" onclick="adminTab('feedback')" style="padding:10px 16px;border:none;background:transparent;color:#8a7aaa;font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">
+            💬 Feedback{% if admin_stats.get('unread_feedback',0) > 0 %} <span style="background:var(--bad);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px">{{admin_stats.get('unread_feedback',0)}}</span>{% endif %}
+          </button>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;padding:4px 0 8px;">
-          <div style="background:var(--tint-soft);border-radius:10px;padding:16px;text-align:center;">
-            <div style="font-size:28px;font-weight:700;color:var(--gold);">{{ admin_stats.total_users }}</div>
-            <div style="font-size:12px;color:#9a8abf;margin-top:4px;">Total Users</div>
-          </div>
-          <div style="background:var(--tint-soft);border-radius:10px;padding:16px;text-align:center;">
-            <div style="font-size:28px;font-weight:700;color:var(--gold);">{{ admin_stats.total_households }}</div>
-            <div style="font-size:12px;color:#9a8abf;margin-top:4px;">Households</div>
-          </div>
-          <div style="background:var(--tint-soft);border-radius:10px;padding:16px;text-align:center;">
-            <div style="font-size:28px;font-weight:700;color:var(--gold);">{{ admin_stats.logins_today }}</div>
-            <div style="font-size:12px;color:#9a8abf;margin-top:4px;">Logins Today</div>
-          </div>
-          <div style="background:var(--tint-soft);border-radius:10px;padding:16px;text-align:center;">
-            <div style="font-size:28px;font-weight:700;color:{% if admin_stats.unread_feedback %}var(--gold){% else %}#b8acd4{% endif %};">{{ admin_stats.unread_feedback }}</div>
-            <div style="font-size:12px;color:#9a8abf;margin-top:4px;">Unread Feedback</div>
-          </div>
-        </div>
-        {% if admin_stats.newest_user %}
-        <div style="border-top:1px solid var(--tint-mid);margin-top:8px;padding-top:14px;font-size:12px;color:#9a8abf;">
-          <strong>Newest user:</strong> {{ admin_stats.newest_user.email }} &mdash; joined {{ admin_stats.newest_user.created_at[:10] }}
-        </div>
-        {% endif %}
-        {% if admin_stats.latest_version %}
-        <div style="border-top:1px solid var(--tint-mid);margin-top:8px;padding-top:10px;font-size:12px;color:#9a8abf;">
-          <strong>Latest version:</strong>
-          <span style="background:var(--gold);color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;margin:0 4px;">{{ admin_stats.latest_version.version }}</span>
-          {{ admin_stats.latest_version.title }}
-          <span style="color:#b8acd4;">&mdash; {{ admin_stats.latest_version.created_at[:10] }}</span>
-        </div>
-        {% endif %}
-      </div>
-      </div>
 
-      {# ── Tab: Users ────────────────────────────────────────────────────── #}
-      <div id="admin-panel-users" class="admin-panel">
-      <div class="card" style="max-width:900px;margin-bottom:24px;">
-        <div class="card-header">
-          <div class="card-title">&#x1F465; Registered Users</div>
-          <span class="badge badge-info">{{ admin_users|length }} user{{ 's' if admin_users|length != 1 else '' }}</span>
-        </div>
-        <div style="overflow-x:auto;">
-          <table style="width:100%;border-collapse:collapse;font-size:13px;">
-            <thead>
-              <tr style="border-bottom:2px solid var(--tint-mid);text-align:left;">
-                <th style="padding:10px 12px;color:#9a8abf;font-weight:600;">Email</th>
-                <th style="padding:10px 12px;color:#9a8abf;font-weight:600;">Household</th>
-                <th style="padding:10px 12px;color:#9a8abf;font-weight:600;">Role</th>
-                <th style="padding:10px 12px;color:#9a8abf;font-weight:600;">Joined</th>
-                <th style="padding:10px 12px;color:#9a8abf;font-weight:600;">Last Login</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for u in admin_users %}
-              <tr style="border-bottom:1px solid var(--tint-mid);{% if loop.even %}background:var(--tint-soft);{% endif %}">
-                <td style="padding:10px 12px;">
-                  <span style="font-weight:600;color:var(--purple-deep);">{{ u.email }}</span>
-                  {% if u.is_admin %}<span class="badge badge-warn" style="margin-left:6px;font-size:10px;">admin</span>{% endif %}
-                </td>
-                <td style="padding:10px 12px;color:#9a8abf;">{{ u.household_name or '&mdash;' }}</td>
-                <td style="padding:10px 12px;color:#9a8abf;">{{ u.role or '&mdash;' }}</td>
-                <td style="padding:10px 12px;color:#9a8abf;">{{ u.created_at[:10] if u.created_at else '&mdash;' }}</td>
-                <td style="padding:10px 12px;color:#9a8abf;">{{ u.last_login_at[:10] if u.last_login_at else 'Never' }}</td>
-              </tr>
-              {% else %}
-              <tr><td colspan="5" style="padding:20px;text-align:center;color:#b8acd4;">No users yet.</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      </div>
+        <div style="padding:20px">
 
-      {# ── Tab: Feedback ─────────────────────────────────────────────────── #}
-      <div id="admin-panel-feedback" class="admin-panel">
-      <div class="card" style="max-width:900px;margin-bottom:24px;">
-        <div class="card-header">
-          <div class="card-title">&#x1F4AC; Feedback</div>
-          {% if admin_stats.unread_feedback %}<span class="badge badge-warn">{{ admin_stats.unread_feedback }} unread</span>{% else %}<span class="badge badge-info">All read</span>{% endif %}
-        </div>
-        {% if admin_feedback %}
-        <div style="display:flex;flex-direction:column;gap:14px;">
-          {% for m in admin_feedback %}
-          <div style="border:1px solid {% if not m.is_read %}var(--gold){% else %}var(--tint-mid){% endif %};border-radius:10px;overflow:hidden;background:{% if not m.is_read %}rgba(245,200,66,.05){% else %}#fff{% endif %};">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--tint-mid);">
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <span style="font-weight:600;color:var(--purple-deep);">{{ m.email or 'Unknown' }}</span>
-                {% if m.subject %}<span style="font-size:12px;color:#9a8abf;">{{ m.subject }}</span>{% endif %}
-                {% if not m.is_read %}
-                  <span class="badge badge-warn" style="font-size:10px;">Unread</span>
+          <!-- ── OVERVIEW TAB ── -->
+          <div id="admtab-overview">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:20px">
+              <div class="stat-card" style="text-align:center;padding:14px">
+                <div style="font-size:26px;font-weight:700;color:var(--gold)">{{admin_stats.get('total_users',0)}}</div>
+                <div style="font-size:11px;color:#3a1f6e;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Total Users</div>
+              </div>
+              <div class="stat-card" style="text-align:center;padding:14px">
+                <div style="font-size:26px;font-weight:700;color:var(--gold)">{{admin_stats.get('total_households',0)}}</div>
+                <div style="font-size:11px;color:#3a1f6e;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Households</div>
+              </div>
+              <div class="stat-card" style="text-align:center;padding:14px">
+                <div style="font-size:26px;font-weight:700;color:var(--gold)">{{admin_stats.get('logins_today',0)}}</div>
+                <div style="font-size:11px;color:#3a1f6e;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Logins Today</div>
+              </div>
+              <div class="stat-card" style="text-align:center;padding:14px">
+                <div style="font-size:26px;font-weight:700;color:{% if admin_stats.get('unread_feedback',0) > 0 %}var(--bad){% else %}var(--gold){% endif %}">{{admin_stats.get('unread_feedback',0)}}</div>
+                <div style="font-size:11px;color:#3a1f6e;text-transform:uppercase;letter-spacing:.5px;margin-top:2px">Unread Feedback</div>
+              </div>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:14px">
+                <div style="font-size:11px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Current Version</div>
+                {% if admin_stats.get('latest_version') %}
+                <div style="font-family:'Cinzel',serif;font-size:20px;font-weight:700;color:var(--gold)">{{admin_stats['latest_version']['version']}}</div>
+                <div style="font-size:13px;color:#c0a8e0;margin-top:2px">{{admin_stats['latest_version']['title']}}</div>
+                <div style="font-size:11px;color:#4a2a7a;margin-top:4px">Released {{fmt_date(admin_stats['latest_version']['created_at'][:10])}}</div>
                 {% else %}
-                  <span style="background:var(--tint-soft);color:#9a8abf;border-radius:20px;padding:2px 8px;font-size:10px;">Read</span>
-                {% endif %}
-                {% if m.feedback_type == 'review' %}
-                  <span style="background:#fef3c7;color:#92400e;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:600;">&#x2B50; Review</span>
+                <div style="font-size:13px;color:#4a2a7a">No versions logged yet.</div>
                 {% endif %}
               </div>
-              <div style="display:flex;gap:8px;align-items:center;">
-                <span style="font-size:11px;color:#b8acd4;">{{ m.created_at[:10] if m.created_at else '' }}</span>
-                {% if not m.is_read %}
-                <form method="POST" action="/admin/feedback/read/{{ m.id }}" style="margin:0;">
-                  <input type="hidden" name="page" value="admin"><input type="hidden" name="tab" value="feedback">
-                  <button type="submit" style="font-size:11px;padding:3px 8px;border:1px solid var(--tint-mid);background:#fff;border-radius:5px;cursor:pointer;color:#9a8abf;">Mark read</button>
-                </form>
+              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:14px">
+                <div style="font-size:11px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Newest User</div>
+                {% if admin_stats.get('newest_user') %}
+                <div style="font-size:14px;font-weight:600;color:#1a0d2e;word-break:break-all">{{admin_stats['newest_user']['email']}}</div>
+                <div style="font-size:11px;color:#4a2a7a;margin-top:4px">Joined {{fmt_date(admin_stats['newest_user']['created_at'][:10])}}</div>
+                {% else %}
+                <div style="font-size:13px;color:#4a2a7a">No users yet.</div>
                 {% endif %}
-                <form method="POST" action="/admin/feedback/delete/{{ m.id }}" style="margin:0;" onsubmit="return confirm('Delete this message?');">
-                  <input type="hidden" name="page" value="admin"><input type="hidden" name="tab" value="feedback">
-                  <button type="submit" style="font-size:11px;padding:3px 8px;border:1px solid #fca5a5;background:#fee2e2;color:#dc2626;border-radius:5px;cursor:pointer;">Delete</button>
-                </form>
+              </div>
+              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:14px">
+                <div style="font-size:11px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Banner Status</div>
+                {% if admin_stats.get('banner_enabled') %}
+                <span style="background:rgba(46,160,67,0.15);color:#2ea043;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px">● Active</span>
+                {% else %}
+                <span style="background:rgba(160,160,180,0.1);color:#8a7aaa;font-size:13px;font-weight:700;padding:3px 10px;border-radius:999px">● Off</span>
+                {% endif %}
+              </div>
+              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:14px">
+                <div style="font-size:11px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Total Versions Logged</div>
+                <div style="font-family:'Cinzel',serif;font-size:20px;font-weight:700;color:var(--gold)">{{admin_update_log|length}}</div>
               </div>
             </div>
-            <div style="padding:12px 16px;color:var(--purple-deep);font-size:13px;white-space:pre-wrap;">{{ m.message }}</div>
           </div>
-          {% endfor %}
-        </div>
-        {% else %}
-        <p style="color:#b8acd4;text-align:center;padding:20px 0;">No feedback yet.</p>
-        {% endif %}
-      </div>
-      </div>
 
-      {# ── Tab: Maintenance Log ──────────────────────────────────────────── #}
-      <div id="admin-panel-log" class="admin-panel">
-      <div class="card" style="max-width:900px;margin-bottom:24px;">
-        <div class="card-header">
-          <div class="card-title">&#x1F6E0; Maintenance Log</div>
-          <button onclick="document.getElementById('new-log-form').classList.toggle('hidden')" class="btn btn-sm btn-primary" style="font-size:12px;padding:5px 12px;">+ Add Entry</button>
-        </div>
-
-        {# New entry form #}
-        <div id="new-log-form" class="hidden adm-form">
-          <form method="POST" action="/admin/site-log/add">
-            <input type="hidden" name="page" value="admin"><input type="hidden" name="tab" value="log">
-            <div class="fg-row">
-              <div class="fg"><label>Title *</label><input type="text" name="title" placeholder="e.g. Fixed login bug" required></div>
-              <div class="fg"><label>Category</label>
-                <select name="category">
-                  <option value="Bug Fix">Bug Fix</option>
-                  <option value="Feature">Feature</option>
-                  <option value="Update">Update</option>
-                  <option value="Security">Security</option>
-                  <option value="DNS / Server">DNS / Server</option>
-                  <option value="Other" selected>Other</option>
+          <!-- ── VERSIONS TAB ── -->
+          <div id="admtab-versions" style="display:none">
+            <form method="post" action="/admin/update-log/add" style="display:grid;grid-template-columns:100px 1fr 130px auto;gap:8px;align-items:end;margin-bottom:6px;width:100%">
+              <input type="hidden" name="month" value="{{month}}">
+              <input type="hidden" name="view" value="{{view}}">
+              <input type="hidden" name="page" value="admin">
+              <div>
+                <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Version</label>
+                <input type="text" name="version" placeholder="e.g. v3.2">
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Title</label>
+                <input type="text" name="title" placeholder="Short title for this release">
+              </div>
+              <div>
+                <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Stage</label>
+                <select name="stage" style="font-size:12px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);color:inherit;width:100%">
+                  <option value="">— Not set —</option>
+                  <option value="Testing">🧪 Testing</option>
+                  <option value="Implemented">✅ Implemented</option>
                 </select>
               </div>
-              <div class="fg"><label>Status</label>
-                <select name="status">
-                  <option value="New" selected>&#x1F535; New</option>
-                  <option value="Investigating">&#x1F7E1; Investigating</option>
-                  <option value="Reviewing">&#x1F7E3; Reviewing</option>
-                  <option value="Complete">&#x1F7E2; Complete</option>
-                </select>
-              </div>
-              <div class="fg"><label>Version</label>
-                <select name="version_id">
-                  <option value="">&#x2014; No version &#x2014;</option>
-                  {% for v in admin_update_log %}<option value="{{ v.id }}">{{ v.version }}</option>{% endfor %}
-                </select>
-              </div>
-              <div class="fg"><label>Stage</label>
-                <select name="stage">
-                  <option value="">&#x2014; Not set &#x2014;</option>
-                  <option value="Testing">&#x1F9EA; Testing</option>
-                  <option value="Implemented">&#x2705; Implemented</option>
-                </select>
-              </div>
-            </div>
-            <div class="fg"><label>Notes</label><textarea name="notes" rows="2" placeholder="Optional details..."></textarea></div>
-            <div class="actions">
-              <button type="submit" class="btn btn-primary" style="font-size:13px;padding:6px 16px;">Save Entry</button>
-              <button type="button" onclick="document.getElementById('new-log-form').classList.add('hidden')" class="adm-btn-cancel">Cancel</button>
-            </div>
-          </form>
-        </div>
+              <button type="submit" class="btn-gold" style="align-self:end">+ Add</button>
+            </form>
+            <div style="font-size:11px;color:#4a2a7a;margin-bottom:14px">After adding, expand the row to write detailed notes.</div>
 
-        {# Version filter pills #}
-        {% if admin_update_log %}
-        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:16px;padding:10px 0;border-bottom:1px solid var(--tint-mid);">
-          <span style="font-size:11px;color:#b8acd4;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-right:2px;">Filter:</span>
-          <button class="ver-filter-btn active" data-ver="all" onclick="filterLogByVersion('all',this)">All</button>
-          {% for v in admin_update_log %}
-          <button class="ver-filter-btn" data-ver="{{ v.id }}" onclick="filterLogByVersion('{{ v.id }}',this)">{{ v.version }}</button>
-          {% endfor %}
-          <button class="ver-filter-btn" data-ver="none" onclick="filterLogByVersion('none',this)">Untagged</button>
-        </div>
-        {% endif %}
-
-        {# Log list — grouped by status #}
-        {% if site_logs %}
-        {% set status_groups = [
-          ('New',          '&#x1F535; New',          '#dbeafe', '#1d4ed8'),
-          ('Investigating','&#x1F7E1; Investigating', '#fef3c7', '#92400e'),
-          ('Reviewing',    '&#x1F7E3; Reviewing',     '#ede9fe', '#5b21b6'),
-          ('Complete',     '&#x1F7E2; Complete',      '#d1fae5', '#065f46'),
-          ('Auto',         '&#x2699;&#xFE0F; Auto',   '#f1f5f9', '#64748b'),
-        ] %}
-        {% for grp_status, grp_label, grp_bg, grp_color in status_groups %}
-          {% set grp_entries = site_logs | selectattr('status','equalto', grp_status) | list %}
-          {% if grp_entries %}
-          <div class="status-group-header">
-            <span style="background:{{ grp_bg }};color:{{ grp_color }};border-radius:20px;padding:2px 11px;font-size:11px;font-weight:700;">{{ grp_label }}</span>
-            <span style="font-size:10px;color:#b8acd4;">{{ grp_entries|length }} entr{{ 'y' if grp_entries|length==1 else 'ies' }}</span>
-          </div>
-          {% for entry in grp_entries %}
-          {% set entry_comments = comments_by_log.get(entry.id, []) %}
-          <details class="log-entry" id="log-{{ entry.id }}" data-version-id="{{ entry.version_id or 'none' }}">
-            <summary>
-              <span class="log-chevron">&#x25B6;</span>
-              {% if entry.log_type != 'auto' %}
-              <form method="POST" action="/admin/site-log/status/{{ entry.id }}" style="margin:0;" onclick="event.stopPropagation();">
-                <input type="hidden" name="page" value="admin"><input type="hidden" name="tab" value="log">
-                <select name="status" class="status-select" onchange="this.form.submit()" title="Change status">
-                  <option value="New" {% if entry.status=='New' %}selected{% endif %}>&#x1F535; New</option>
-                  <option value="Investigating" {% if entry.status=='Investigating' %}selected{% endif %}>&#x1F7E1; Investigating</option>
-                  <option value="Reviewing" {% if entry.status=='Reviewing' %}selected{% endif %}>&#x1F7E3; Reviewing</option>
-                  <option value="Complete" {% if entry.status=='Complete' %}selected{% endif %}>&#x1F7E2; Complete</option>
-                </select>
-              </form>
-              {% else %}
-              <span style="font-size:11px;background:#f1f5f9;color:#64748b;border-radius:6px;padding:3px 8px;white-space:nowrap;">&#x2699;&#xFE0F; Auto</span>
-              {% endif %}
-              <span class="badge {% if entry.category in ('Bug Fix','Security') %}badge-warn{% else %}badge-info{% endif %}" style="font-size:10px;white-space:nowrap;">{{ entry.category }}</span>
-              {% if entry.version_label %}<span style="font-size:10px;background:var(--tint-mid);color:#7c5cbf;border-radius:5px;padding:2px 7px;white-space:nowrap;font-weight:600;">{{ entry.version_label }}</span>{% endif %}
-              {% if entry.stage %}<span style="font-size:10px;white-space:nowrap;border-radius:5px;padding:2px 7px;font-weight:600;{% if entry.stage=='Implemented' %}background:#d1fae5;color:#065f46;{% else %}background:#fef3c7;color:#92400e;{% endif %}">{% if entry.stage=='Implemented' %}&#x2705;{% else %}&#x1F9EA;{% endif %} {{ entry.stage }}</span>{% endif %}
-              <span style="font-weight:600;color:var(--purple-deep);font-size:13px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ entry.title }}</span>
-              <span style="font-size:11px;color:#b8acd4;white-space:nowrap;">{{ entry.created_at[:10] if entry.created_at else '' }}</span>
-              {% if entry_comments %}<span style="font-size:11px;color:#b8acd4;white-space:nowrap;">&#x1F4AC; {{ entry_comments|length }}</span>{% endif %}
-              <form method="POST" action="/admin/site-log/delete/{{ entry.id }}" onsubmit="return confirm('Delete this entry?');" style="margin:0;" onclick="event.stopPropagation();">
-                <input type="hidden" name="page" value="admin"><input type="hidden" name="tab" value="log">
-                <button type="submit" style="font-size:11px;padding:2px 7px;border:1px solid #fca5a5;background:#fee2e2;color:#dc2626;border-radius:5px;cursor:pointer;line-height:1.4;">&#x2715;</button>
-              </form>
-            </summary>
-
-            <div class="log-body">
-              {% if entry.notes %}<div style="font-size:12px;color:#9a8abf;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--tint-mid);">{{ entry.notes }}</div>{% endif %}
-
-              {% if entry.log_type != 'auto' %}
-              <details style="margin-bottom:10px;">
-                <summary style="font-size:12px;font-weight:600;color:#9a8abf;cursor:pointer;list-style:none;padding:4px 0;">
-                  &#x270E; Edit entry
-                </summary>
-                <div class="adm-form" style="margin-top:8px;">
-                  <form method="POST" action="/admin/site-log/update/{{ entry.id }}">
-                    <input type="hidden" name="page" value="admin"><input type="hidden" name="tab" value="log">
-                    <div class="fg-row">
-                      <div class="fg"><label>Title</label><input type="text" name="title" value="{{ entry.title }}" required></div>
-                      <div class="fg"><label>Category</label>
-                        <select name="category">
-                          {% for cat in ['Bug Fix','Feature','Update','Security','DNS / Server','Other'] %}
-                          <option value="{{ cat }}" {% if entry.category==cat %}selected{% endif %}>{{ cat }}</option>
-                          {% endfor %}
-                        </select>
+            {% if admin_update_log %}
+            <div style="display:grid;gap:8px">
+              {% for entry in admin_update_log %}
+              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);overflow:hidden">
+                <div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:rgba(255,255,255,0.03);cursor:pointer" onclick="toggleAdminEntry({{entry.id}})">
+                  <span style="font-family:'Cinzel',serif;font-weight:700;color:var(--gold);font-size:14px;min-width:60px">{{entry.version}}</span>
+                  <span style="font-weight:600;color:#1a0d2e;flex:1">{{entry.title}}</span>
+                  {% if entry.stage %}
+                  <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;white-space:nowrap;{% if entry.stage=='Implemented' %}background:#d1fae5;color:#065f46;{% else %}background:#fef3c7;color:#92400e;{% endif %}">{% if entry.stage=='Implemented' %}✅{% else %}🧪{% endif %} {{entry.stage}}</span>
+                  {% endif %}
+                  <span style="font-size:11px;color:#4a2a7a">{{entry.created_at[5:7]}}-{{entry.created_at[8:10]}}-{{entry.created_at[:4]}}</span>
+                  <span style="font-size:11px;color:#4a2a7a">▼</span>
+                </div>
+                <div id="admin-entry-{{entry.id}}" style="display:none;padding:14px;border-top:1px solid var(--line-light)">
+                  <div style="display:flex;flex-direction:column;gap:10px;width:100%">
+                  <form method="post" action="/admin/update-log/update/{{entry.id}}" style="width:100%">
+                    <input type="hidden" name="month" value="{{month}}">
+                    <input type="hidden" name="view" value="{{view}}">
+                    <input type="hidden" name="page" value="admin">
+                    <div style="display:flex;gap:8px;margin-bottom:8px">
+                      <div style="width:100px;flex-shrink:0">
+                        <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Version</label>
+                        <input type="text" name="version" value="{{entry.version}}" required>
                       </div>
-                      <div class="fg"><label>Status</label>
-                        <select name="status">
-                          <option value="New" {% if entry.status=='New' %}selected{% endif %}>&#x1F535; New</option>
-                          <option value="Investigating" {% if entry.status=='Investigating' %}selected{% endif %}>&#x1F7E1; Investigating</option>
-                          <option value="Reviewing" {% if entry.status=='Reviewing' %}selected{% endif %}>&#x1F7E3; Reviewing</option>
-                          <option value="Complete" {% if entry.status=='Complete' %}selected{% endif %}>&#x1F7E2; Complete</option>
-                        </select>
+                      <div style="flex:1">
+                        <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Title</label>
+                        <input type="text" name="title" value="{{entry.title}}" required style="width:100%">
                       </div>
-                      <div class="fg"><label>Version</label>
-                        <select name="version_id">
-                          <option value="">&#x2014; No version &#x2014;</option>
-                          {% for v in admin_update_log %}<option value="{{ v.id }}" {% if entry.version_id and entry.version_id==v.id %}selected{% endif %}>{{ v.version }}</option>{% endfor %}
-                        </select>
-                      </div>
-                      <div class="fg"><label>Stage</label>
-                        <select name="stage">
-                          <option value="" {% if not entry.stage %}selected{% endif %}>&#x2014; Not set &#x2014;</option>
-                          <option value="Testing" {% if entry.stage=='Testing' %}selected{% endif %}>&#x1F9EA; Testing</option>
-                          <option value="Implemented" {% if entry.stage=='Implemented' %}selected{% endif %}>&#x2705; Implemented</option>
+                      <div style="width:140px;flex-shrink:0">
+                        <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Stage</label>
+                        <select name="stage" style="font-size:12px;padding:6px 8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.07);color:inherit;width:100%">
+                          <option value="" {% if not entry.stage %}selected{% endif %}>— Not set —</option>
+                          <option value="Testing" {% if entry.stage=='Testing' %}selected{% endif %}>🧪 Testing</option>
+                          <option value="Implemented" {% if entry.stage=='Implemented' %}selected{% endif %}>✅ Implemented</option>
                         </select>
                       </div>
                     </div>
-                    <div class="fg"><label>Notes</label><textarea name="notes" rows="2">{{ entry.notes or '' }}</textarea></div>
-                    <div class="actions">
-                      <button type="submit" class="btn btn-primary" style="font-size:12px;padding:5px 14px;">Save</button>
+                    <div style="margin-bottom:10px;width:100%">
+                      <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Notes — describe exactly what changed in this version</label>
+                      <textarea name="body" style="width:100%;box-sizing:border-box;min-height:220px;resize:vertical;font-size:13px;line-height:1.6;color:#000;background:#fff">{{entry.body or ''}}</textarea>
+                    </div>
+                    <div style="display:flex;gap:8px">
+                      <button type="submit" class="btn-gold btn-sm">Save Changes</button>
                     </div>
                   </form>
+                  <form method="post" action="/admin/update-log/delete/{{entry.id}}" onsubmit="return confirm('Delete this entry?')" style="margin:0">
+                    <input type="hidden" name="month" value="{{month}}">
+                    <input type="hidden" name="view" value="{{view}}">
+                    <input type="hidden" name="page" value="admin">
+                    <button type="submit" class="btn-danger btn-sm">Delete</button>
+                  </form>
                 </div>
-              </details>
-              {% endif %}
 
-              <div style="font-size:12px;font-weight:600;color:#9a8abf;margin-bottom:6px;">&#x1F4AC; Comments {% if entry_comments %}({{ entry_comments|length }}){% endif %}</div>
-              {% if entry_comments %}
-              {% for c in entry_comments %}
-              <div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--tint-mid);">
-                <div style="flex:1;">
-                  <div style="font-size:12px;color:var(--purple-deep);">{{ c.comment }}</div>
-                  <div style="font-size:10px;color:#b8acd4;margin-top:2px;">{{ c.created_at[:10] if c.created_at else '' }}</div>
                 </div>
-                <form method="POST" action="/admin/site-log/comment/delete/{{ c.id }}" style="margin:0;">
-                  <input type="hidden" name="page" value="admin"><input type="hidden" name="tab" value="log">
-                  <button type="submit" style="font-size:10px;padding:2px 6px;border:1px solid #fca5a5;background:#fee2e2;color:#dc2626;border-radius:4px;cursor:pointer;">&#x2715;</button>
-                </form>
               </div>
               {% endfor %}
-              {% else %}
-              <p style="font-size:12px;color:#b8acd4;margin-bottom:6px;">No comments yet.</p>
-              {% endif %}
-              <form method="POST" action="/admin/site-log/comment/add/{{ entry.id }}" style="margin-top:8px;display:flex;gap:8px;">
-                <input type="hidden" name="page" value="admin"><input type="hidden" name="tab" value="log">
-                <input type="text" name="comment" placeholder="Add a comment..." required style="font-size:12px;flex:1;padding:5px 10px;background:#fff;border:1px solid var(--tint-mid);border-radius:7px;color:var(--purple-deep);box-sizing:border-box;">
-                <button type="submit" class="btn btn-primary" style="font-size:12px;padding:5px 12px;">Add</button>
-              </form>
             </div>
-          </details>
-          {% endfor %}
-          {% endif %}
-        {% endfor %}
-        {% else %}
-        <p style="color:#b8acd4;text-align:center;padding:20px 0;">No log entries yet. Add your first one above!</p>
-        {% endif %}
-      </div>
-      </div>
+            {% else %}
+            <div style="font-size:13px;color:#4a2a7a;padding:20px;text-align:center">No version entries yet. Add your first one above.</div>
+            {% endif %}
+          </div>
 
-      {# ── Tab: Versions ─────────────────────────────────────────────────── #}
-      <div id="admin-panel-versions" class="admin-panel">
-      <div class="card" style="max-width:900px;margin-bottom:24px;">
-        <div class="card-header">
-          <div class="card-title">&#x1F4CC; Version Tracker</div>
-          <button onclick="document.getElementById('new-version-form').classList.toggle('hidden')" class="btn btn-sm btn-primary" style="font-size:12px;padding:5px 12px;">+ Tag Version</button>
-        </div>
-        <div id="new-version-form" class="hidden adm-form" style="margin-bottom:16px;">
-          <form method="POST" action="/admin/update-log/add">
-            <input type="hidden" name="page" value="admin"><input type="hidden" name="tab" value="versions">
-            <div class="fg-row">
-              <div class="fg"><label>Version *</label><input type="text" name="version" placeholder="e.g. V2.1" required></div>
-              <div class="fg"><label>Title *</label><input type="text" name="title" placeholder="What changed?" required></div>
-            </div>
-            <div class="fg"><label>Notes</label><textarea name="body" rows="2" placeholder="Optional details..."></textarea></div>
-            <div class="actions">
-              <button type="submit" class="btn btn-primary" style="font-size:13px;padding:6px 16px;">Tag Version</button>
-              <button type="button" onclick="document.getElementById('new-version-form').classList.add('hidden')" class="adm-btn-cancel">Cancel</button>
-            </div>
-          </form>
-        </div>
-        {% if admin_update_log %}
-        <div style="display:flex;flex-direction:column;gap:0;">
-          {% for v in admin_update_log %}
-          <div style="border-bottom:1px solid var(--tint-mid);padding:12px 0;">
-            <div style="display:flex;align-items:center;gap:12px;">
-              <div style="background:var(--gold);color:#fff;font-weight:700;font-size:13px;border-radius:8px;padding:5px 12px;flex-shrink:0;">{{ v.version }}</div>
-              <div style="flex:1;">
-                {% if v.title %}<div style="font-size:13px;color:var(--purple-deep);">{{ v.title }}</div>{% endif %}
-                {% if v.body %}<div style="font-size:12px;color:#9a8abf;margin-top:2px;">{{ v.body }}</div>{% endif %}
-                <div style="font-size:11px;color:#b8acd4;margin-top:2px;">Tagged {{ v.created_at[:10] if v.created_at else '' }}</div>
-              </div>
-              <div style="display:flex;gap:6px;flex-shrink:0;">
-                <button onclick="document.getElementById('edit-ver-{{ v.id }}').classList.toggle('hidden')" style="font-size:11px;padding:3px 9px;border:1px solid var(--tint-mid);background:#fff;border-radius:5px;cursor:pointer;color:#9a8abf;">Edit</button>
-                <form method="POST" action="/admin/update-log/delete/{{ v.id }}" onsubmit="return confirm('Remove this version tag?');" style="margin:0;">
-                  <input type="hidden" name="page" value="admin"><input type="hidden" name="tab" value="versions">
-                  <button type="submit" style="font-size:11px;padding:3px 8px;border:1px solid #fca5a5;background:#fee2e2;color:#dc2626;border-radius:5px;cursor:pointer;">&#x2715;</button>
-                </form>
-              </div>
-            </div>
-            <div id="edit-ver-{{ v.id }}" class="hidden adm-form" style="margin-top:10px;">
-              <form method="POST" action="/admin/update-log/update/{{ v.id }}">
-                <input type="hidden" name="page" value="admin"><input type="hidden" name="tab" value="versions">
-                <div class="fg-row">
-                  <div class="fg"><label>Version</label><input type="text" name="version" value="{{ v.version }}" required></div>
-                  <div class="fg"><label>Title</label><input type="text" name="title" value="{{ v.title or '' }}" required></div>
+          <!-- ── BANNER TAB ── -->
+          <div id="admtab-banner" style="display:none">
+            <form method="post" action="/admin/banner/save">
+              <input type="hidden" name="month" value="{{month}}">
+              <input type="hidden" name="view" value="{{view}}">
+              <input type="hidden" name="page" value="admin">
+              <div style="border:1px solid var(--line-light);border-radius:var(--radius-sm);padding:16px;margin-bottom:14px">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+                  <label style="font-size:14px;color:#c0a8e0;display:flex;align-items:center;gap:8px;cursor:pointer">
+                    <input type="checkbox" name="banner_enabled" value="1" {% if banner_enabled %}checked{% endif %} style="width:16px;height:16px">
+                    Show banner to all users
+                  </label>
                 </div>
-                <div class="fg"><label>Notes</label><textarea name="body" rows="2">{{ v.body or '' }}</textarea></div>
-                <div class="actions">
-                  <button type="submit" class="btn btn-primary" style="font-size:12px;padding:5px 14px;">Save</button>
-                  <button type="button" onclick="document.getElementById('edit-ver-{{ v.id }}').classList.add('hidden')" class="adm-btn-cancel">Cancel</button>
+                <div style="margin-bottom:12px">
+                  <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Banner Text</label>
+                  <textarea name="banner_text" rows="5" style="width:100%;box-sizing:border-box;resize:vertical;font-size:13px;color:#000;background:#fff;line-height:1.5;min-height:100px">{{banner_text}}</textarea>
                 </div>
-              </form>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+                  <div>
+                    <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Show From <span style="font-weight:400;color:#6a5a8a">(optional)</span></label>
+                    <input type="date" name="banner_start_date" value="{{banner_start_date}}">
+                    <div style="font-size:11px;color:#4a2a7a;margin-top:3px">Banner starts showing on this date</div>
+                  </div>
+                  <div>
+                    <label style="font-size:11px;font-weight:600;color:#3a1f6e;display:block;margin-bottom:4px">Hide After <span style="font-weight:400;color:#6a5a8a">(optional)</span></label>
+                    <input type="date" name="banner_end_date" value="{{banner_end_date}}">
+                    <div style="font-size:11px;color:#4a2a7a;margin-top:3px">Banner auto-hides after this date</div>
+                  </div>
+                </div>
+                <button type="submit" class="btn-gold">Save Banner</button>
+              </div>
+            </form>
+            {% if banner_enabled and banner_text %}
+            <div style="background:#fffbea;border:1.5px solid #f5c842;border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:10px">
+              <span style="background:#f5c842;color:#5a4000;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;white-space:nowrap">Preview</span>
+              <span style="font-size:13px;color:#5a4000">{{banner_text}}</span>
             </div>
-            {# Log entries tagged to this version #}
-            {% set ver_logs = site_logs | selectattr('version_id', 'equalto', v.id) | list %}
-            {% if ver_logs %}
-            <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--tint-mid);">
-              <div style="font-size:10px;font-weight:700;color:#b8acd4;text-transform:uppercase;letter-spacing:.6px;margin-bottom:7px;">
-                &#x1F4CB; {{ ver_logs|length }} linked log entr{{ 'y' if ver_logs|length==1 else 'ies' }}
+            {% else %}
+            <div style="font-size:13px;color:#4a2a7a;padding:12px;text-align:center;border:1px dashed rgba(200,170,255,0.2);border-radius:8px">Banner is currently off. Enable it above to show a message to all users.</div>
+            {% endif %}
+
+            {% if banner_history %}
+            <div style="margin-top:18px;border-top:1px solid var(--line-light);padding-top:14px">
+              <div style="font-size:12px;font-weight:700;color:#4a2a7a;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">📜 Banner History — click to reuse</div>
+              <div style="display:grid;gap:6px">
+                {% for h in banner_history %}
+                <div style="border:1px solid var(--line-light);border-radius:8px;padding:10px 12px;cursor:pointer;transition:background 0.15s"
+                     onclick="reuseAdminBanner('{{h.text|replace("'","\'")}}','{{h.start_date or ""}}','{{h.end_date or ""}}')"
+                     onmouseover="this.style.background='rgba(245,200,66,0.06)'"
+                     onmouseout="this.style.background=''">
+                  <div style="font-size:13px;color:#1a0d2e;margin-bottom:4px">{{h.text}}</div>
+                  <div style="font-size:11px;color:#4a2a7a">
+                    Saved {{h.saved_at[5:7]}}-{{h.saved_at[8:10]}}-{{h.saved_at[:4]}}
+                    {% if h.start_date %} · From {{h.start_date[5:7]}}-{{h.start_date[8:10]}}-{{h.start_date[:4]}}{% endif %}
+                    {% if h.end_date %} · Until {{h.end_date[5:7]}}-{{h.end_date[8:10]}}-{{h.end_date[:4]}}{% endif %}
+                  </div>
+                </div>
+                {% endfor %}
               </div>
-              {% for e in ver_logs %}
-              <div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--tint-mid);{% if loop.last %}border-bottom:none;{% endif %}">
-                <span class="badge {% if e.category in ('Bug Fix','Security') %}badge-warn{% else %}badge-info{% endif %}" style="font-size:9px;padding:1px 5px;">{{ e.category }}</span>
-                {% if e.stage %}<span style="font-size:9px;padding:2px 6px;border-radius:4px;font-weight:600;{% if e.stage=='Implemented' %}background:#d1fae5;color:#065f46;{% else %}background:#fef3c7;color:#92400e;{% endif %}">{% if e.stage=='Implemented' %}&#x2705;{% else %}&#x1F9EA;{% endif %} {{ e.stage }}</span>{% endif %}
-                <span style="font-size:12px;color:var(--purple-deep);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ e.title }}</span>
-                <a href="?page=admin&amp;tab=log#log-{{ e.id }}" style="font-size:10px;color:#b8acd4;text-decoration:none;flex-shrink:0;" title="View in Maintenance Log">&#x1F517;</a>
-              </div>
-              {% endfor %}
             </div>
             {% endif %}
           </div>
-          {% endfor %}
-        </div>
-        {% else %}
-        <p style="color:#b8acd4;text-align:center;padding:20px 0;">No versions tagged yet. Click "+ Tag Version" when you hit a milestone!</p>
-        {% endif %}
-      </div>
-      </div>
 
-      {# ── Tab: Banner ───────────────────────────────────────────────────── #}
-      <div id="admin-panel-banner" class="admin-panel">
-      <div class="card" style="max-width:900px;margin-bottom:24px;">
-        <div class="card-header">
-          <div class="card-title">&#x1F4E2; Site Banner</div>
-          {% if banner_enabled %}<span class="badge badge-warn">Live</span>{% else %}<span class="badge badge-info">Off</span>{% endif %}
-        </div>
-        <div class="adm-form">
-          <form method="POST" action="/admin/banner/save">
-            <input type="hidden" name="page" value="admin"><input type="hidden" name="tab" value="banner">
-            <div class="fg" style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-              <label style="margin:0;display:flex;align-items:center;gap:8px;cursor:pointer;">
-                <input type="checkbox" name="banner_enabled" value="1" {% if banner_enabled %}checked{% endif %} style="width:16px;height:16px;accent-color:var(--gold);">
-                <span style="font-size:13px;font-weight:600;color:var(--purple-deep);">Banner enabled</span>
-              </label>
+          <!-- ── USERS TAB ── -->
+          <div id="admtab-users" style="display:none">
+            <div style="margin-bottom:12px">
+              <input type="text" id="adminUserSearch" placeholder="Search by email..." oninput="filterAdminUsers()" style="max-width:320px">
             </div>
-            <div class="fg"><label>Banner Text</label><textarea name="banner_text" rows="2" placeholder="Message to show all users...">{{ banner_text }}</textarea></div>
-            <div class="fg-row">
-              <div class="fg"><label>Start Date (optional)</label><input type="date" name="banner_start_date" value="{{ banner_start_date }}"></div>
-              <div class="fg"><label>End Date (optional)</label><input type="date" name="banner_end_date" value="{{ banner_end_date }}"></div>
+            <div style="overflow-x:auto">
+            <table class="adaptive-table" id="adminUsersTable">
+              <tr><th>ID</th><th style="min-width:220px">Email</th><th>Household</th><th>Role</th><th>Joined</th><th>Last Login</th><th>Admin</th><th>Delete</th></tr>
+              {% for u in admin_users %}
+              <tr class="admin-user-row" data-search="{{u.email|lower}} {{(u.household_name or '')|lower}}" {% if u.is_admin %}style="background:rgba(245,200,66,0.05)"{% endif %}>
+                <td style="font-size:12px;color:#3a1f6e">{{u.id}}</td>
+                <td style="word-break:break-all">
+                  <span style="font-weight:600;color:#1a0d2e">{{u.email}}</span>
+                  {% if u.is_admin %}<span style="font-size:10px;background:rgba(245,200,66,0.2);color:var(--gold);padding:1px 6px;border-radius:999px;margin-left:4px">ADMIN</span>{% endif %}
+                </td>
+                <td style="font-size:12px">{{u.household_name or '—'}}</td>
+                <td style="font-size:12px;color:#3a1f6e">{{u.role or '—'}}</td>
+                <td style="font-size:12px;color:#3a1f6e;white-space:nowrap">
+                  {% if u.created_at %}{{u.created_at[5:7]}}-{{u.created_at[8:10]}}-{{u.created_at[:4]}}{% else %}—{% endif %}
+                </td>
+                <td style="font-size:12px;color:#3a1f6e;white-space:nowrap">
+                  {% if u.last_login_at %}{{u.last_login_at[5:7]}}-{{u.last_login_at[8:10]}}-{{u.last_login_at[:4]}}{% else %}Never{% endif %}
+                </td>
+                <td>
+                  {% if u.id != session.get('user_id') %}
+                  <form method="post" action="/admin/user/toggle-admin/{{u.id}}" style="margin:0">
+                    <input type="hidden" name="month" value="{{month}}">
+                    <input type="hidden" name="view" value="{{view}}">
+                    <input type="hidden" name="page" value="admin">
+                    <button type="submit" class="btn-sm" style="white-space:nowrap;{% if u.is_admin %}background:#fff3cd;color:#856404{% else %}background:rgba(255,255,255,0.07);color:#8a7aaa{% endif %}">
+                      {{'★ Admin' if u.is_admin else '☆ Grant'}}
+                    </button>
+                  </form>
+                  {% else %}
+                  <span style="font-size:11px;color:var(--gold)">★ You</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if u.id != session.get('user_id') %}
+                  <form method="post" action="/admin/user/delete/{{u.id}}" onsubmit="return confirm('Delete {{u.email}}?')" style="margin:0">
+                    <input type="hidden" name="month" value="{{month}}">
+                    <input type="hidden" name="view" value="{{view}}">
+                    <input type="hidden" name="page" value="admin">
+                    <button type="submit" class="btn-danger btn-sm">Delete</button>
+                  </form>
+                  {% else %}
+                  <span style="font-size:11px;color:#4a2a7a">—</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </table>
             </div>
-            <div class="actions">
-              <button type="submit" class="btn btn-primary" style="font-size:13px;padding:6px 16px;">Save Banner</button>
-            </div>
-          </form>
-        </div>
-        {% if banner_history %}
-        <div style="border-top:1px solid var(--tint-mid);padding-top:14px;margin-top:8px;">
-          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#b8acd4;margin-bottom:10px;">History</div>
-          {% for h in banner_history %}
-          <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--tint-mid);{% if loop.last %}border-bottom:none;{% endif %}">
-            <div style="flex:1;font-size:13px;color:var(--purple-deep);">{{ h.text }}</div>
-            <div style="font-size:11px;color:#b8acd4;white-space:nowrap;flex-shrink:0;">{{ h.saved_at[:10] if h.saved_at else '' }}{% if h.start_date or h.end_date %}<br><span style="font-size:10px;">{{ h.start_date or '' }}{% if h.start_date and h.end_date %} &ndash; {% endif %}{{ h.end_date or '' }}</span>{% endif %}</div>
           </div>
-          {% endfor %}
-        </div>
-        {% endif %}
-      </div>
-      </div>
 
-      {% endif %}{# /admin #}
+          <!-- ── FEEDBACK TAB ── -->
+          <div id="admtab-feedback" style="display:none">
 
+            <!-- Filter tabs -->
+            <div style="display:flex;gap:0;margin-bottom:14px;border-bottom:1px solid var(--line-light)">
+              <button type="button" onclick="filterFeedback('all')" id="fb-filter-all"
+                style="padding:7px 14px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:var(--gold);border-bottom:2px solid var(--gold);font-family:'DM Sans',sans-serif">
+                All
+              </button>
+              <button type="button" onclick="filterFeedback('unread')" id="fb-filter-unread"
+                style="padding:7px 14px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:#4a2a7a;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">
+                Unread
+              </button>
+              <button type="button" onclick="filterFeedback('feedback')" id="fb-filter-feedback"
+                style="padding:7px 14px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:#4a2a7a;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">
+                💬 Feedback
+              </button>
+              <button type="button" onclick="filterFeedback('review')" id="fb-filter-review"
+                style="padding:7px 14px;border:none;background:transparent;font-size:12px;font-weight:700;cursor:pointer;color:#4a2a7a;border-bottom:2px solid transparent;font-family:'DM Sans',sans-serif">
+                ⭐ Reviews
+              </button>
+            </div>
+
+            {% if admin_feedback %}
+            <table class="adaptive-table" id="feedbackTable">
+              <tr>
+                <th style="min-width:140px">From</th>
+                <th>Subject</th>
+                <th>Message</th>
+                <th style="min-width:130px">Type</th>
+                <th style="min-width:80px">Actions</th>
+              </tr>
+              {% for fb in admin_feedback %}
+              <tr class="fb-row"
+                  data-read="{{fb.is_read}}"
+                  data-type="{{fb.feedback_type or 'unread'}}"
+                  {% if not fb.is_read %}style="background:rgba(245,200,66,0.04)"{% endif %}>
+                <td style="font-size:12px">
+                  <div style="font-weight:600;color:#1a0d2e;word-break:break-all">{{fb.email or 'Anonymous'}}</div>
+                  <div style="color:#4a2a7a;font-size:11px;margin-top:2px">
+                    {{fb.created_at[5:7]}}-{{fb.created_at[8:10]}}-{{fb.created_at[:4]}}
+                    {% if not fb.is_read %}<span style="background:var(--bad);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:999px;margin-left:4px">NEW</span>{% endif %}
+                  </div>
+                </td>
+                <td style="font-size:13px;font-weight:600;color:#1a0d2e;word-break:break-word;white-space:normal">{{fb.subject or '(no subject)'}}</td>
+                <td style="font-size:12px;color:#1a0d2e;max-width:300px">
+                  <div style="white-space:pre-wrap;background:rgba(0,0,0,0.04);padding:8px 10px;border-radius:5px;max-height:80px;overflow-y:auto">{{fb.message}}</div>
+                </td>
+                <td>
+                  <!-- Type toggle: Unread / Feedback / Review -->
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    <form method="post" action="/admin/feedback/settype/{{fb.id}}" style="margin:0">
+                      <input type="hidden" name="month" value="{{month}}">
+                      <input type="hidden" name="view" value="{{view}}">
+                      <input type="hidden" name="page" value="admin">
+                      <select name="feedback_type" onchange="nsSubmit(this.form)"
+                        style="font-size:12px;padding:4px 6px;border-radius:6px;border:1px solid var(--line-light);background:{% if fb.feedback_type == 'review' %}rgba(245,200,66,0.1){% elif fb.feedback_type == 'feedback' %}rgba(100,150,255,0.1){% else %}rgba(160,160,180,0.1){% endif %}">
+                        <option value="" {% if not fb.feedback_type or fb.feedback_type not in ('feedback','review') %}selected{% endif %}>— Unread —</option>
+                        <option value="feedback" {% if fb.feedback_type == 'feedback' %}selected{% endif %}>💬 Feedback</option>
+                        <option value="review" {% if fb.feedback_type == 'review' %}selected{% endif %}>⭐ Review</option>
+                      </select>
+                    </form>
+                  </div>
+                </td>
+                <td>
+                  <div style="display:flex;flex-direction:column;gap:4px">
+                    {% if not fb.is_read %}
+                    <form method="post" action="/admin/feedback/read/{{fb.id}}" style="margin:0">
+                      <input type="hidden" name="month" value="{{month}}">
+                      <input type="hidden" name="view" value="{{view}}">
+                      <input type="hidden" name="page" value="admin">
+                      <button type="submit" class="btn-sm" style="background:rgba(46,160,67,0.15);color:#2ea043;border:1px solid rgba(46,160,67,0.3);width:100%">✓ Read</button>
+                    </form>
+                    {% endif %}
+                    <form method="post" action="/admin/feedback/delete/{{fb.id}}" onsubmit="return confirm('Delete this message?')" style="margin:0">
+                      <input type="hidden" name="month" value="{{month}}">
+                      <input type="hidden" name="view" value="{{view}}">
+                      <input type="hidden" name="page" value="admin">
+                      <button type="submit" class="btn-danger btn-sm" style="width:100%">Delete</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+              {% endfor %}
+            </table>
+            {% else %}
+            <div style="text-align:center;padding:40px">
+              <div style="font-size:32px;margin-bottom:10px">💬</div>
+              <div style="font-size:14px;color:#4a2a7a">No messages yet. Users can submit via the 💬 Feedback button in the top bar.</div>
+            </div>
+            {% endif %}
+          </div>
+
+        </div><!-- end padding div -->
+      </div>
+      {% endif %}
 
     </main>
   </div>
@@ -2979,6 +2821,30 @@ window.addEventListener('beforeunload', function(){
   </div>
 </div>
 
+<!-- FEEDBACK MODAL -->
+<div id="feedbackModal" class="modal-overlay">
+  <div class="modal-box" style="max-width:500px">
+    <h3>💬 Send Feedback</h3>
+    <p style="font-size:13px;color:#3a1f6e;margin-bottom:14px">Have a question, found a bug, or want to leave a review? Send a message directly to the admin panel.</p>
+    <form method="post" action="/feedback/submit" class="stack-form">
+      <input type="hidden" name="month" value="{{month}}">
+      <input type="hidden" name="view" value="{{view}}">
+      <input type="hidden" name="page" value="{{page}}">
+      <div class="field-row">
+        <label>Subject</label>
+        <input type="text" name="subject" placeholder="e.g. Bug report, Feature idea, Love it!">
+      </div>
+      <div class="field-row">
+        <label>Message</label>
+        <textarea name="message" style="min-height:140px;resize:vertical;color:#000;background:#fff" placeholder="Describe your issue, idea, or leave a review..." required></textarea>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn-gold">Send Message</button>
+        <button type="button" onclick="closeFeedback()" class="btn-muted">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <!-- ROLLOVER MODAL -->
 <div id="rolloverModal" class="modal-overlay">
@@ -3092,6 +2958,68 @@ function closeMoveModal() {
   document.getElementById('moveModal').style.display = 'none';
 }
 
+// ── PAYCHECK SECTION ACCORDION ──
+function adminTab(tab){
+  ['overview','versions','banner','users','feedback'].forEach(t=>{
+    const el=document.getElementById('admtab-'+t);
+    const btn=document.getElementById('admtab-btn-'+t);
+    if(el) el.style.display=(t===tab)?'block':'none';
+    if(btn){
+      btn.style.color=(t===tab)?'var(--gold)':'#8a7aaa';
+      btn.style.borderBottom=(t===tab)?'2px solid var(--gold)':'2px solid transparent';
+    }
+  });
+  try{ sessionStorage.setItem('ns_admin_tab', tab); }catch(e){}
+}
+
+function openFeedback(){ document.getElementById('feedbackModal').style.display='block'; }
+function filterFeedback(type){
+  // Update filter button styles
+  ['all','unread','feedback','review'].forEach(t=>{
+    const btn = document.getElementById('fb-filter-'+t);
+    if(!btn) return;
+    const active = t === type;
+    btn.style.color = active ? 'var(--gold)' : '#4a2a7a';
+    btn.style.borderBottom = active ? '2px solid var(--gold)' : '2px solid transparent';
+  });
+  // Filter rows
+  document.querySelectorAll('.fb-row').forEach(row=>{
+    const isRead = row.dataset.read === '1';
+    const rowType = row.dataset.type || 'unread';
+    let show = false;
+    if(type === 'all') show = true;
+    else if(type === 'unread') show = !isRead;
+    else if(type === 'feedback') show = rowType === 'feedback';
+    else if(type === 'review') show = rowType === 'review';
+    row.style.display = show ? '' : 'none';
+  });
+  try{ sessionStorage.setItem('ns_fb_filter', type); }catch(e){}
+}
+
+function reuseAdminBanner(text, startDate, endDate){
+  const t=document.querySelector('input[name="banner_text"]');
+  const s=document.querySelector('input[name="banner_start_date"]');
+  const e=document.querySelector('input[name="banner_end_date"]');
+  const cb=document.querySelector('input[name="banner_enabled"]');
+  if(t) t.value=text;
+  if(s) s.value=startDate;
+  if(e) e.value=endDate;
+  if(cb) cb.checked=true;
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function closeFeedback(){ document.getElementById('feedbackModal').style.display='none'; }
+
+function toggleAdminEntry(id){
+  const el=document.getElementById('admin-entry-'+id);
+  if(el) el.style.display=el.style.display==='none'?'block':'none';
+}
+
+function filterAdminUsers(){
+  const q=(document.getElementById('adminUserSearch').value||'').toLowerCase();
+  document.querySelectorAll('.admin-user-row').forEach(row=>{
+    row.style.display=(row.dataset.search||'').includes(q)?'':'none';
+  });
+}
 
 function toggleSubsWidget(){
   const body = document.getElementById('subs-widget-body');
@@ -3747,7 +3675,15 @@ window.addEventListener('DOMContentLoaded', ()=>{
   try{ snLoad(); }catch(e){ console.error('snLoad failed',e); }
   restorePaycheckSections();
   // Restore feedback filter
+  if(document.getElementById('fb-filter-all')){
+    try{ filterFeedback(sessionStorage.getItem('ns_fb_filter')||'all'); }catch(e){}
   }
+  // Restore admin tab state
+  if(document.getElementById('admtab-overview')){
+    try{
+      const savedTab = sessionStorage.getItem('ns_admin_tab') || 'overview';
+      adminTab(savedTab);
+    }catch(e){ adminTab('overview'); }
   }
   // Restore subscriptions widget state
   try{

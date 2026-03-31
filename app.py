@@ -410,23 +410,6 @@ def init_db():
             end_date text,
             saved_at text not null
         );
-        create table if not exists site_log (
-            id integer primary key,
-            title text not null,
-            category text not null default 'Other',
-            status text not null default 'New',
-            stage text,
-            version_id integer,
-            notes text,
-            log_type text not null default 'manual',
-            created_at text not null
-        );
-        create table if not exists log_comments (
-            id integer primary key,
-            log_id integer not null,
-            comment text not null,
-            created_at text not null
-        );
     """)
     c.execute("insert or ignore into site_banner(id,enabled,text,updated_at) values(1,0,'',?)",
               (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),))
@@ -588,9 +571,6 @@ def redirect_dashboard_from_form(form):
     settings_tab = (form.get("settings_tab", "") or "").strip()
     if settings_tab:
         params["settings_tab"] = settings_tab
-    admin_tab = (form.get("tab", "") or "").strip()
-    if admin_tab:
-        params["tab"] = admin_tab
     target = url_for("dashboard", **params)
     anchor = (form.get("anchor", "") or "").strip().lstrip("#")
     if anchor:
@@ -1520,8 +1500,6 @@ def dashboard():
     admin_update_log = []
     admin_feedback = []
     banner_history = []
-    site_logs = []
-    comments_by_log = {}
     if user_is_admin:
         admin_users = c.execute(
             "select u.id, u.email, u.created_at, u.last_login_at, u.is_admin, "
@@ -1534,19 +1512,6 @@ def dashboard():
         admin_update_log = c.execute(
             "select * from update_log order by id desc"
         ).fetchall()
-        site_logs_raw = c.execute(
-            "select sl.*, ul.version as version_label "
-            "from site_log sl "
-            "left join update_log ul on ul.id = sl.version_id "
-            "order by sl.id desc"
-        ).fetchall()
-        site_logs = [dict(r) for r in site_logs_raw]
-        comments_raw = c.execute("select * from log_comments order by id asc").fetchall()
-        for comm in comments_raw:
-            lid = comm["log_id"]
-            if lid not in comments_by_log:
-                comments_by_log[lid] = []
-            comments_by_log[lid].append(dict(comm))
 
         # Extra stats for admin dashboard tab
         admin_stats = {
@@ -1730,7 +1695,6 @@ def dashboard():
         show_tour=show_tour, today_str=today.strftime('%Y-%m-%d'),
         user_is_admin=user_is_admin, banner_enabled=banner_enabled, banner_text=banner_text, banner_start_date=banner_start_date, banner_end_date=banner_end_date,
         admin_users=admin_users, admin_update_log=admin_update_log, admin_stats=admin_stats if user_is_admin else {}, admin_feedback=admin_feedback if user_is_admin else [], banner_history=banner_history if user_is_admin else [],
-        site_logs=site_logs if user_is_admin else [], comments_by_log=comments_by_log if user_is_admin else {},
         bill_name_suggestions=bill_name_suggestions,
         bill_name_meta=bill_name_meta,
     )
@@ -2716,90 +2680,6 @@ def admin_update_log_delete(item_id):
     if not authed() or not is_admin_user(): return ("Forbidden", 403)
     c = conn()
     c.execute("delete from update_log where id=?", (item_id,))
-    c.commit(); c.close()
-    return redirect_dashboard_from_form(request.form)
-
-
-# ── Site Log (Maintenance) routes ──────────────────────────────────────────────
-
-@app.post("/admin/site-log/add")
-def admin_site_log_add():
-    if not authed() or not is_admin_user(): return ("Forbidden", 403)
-    title = (request.form.get("title", "") or "").strip()
-    category = (request.form.get("category", "Other") or "Other").strip()
-    status = (request.form.get("status", "New") or "New").strip()
-    stage = (request.form.get("stage", "") or "").strip() or None
-    version_id = request.form.get("version_id", "") or None
-    if version_id:
-        try: version_id = int(version_id)
-        except: version_id = None
-    notes = (request.form.get("notes", "") or "").strip() or None
-    if title:
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        c = conn()
-        c.execute("insert into site_log(title,category,status,stage,version_id,notes,log_type,created_at) values(?,?,?,?,?,?,'manual',?)",
-                  (title, category, status, stage, version_id, notes, now))
-        c.commit(); c.close()
-    return redirect_dashboard_from_form(request.form)
-
-
-@app.post("/admin/site-log/update/<int:log_id>")
-def admin_site_log_update(log_id):
-    if not authed() or not is_admin_user(): return ("Forbidden", 403)
-    title = (request.form.get("title", "") or "").strip()
-    category = (request.form.get("category", "Other") or "Other").strip()
-    status = (request.form.get("status", "New") or "New").strip()
-    stage = (request.form.get("stage", "") or "").strip() or None
-    version_id = request.form.get("version_id", "") or None
-    if version_id:
-        try: version_id = int(version_id)
-        except: version_id = None
-    notes = (request.form.get("notes", "") or "").strip() or None
-    if title:
-        c = conn()
-        c.execute("update site_log set title=?,category=?,status=?,stage=?,version_id=?,notes=? where id=?",
-                  (title, category, status, stage, version_id, notes, log_id))
-        c.commit(); c.close()
-    return redirect_dashboard_from_form(request.form)
-
-
-@app.post("/admin/site-log/delete/<int:log_id>")
-def admin_site_log_delete(log_id):
-    if not authed() or not is_admin_user(): return ("Forbidden", 403)
-    c = conn()
-    c.execute("delete from log_comments where log_id=?", (log_id,))
-    c.execute("delete from site_log where id=?", (log_id,))
-    c.commit(); c.close()
-    return redirect_dashboard_from_form(request.form)
-
-
-@app.post("/admin/site-log/status/<int:log_id>")
-def admin_site_log_status(log_id):
-    if not authed() or not is_admin_user(): return ("Forbidden", 403)
-    status = (request.form.get("status", "New") or "New").strip()
-    c = conn()
-    c.execute("update site_log set status=? where id=?", (status, log_id))
-    c.commit(); c.close()
-    return redirect_dashboard_from_form(request.form)
-
-
-@app.post("/admin/site-log/comment/add/<int:log_id>")
-def admin_log_comment_add(log_id):
-    if not authed() or not is_admin_user(): return ("Forbidden", 403)
-    comment = (request.form.get("comment", "") or "").strip()
-    if comment:
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        c = conn()
-        c.execute("insert into log_comments(log_id,comment,created_at) values(?,?,?)", (log_id, comment, now))
-        c.commit(); c.close()
-    return redirect_dashboard_from_form(request.form)
-
-
-@app.post("/admin/site-log/comment/delete/<int:comment_id>")
-def admin_log_comment_delete(comment_id):
-    if not authed() or not is_admin_user(): return ("Forbidden", 403)
-    c = conn()
-    c.execute("delete from log_comments where id=?", (comment_id,))
     c.commit(); c.close()
     return redirect_dashboard_from_form(request.form)
 
