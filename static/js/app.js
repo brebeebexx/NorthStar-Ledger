@@ -579,28 +579,28 @@ function renderPlanner() {
     const isLast     = idx === sorted.length - 1;
 
     // Merge bills + reconcile adjustments into one date-ordered list
-    // Bills: sort key = due_date (unpaid) or paid_date (paid). Adjustments: sort key = adjustment_date.
+    // Sort groups: 0 = paid (top), 1 = pending (middle), 2 = postponed (bottom)
     const entries = [
       ...bills.map(b => ({
-        type:     'bill',
-        data:     b,
-        sortDate: b.is_paid
+        type:      'bill',
+        data:      b,
+        sortDate:  b.is_paid
           ? (b.paid_date || b.due_date || '9999-12-31')
           : (b.due_date  || b.planned_pay_date || '9999-12-31'),
-        isPending: !b.is_paid && !b.is_postponed,
+        sortGroup: b.is_paid ? 0 : b.is_postponed ? 2 : 1,
       })),
       ...adjs.map(a => ({
-        type:     'adj',
-        data:     a,
-        sortDate: a.adjustment_date || '9999-12-31',
-        isPending: true,  // reconcile entries sort alongside unpaid bills by date
+        type:      'adj',
+        data:      a,
+        sortDate:  a.adjustment_date || '9999-12-31',
+        sortGroup: 1,  // reconcile entries sort alongside pending bills
       })),
     ];
 
-    // Group 1: unpaid bills + reconcile adjustments, sorted by date.
-    // Group 2: paid bills, sorted by date (shown at bottom).
+    // Sort: paid first (group 0), then pending (group 1), postponed last (group 2).
+    // Within each group, sort by date ascending.
     entries.sort((a, b) => {
-      if (a.isPending !== b.isPending) return a.isPending ? -1 : 1;
+      if (a.sortGroup !== b.sortGroup) return a.sortGroup - b.sortGroup;
       return a.sortDate.localeCompare(b.sortDate);
     });
 
@@ -2467,9 +2467,24 @@ async function addBill() {
 }
 
 async function togglePay(id) {
-  const data = await api('POST', `/api/bills/${id}/pay`, {});
   const bill = state.bills.find(b => b.id === id);
-  if (bill) { bill.is_paid = data.is_paid; bill.is_postponed = 0; bill.paid_date = data.paid_date || null; }
+  let newPaycheckId = bill ? bill.paycheck_id : null;
+
+  if (bill && !bill.is_paid) {
+    // Marking as paid → reassign to the paycheck that covers today (paid date)
+    newPaycheckId = autoAssignPaycheck(state.today) || bill.paycheck_id;
+  } else if (bill && bill.is_paid) {
+    // Unmarking → reassign back based on planned_pay_date or due_date
+    newPaycheckId = autoAssignPaycheck(bill.planned_pay_date || bill.due_date) || bill.paycheck_id;
+  }
+
+  const data = await api('POST', `/api/bills/${id}/pay`, { paycheck_id: newPaycheckId });
+  if (bill) {
+    bill.is_paid     = data.is_paid;
+    bill.is_postponed = 0;
+    bill.paid_date   = data.paid_date || null;
+    bill.paycheck_id = data.paycheck_id;
+  }
   renderPlanner();
   renderDashboard();
 }
@@ -2486,9 +2501,11 @@ async function saveEditPaidDate() {
   const id      = parseInt(document.getElementById('edit-paid-date-bill-id').value);
   const newDate = document.getElementById('edit-paid-date-value').value;
   if (!newDate) return;
-  const data = await api('POST', `/api/bills/${id}/paid-date`, { paid_date: newDate });
+  // Reassign to the paycheck that covers the new paid date
+  const newPaycheckId = autoAssignPaycheck(newDate);
+  const data = await api('POST', `/api/bills/${id}/paid-date`, { paid_date: newDate, paycheck_id: newPaycheckId });
   const bill = state.bills.find(b => b.id === id);
-  if (bill) bill.paid_date = data.paid_date;
+  if (bill) { bill.paid_date = data.paid_date; bill.paycheck_id = data.paycheck_id; }
   closeModal('modal-edit-paid-date');
   renderPlanner();
   renderDashboard();
