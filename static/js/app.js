@@ -12,13 +12,16 @@ let state = {
   billNames:          [...APP_DATA.billNames],
   stickyNotes:        [...APP_DATA.stickyNotes],
   balanceAdjustments: [...(APP_DATA.balanceAdjustments || [])],
+  snapshots:          [...(APP_DATA.snapshots || [])],
   today:              APP_DATA.today,
 };
 
-let calYear     = new Date().getFullYear();
-let calMonth    = new Date().getMonth(); // 0-indexed
-let plannerYear = new Date().getFullYear();
-let plannerMonth= new Date().getMonth(); // 0-indexed
+// Single shared month for all tabs (planner, dashboard, debt, savings, subs, calendar)
+let plannerYear  = new Date().getFullYear();
+let plannerMonth = new Date().getMonth(); // 0-indexed
+// calYear/calMonth are now aliases so calendar uses the same state
+Object.defineProperty(window, 'calYear',  { get: () => plannerYear,  set: v => { plannerYear  = v; } });
+Object.defineProperty(window, 'calMonth', { get: () => plannerMonth, set: v => { plannerMonth = v; } });
 
 // ─── Init ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -40,7 +43,47 @@ document.addEventListener('DOMContentLoaded', () => {
   // Populate dropdowns on load
   populatePaycheckDropdowns();
   populateSavingsGoalDropdowns();
+
+  // Auto-snapshot: silently record this month's debt + savings if not yet snapped
+  autoSnapshot();
 });
+
+// ── Snapshot helpers ──────────────────────────────────────────────────────────
+function calcSnapshotTotals() {
+  const totalDebt    = state.debtAccounts
+    .filter(d => (d.status || 'balance') === 'balance')
+    .reduce((s, d) => s + (d.balance || 0), 0);
+  const totalSavings = state.savingsGoals
+    .reduce((s, g) => s + (g.current_amount || 0), 0);
+  return { totalDebt, totalSavings };
+}
+
+async function autoSnapshot() {
+  const month = state.today.slice(0, 7);
+  const already = state.snapshots.find(s => s.month === month);
+  if (already) return; // already snapped this month
+  await takeSnapshot(true); // silent = no alert
+}
+
+async function takeSnapshot(silent = false) {
+  const month = state.today.slice(0, 7);
+  const { totalDebt, totalSavings } = calcSnapshotTotals();
+  const data = await api('POST', '/api/snapshots', {
+    month,
+    total_debt:    totalDebt,
+    total_savings: totalSavings,
+  });
+  // Upsert into local state
+  const idx = state.snapshots.findIndex(s => s.month === month);
+  if (idx > -1) state.snapshots[idx] = data;
+  else          state.snapshots.push(data);
+  state.snapshots.sort((a, b) => a.month.localeCompare(b.month));
+  if (!silent) {
+    const tab = document.querySelector('.tab-section.active')?.id?.replace('tab-','');
+    if (tab === 'insights') renderInsights();
+    alert(`📸 Snapshot saved for ${month}!\nDebt: $${fmt(totalDebt)} · Savings: $${fmt(totalSavings)}`);
+  }
+}
 
 
 // ─── Tab Switching ────────────────────────────────────────────
@@ -54,6 +97,10 @@ function switchTab(tab) {
   const navItem = document.querySelector(`[data-tab="${tab}"]`);
   if (navItem) navItem.classList.add('active');
 
+  // Show/hide shared month nav and sync label
+  updateSharedNavVisibility(tab);
+  syncAllMonthLabels();
+
   // Update URL without reload
   const url = new URL(window.location);
   url.searchParams.set('tab', tab);
@@ -65,6 +112,7 @@ function switchTab(tab) {
   if (tab === 'savings')       renderSavings();
   if (tab === 'debt')          renderDebt();
   if (tab === 'subscriptions') renderSubscriptions();
+  if (tab === 'forecast')      renderForecast();
   if (tab === 'insights')      renderInsights();
   if (tab === 'calendar')      renderCalendar();
 
@@ -142,24 +190,25 @@ async function api(method, url, body) {
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════
 function renderDashboard() {
-  const today = new Date(state.today + 'T00:00:00');
-  const thisMonth = state.today.slice(0, 7);
+  const refDate   = viewRefDate();
+  const thisMonth = `${plannerYear}-${String(plannerMonth + 1).padStart(2, '0')}`;
+  const today     = new Date(refDate + 'T00:00:00');
 
-  // Find current paycheck (most recent past or today)
+  // Find current paycheck (most recent on or before the reference date)
   const pastPaychecks = state.paychecks
-    .filter(p => p.date <= state.today)
+    .filter(p => p.date <= refDate)
     .sort((a, b) => b.date.localeCompare(a.date));
   const currentPaycheck = pastPaychecks[0] || null;
 
   // Stat cards
   const totalSaved = state.savingsGoals.reduce((s, g) => s + g.current_amount, 0);
 
-  // Current Month Projection: unpaid bills this month vs projected month-end balance
+  // Selected Month Projection: unpaid bills vs projected month-end balance
   const thisMonthPaychecks = state.paychecks
     .filter(p => p.date && p.date.slice(0, 7) === thisMonth)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // Unpaid bills for this month's paychecks (or due this month)
+  // Unpaid bills for selected month
   const unpaidThisMonth = state.bills.filter(b =>
     !b.is_paid && !b.is_postponed &&
     (b.due_date ? b.due_date.slice(0, 7) === thisMonth : false)
@@ -219,54 +268,89 @@ function renderDashboard() {
     `;
   }
 
-  // Upcoming bills (next 7 days)
-  const in7 = new Date(today); in7.setDate(in7.getDate() + 7);
+  // Upcoming bills — unpaid bills for the selected month, sorted by due date
   const upcoming = state.bills
-    .filter(b => !b.is_paid && !b.is_postponed && b.due_date && b.due_date <= in7.toISOString().slice(0,10))
-    .sort((a,b) => a.due_date.localeCompare(b.due_date))
-    .slice(0, 5);
+    .filter(b => {
+      if (b.is_paid || b.is_postponed || !b.due_date) return false;
+      // Match the selected month (bills can be stored by due_date or by month field)
+      const billMonth = (b.month || b.due_date.slice(0, 7));
+      return billMonth === thisMonth;
+    })
+    .sort((a, b) => a.due_date.localeCompare(b.due_date))
+    .slice(0, 8);
 
   const upEl = document.getElementById('dashboard-upcoming-bills');
   if (upEl) {
     if (upcoming.length) {
-      upEl.innerHTML = upcoming.map(b => `
-        <div style="display:flex;justify-content:space-between;padding:0.6rem 1.2rem;border-bottom:1px solid var(--border);font-size:0.875rem;">
-          <span>${b.name}</span>
-          <span style="font-weight:600;color:var(--warning);">$${fmt(b.amount)} — ${fmtDate(b.due_date)}</span>
-        </div>`).join('');
+      upEl.innerHTML = upcoming.map(b => {
+        const daysLeft = Math.ceil((new Date(b.due_date + 'T00:00:00') - today) / 86400000);
+        const dueColor = daysLeft < 0 ? 'var(--danger)' : daysLeft <= 3 ? 'var(--warning)' : 'var(--text-md)';
+        const dueLabel = daysLeft < 0 ? `${Math.abs(daysLeft)}d overdue` : daysLeft === 0 ? 'Due today' : `Due in ${daysLeft}d`;
+        return `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 1.2rem;border-bottom:1px solid var(--border);font-size:0.875rem;">
+          <span>${escHtml(b.name)}</span>
+          <span style="display:flex;gap:1rem;align-items:center;">
+            <span style="font-size:0.75rem;color:${dueColor};font-weight:600;">${dueLabel}</span>
+            <span style="font-weight:600;">$${fmt(b.amount)}</span>
+          </span>
+        </div>`;
+      }).join('');
     } else {
-      upEl.innerHTML = '<p class="empty-state">No bills due in the next 7 days.</p>';
+      upEl.innerHTML = '<p class="empty-state">No unpaid bills for this month.</p>';
     }
   }
 
-  // Savings goals summary with Needed/Month
+  // Savings goals summary with Needed/Month + Needs Attention warning
   const savEl = document.getElementById('dashboard-savings');
   if (savEl) {
     if (state.savingsGoals.length) {
-      savEl.innerHTML = state.savingsGoals.slice(0,3).map(g => {
+      const todayStr = state.today;
+      const needsAttention = state.savingsGoals.filter(g =>
+        g.target_date && g.target_date < todayStr && g.current_amount < g.target_amount
+      );
+
+      let warningBanner = '';
+      if (needsAttention.length) {
+        warningBanner = `
+          <div style="display:flex;align-items:center;gap:0.6rem;padding:0.65rem 1.2rem;background:#fffbeb;border-bottom:1px solid #fcd34d;font-size:0.8rem;color:#b45309;">
+            <span style="font-size:1rem;">⚠️</span>
+            <span><strong>${needsAttention.length} goal${needsAttention.length > 1 ? 's' : ''}</strong> past target date &mdash;
+              <button class="link-btn" style="color:#b45309;font-weight:600;" onclick="switchTab('savings')">Review →</button>
+            </span>
+          </div>`;
+      }
+
+      const goalRows = state.savingsGoals.slice(0, 3).map(g => {
         const pct = Math.min(100, Math.round((g.current_amount / g.target_amount) * 100));
         const remaining = Math.max(0, g.target_amount - g.current_amount);
+        const isAlert = g.target_date && g.target_date < todayStr && remaining > 0;
+        const isComplete = remaining <= 0;
         let neededHtml = '';
-        if (g.target_date && remaining > 0) {
-          const now = new Date();
+        if (isAlert) {
+          neededHtml = `<div style="font-size:0.73rem;color:#b45309;font-weight:600;margin-top:0.15rem;">⚠️ Target date passed — $${fmt(remaining)} remaining</div>`;
+        } else if (isComplete) {
+          neededHtml = `<div style="font-size:0.73rem;color:var(--sage-dk);font-weight:600;margin-top:0.15rem;">🎉 Goal reached!</div>`;
+        } else if (g.target_date && remaining > 0) {
           const target = new Date(g.target_date + 'T00:00:00');
-          const msLeft = target - now;
+          const msLeft = target - today;
           const monthsLeft = Math.max(1, Math.ceil(msLeft / (1000 * 60 * 60 * 24 * 30.44)));
           const perMonth = remaining / monthsLeft;
           neededHtml = `<div style="font-size:0.73rem;color:var(--sage-dk);font-weight:600;margin-top:0.15rem;">
             $${fmt(perMonth)}/mo needed &mdash; ${monthsLeft} month${monthsLeft !== 1 ? 's' : ''} left</div>`;
-        } else if (remaining <= 0) {
-          neededHtml = `<div style="font-size:0.73rem;color:var(--sage-dk);font-weight:600;margin-top:0.15rem;">🎉 Goal reached!</div>`;
         }
-        return `<div style="padding:0.7rem 1.2rem;border-bottom:1px solid var(--border);">
+        const cardBg = isAlert ? 'background:#fffbeb;' : isComplete ? 'background:#f0fdf4;' : '';
+        const barColor = isAlert ? 'background:linear-gradient(90deg,#d97706,#fbbf24);' : isComplete ? 'background:linear-gradient(90deg,#16a34a,#4ade80);' : '';
+        return `<div style="padding:0.7rem 1.2rem;border-bottom:1px solid var(--border);${cardBg}">
           <div style="display:flex;justify-content:space-between;font-size:0.82rem;font-weight:600;margin-bottom:0.3rem;">
-            <span>${g.name}</span><span>${pct}%</span>
+            <span>${escHtml(g.name)}</span><span>${pct}%</span>
           </div>
-          <div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
+          <div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${pct}%;${barColor}"></div></div>
           <div style="font-size:0.73rem;color:var(--text-lt);margin-top:0.2rem;">$${fmt(g.current_amount)} of $${fmt(g.target_amount)}</div>
           ${neededHtml}
         </div>`;
       }).join('');
+
+      savEl.innerHTML = warningBanner + goalRows;
     } else {
       savEl.innerHTML = `<p class="empty-state">No savings goals yet. <button class="link-btn" onclick="switchTab('savings')">Add one →</button></p>`;
     }
@@ -277,17 +361,70 @@ function renderDashboard() {
 // ═══════════════════════════════════════════════════════════════
 // PLANNER
 // ═══════════════════════════════════════════════════════════════
-function plannerPrevMonth() {
+// Sync the single shared month label
+function syncAllMonthLabels() {
+  const label = new Date(plannerYear, plannerMonth, 1)
+    .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const el = document.getElementById('shared-month-label');
+  if (el) el.textContent = label;
+}
+
+// Tabs that show the shared month nav bar
+const MONTH_NAV_TABS = new Set(['dashboard','planner','savings','debt','subscriptions','calendar']);
+// Forecast uses its own horizon controls — no shared month nav needed
+
+function updateSharedNavVisibility(tab) {
+  const bar = document.getElementById('shared-month-nav-bar');
+  if (!bar) return;
+  bar.style.display = MONTH_NAV_TABS.has(tab) ? 'flex' : 'none';
+}
+
+function _reRenderActiveTab() {
+  const tab = document.querySelector('.tab-section.active')?.id?.replace('tab-', '');
+  if (tab === 'planner') {
+    renderPlanner();
+    if (document.getElementById('recurring-view')?.style.display !== 'none') renderRecurringInline();
+  } else if (tab === 'dashboard')     renderDashboard();
+  else if (tab === 'savings')         renderSavings();
+  else if (tab === 'debt')            renderDebt();
+  else if (tab === 'subscriptions')   renderSubscriptions();
+  else if (tab === 'calendar')        renderCalendar();
+}
+
+function globalPrevMonth() {
   plannerMonth--;
   if (plannerMonth < 0) { plannerMonth = 11; plannerYear--; }
-  renderPlanner();
-  if (document.getElementById('recurring-view')?.style.display !== 'none') renderRecurringInline();
+  syncAllMonthLabels();
+  _reRenderActiveTab();
 }
-function plannerNextMonth() {
+function globalNextMonth() {
   plannerMonth++;
   if (plannerMonth > 11) { plannerMonth = 0; plannerYear++; }
-  renderPlanner();
-  if (document.getElementById('recurring-view')?.style.display !== 'none') renderRecurringInline();
+  syncAllMonthLabels();
+  _reRenderActiveTab();
+}
+
+// Keep old names as aliases so nothing else breaks
+function plannerPrevMonth() { globalPrevMonth(); }
+function plannerNextMonth() { globalNextMonth(); }
+function prevMonth()        { globalPrevMonth(); }
+function nextMonth()        { globalNextMonth(); }
+
+// Reference date for the currently viewed month:
+//   current month  → today's actual date
+//   past month     → last day of that month (so overdue = unpaid by month-end)
+//   future month   → first day of that month (nothing is overdue yet)
+function viewRefDate() {
+  const todayMonth = state.today.slice(0, 7);
+  const selMonth   = `${plannerYear}-${String(plannerMonth + 1).padStart(2, '0')}`;
+  if (selMonth === todayMonth) return state.today;
+  if (selMonth < todayMonth) {
+    // Last day of selected past month
+    const d = new Date(plannerYear, plannerMonth + 1, 0);
+    return d.toISOString().slice(0, 10);
+  }
+  // First day of selected future month
+  return `${selMonth}-01`;
 }
 
 function renderPlanner() {
@@ -312,14 +449,15 @@ function renderPlanner() {
   }
 
   // ── Past Due Widget ───────────────────────────────────────────
+  const refDate = viewRefDate();
   const pastDueBills = state.bills
-    .filter(b => !b.is_paid && !b.is_postponed && b.due_date && b.due_date < state.today)
+    .filter(b => !b.is_paid && !b.is_postponed && b.due_date && b.due_date < refDate)
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
 
   let pastDueHtml = '';
   if (pastDueBills.length) {
     const rows = pastDueBills.map(b => {
-      const daysOverdue = Math.floor((new Date(state.today + 'T00:00:00') - new Date(b.due_date + 'T00:00:00')) / 86400000);
+      const daysOverdue = Math.floor((new Date(refDate + 'T00:00:00') - new Date(b.due_date + 'T00:00:00')) / 86400000);
       return `<div class="alert-widget-row">
         <span class="alert-widget-name">${escHtml(b.name)}</span>
         <span class="alert-widget-detail">due ${fmtDate(b.due_date)} &mdash; <strong>${daysOverdue}d overdue</strong></span>
@@ -336,19 +474,19 @@ function renderPlanner() {
     </div>`;
   }
 
-  // ── Promotions Ending Widget (within 60 days) ─────────────────
-  const sixtyDaysOut = new Date(state.today + 'T00:00:00');
+  // ── Promotions Ending Widget (within 60 days of view reference) ──
+  const sixtyDaysOut = new Date(refDate + 'T00:00:00');
   sixtyDaysOut.setDate(sixtyDaysOut.getDate() + 60);
   const sixtyStr = sixtyDaysOut.toISOString().slice(0, 10);
 
   const promoAccounts = state.debtAccounts
-    .filter(d => d.is_promo && d.promo_end_date && d.promo_end_date >= state.today && d.promo_end_date <= sixtyStr)
+    .filter(d => d.is_promo && d.promo_end_date && d.promo_end_date >= refDate && d.promo_end_date <= sixtyStr)
     .sort((a, b) => a.promo_end_date.localeCompare(b.promo_end_date));
 
   let promoHtml = '';
   if (promoAccounts.length) {
     const rows = promoAccounts.map(d => {
-      const daysLeft = Math.ceil((new Date(d.promo_end_date + 'T00:00:00') - new Date(state.today + 'T00:00:00')) / 86400000);
+      const daysLeft = Math.ceil((new Date(d.promo_end_date + 'T00:00:00') - new Date(refDate + 'T00:00:00')) / 86400000);
       return `<div class="alert-widget-row">
         <span class="alert-widget-name">${escHtml(d.name)}</span>
         <span class="alert-widget-detail">ends ${fmtDate(d.promo_end_date)} &mdash; <strong>${daysLeft}d left</strong></span>
@@ -455,7 +593,8 @@ function renderPlanner() {
     <div class="bucket ${isCurrent ? 'current' : ''} ${isNeg ? 'negative' : ''}" id="bucket-${p.id}">
       <div class="bucket-header" onclick="toggleBucket(${p.id})">
         <div class="bucket-title">
-          💵 ${fmtDate(p.date)}
+          ${p.income_type === 'bonus' ? '🎁' : '💵'} ${fmtDate(p.date)}
+          ${p.income_type === 'bonus' ? '<span class="badge-bonus">BONUS</span>' : ''}
           ${isCurrent ? '<span class="badge-current">CURRENT</span>' : ''}
           ${isNeg ? '<span class="badge-warning">⚠️ Negative</span>' : ''}
         </div>
@@ -504,6 +643,101 @@ function renderPlanner() {
       </div>
     </div>`;
   }
+
+}
+
+// ── Import Recurring Bills for current planner month ─────────────────────────
+function openImportRecurring() {
+  const monthStr   = `${plannerYear}-${String(plannerMonth + 1).padStart(2,'0')}`;
+  const monthLabel = new Date(plannerYear, plannerMonth, 1)
+    .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const dueThisMonth = state.subscriptions
+    .map(s => ({ sub: s, dueDate: subDueInMonth(s, plannerYear, plannerMonth) }))
+    .filter(x => x.dueDate !== null)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+
+  // Skip ones already imported this month (match by name)
+  const existingNames = new Set(
+    state.bills
+      .filter(b => b.due_date && b.due_date.slice(0,7) === monthStr)
+      .map(b => b.name.toLowerCase().trim())
+  );
+  const toAdd = dueThisMonth.filter(x => !existingNames.has(x.sub.name.toLowerCase().trim()));
+
+  const el  = document.getElementById('import-recurring-body');
+  const btn = document.getElementById('import-recurring-confirm');
+  if (!el || !btn) return;
+
+  if (!dueThisMonth.length) {
+    el.innerHTML = `<p style="color:var(--text-lt);padding:0.5rem 0;">No subscriptions are due in ${monthLabel}.</p>`;
+    btn.style.display = 'none';
+  } else if (!toAdd.length) {
+    el.innerHTML = `<p style="color:var(--sage-dk);padding:0.5rem 0;">✅ All subscriptions due in ${monthLabel} have already been added.</p>`;
+    btn.style.display = 'none';
+  } else {
+    const total = toAdd.reduce((s, x) => s + x.sub.amount, 0);
+    el.innerHTML = `
+      <p style="font-size:0.85rem;color:var(--text-lt);margin:0 0 0.75rem;">
+        These will be added as <strong>unassigned bills</strong> for <strong>${monthLabel}</strong>. You can then assign them to a paycheck as normal.
+      </p>
+      <table style="width:100%;font-size:0.85rem;border-collapse:collapse;">
+        <thead><tr style="border-bottom:2px solid var(--border);">
+          <th style="text-align:left;padding:0.4rem 0.5rem;">Name</th>
+          <th style="text-align:left;padding:0.4rem 0.5rem;">Due Date</th>
+          <th style="text-align:right;padding:0.4rem 0.5rem;">Amount</th>
+        </tr></thead>
+        <tbody>${toAdd.map(x => `
+          <tr style="border-bottom:1px solid var(--border);">
+            <td style="padding:0.4rem 0.5rem;">🔁 ${escHtml(x.sub.name)}</td>
+            <td style="padding:0.4rem 0.5rem;">${fmtDate(x.dueDate)}</td>
+            <td style="padding:0.4rem 0.5rem;text-align:right;">$${fmt(x.sub.amount)}</td>
+          </tr>`).join('')}
+        </tbody>
+        <tfoot><tr style="border-top:2px solid var(--border);">
+          <td colspan="2" style="padding:0.5rem 0.5rem;font-weight:700;">Total</td>
+          <td style="padding:0.5rem 0.5rem;text-align:right;font-weight:700;color:var(--danger);">-$${fmt(total)}</td>
+        </tr></tfoot>
+      </table>`;
+    btn.style.display = '';
+    btn.onclick = () => confirmImportRecurring(toAdd);
+  }
+  openModal('modal-import-recurring');
+}
+
+async function confirmImportRecurring(toAdd) {
+  const monthStr = `${plannerYear}-${String(plannerMonth + 1).padStart(2,'0')}`;
+
+  // Paychecks for this month, sorted oldest → newest
+  const monthChecks = [...state.paychecks]
+    .filter(p => p.date && p.date.slice(0,7) === monthStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  for (const { sub, dueDate } of toAdd) {
+    // Auto-assign: find the most recent paycheck on or before the due date.
+    // If none exists before due date, use the first paycheck of the month.
+    let assigned = null;
+    if (monthChecks.length) {
+      const before = monthChecks.filter(p => p.date <= dueDate);
+      assigned = before.length ? before[before.length - 1] : monthChecks[0];
+    }
+
+    const data = await api('POST', '/api/bills', {
+      name:         sub.name,
+      amount:       sub.amount,
+      due_date:     dueDate,
+      month:        monthStr,
+      paycheck_id:  assigned ? assigned.id : null,
+      is_recurring: 1,
+      category:     'subscription',
+      notes:        'Auto-imported from Subscriptions',
+    });
+    state.bills.push(data);
+  }
+  closeModal('modal-import-recurring');
+  populatePaycheckDropdowns();
+  renderPlanner();
+  renderDashboard();
 }
 
 // billRowHtml now accepts an optional runningBal to show per-row balance
@@ -601,13 +835,43 @@ function renderSavings() {
     return;
   }
 
-  container.className = 'savings-grid';
-  container.innerHTML = state.savingsGoals.map(g => {
-    const pct = Math.min(100, Math.round((g.current_amount / g.target_amount) * 100));
+  const today = state.today;
+
+  // Classify each goal
+  const complete      = state.savingsGoals.filter(g => g.current_amount >= g.target_amount);
+  const needsAttention= state.savingsGoals.filter(g =>
+    g.current_amount < g.target_amount && g.target_date && g.target_date < today
+  );
+  const inProgress    = state.savingsGoals.filter(g =>
+    g.current_amount < g.target_amount && (!g.target_date || g.target_date >= today)
+  );
+
+  function goalCard(g, status) {
+    const pct        = Math.min(100, Math.round((g.current_amount / g.target_amount) * 100));
+    const remaining  = Math.max(0, g.target_amount - g.current_amount);
+    const isComplete = status === 'complete';
+    const isAlert    = status === 'attention';
+
+    let dateHtml = '';
+    if (g.target_date) {
+      if (isAlert) {
+        dateHtml = `<div class="goal-date goal-date-overdue">⚠️ Target was ${fmtDate(g.target_date)} — please update</div>`;
+      } else if (isComplete) {
+        dateHtml = `<div class="goal-date">🗓 Target was ${fmtDate(g.target_date)}</div>`;
+      } else {
+        const msLeft     = new Date(g.target_date + 'T00:00:00') - new Date(today + 'T00:00:00');
+        const monthsLeft = Math.max(1, Math.ceil(msLeft / (1000 * 60 * 60 * 24 * 30.44)));
+        const perMonth   = remaining / monthsLeft;
+        dateHtml = `<div class="goal-date">🗓 Target: ${fmtDate(g.target_date)} &mdash; <strong>$${fmt(perMonth)}/mo needed</strong></div>`;
+      }
+    }
+
+    const barColor = isAlert ? '#e85d5d' : isComplete ? 'var(--brand)' : 'var(--sage-dk)';
+
     return `
-    <div class="goal-card">
+    <div class="goal-card ${isAlert ? 'goal-card-alert' : isComplete ? 'goal-card-complete' : ''}">
       <div class="goal-card-header">
-        <div class="goal-card-name">🎯 ${g.name}</div>
+        <div class="goal-card-name">${isComplete ? '✅' : isAlert ? '⚠️' : '🎯'} ${escHtml(g.name)}</div>
         <div class="goal-card-actions">
           <button onclick="editGoal(${g.id})" title="Edit">✏️</button>
           <button onclick="deleteGoal(${g.id})" title="Delete">🗑️</button>
@@ -617,11 +881,26 @@ function renderSavings() {
         <span>Saved: <strong>$${fmt(g.current_amount)}</strong></span>
         <span>Goal: <strong>$${fmt(g.target_amount)}</strong></span>
       </div>
-      <div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${pct}%"></div></div>
+      <div class="goal-bar-bg"><div class="goal-bar-fill" style="width:${pct}%;background:${barColor};"></div></div>
       <div class="goal-pct">${pct}% complete</div>
-      ${g.target_date ? `<div class="goal-date">🗓 Target: ${fmtDate(g.target_date)}</div>` : ''}
+      ${dateHtml}
     </div>`;
-  }).join('');
+  }
+
+  function section(title, goals, status, extraClass = '') {
+    if (!goals.length) return '';
+    return `
+    <div class="savings-section ${extraClass}">
+      <div class="savings-section-header">${title}</div>
+      <div class="savings-grid">${goals.map(g => goalCard(g, status)).join('')}</div>
+    </div>`;
+  }
+
+  container.className = ''; // reset — sections handle their own grid
+  container.innerHTML =
+    section('🎯 In Progress', inProgress, 'active') +
+    section('⚠️ Needs Attention — Target Date Passed', needsAttention, 'attention', 'savings-section-alert') +
+    section('✅ Complete', complete, 'complete', 'savings-section-complete');
 }
 
 
@@ -916,37 +1195,21 @@ function renderSubscriptions() {
     return;
   }
 
+  // Sort by next due date (nulls last), then name
+  const sorted = [...state.subscriptions].sort((a, b) => {
+    if (!a.next_due_date && !b.next_due_date) return a.name.localeCompare(b.name);
+    if (!a.next_due_date) return 1;
+    if (!b.next_due_date) return -1;
+    return a.next_due_date.localeCompare(b.next_due_date) || a.name.localeCompare(b.name);
+  });
+
   const monthly = calcMonthlySubTotal();
   const annual  = monthly * 12;
 
-  const toMonthly = s => {
-    if (s.interval_unit === 'month') return s.amount * s.interval_count;
-    if (s.interval_unit === 'year')  return (s.amount * s.interval_count) / 12;
-    if (s.interval_unit === 'week')  return (s.amount * s.interval_count * 52) / 12;
-    return s.amount;
-  };
+  const toMonthly = s => subToMonthly(s);
 
-  const rows = state.subscriptions.map(s => {
+  const rows = sorted.map(s => {
     const mo = toMonthly(s);
-    if (_subEditId === s.id) {
-      return `<tr id="sub-row-${s.id}">
-        <td><input class="dt-input" id="sedit-name" value="${escHtml(s.name)}" style="width:140px;"></td>
-        <td><input class="dt-input" id="sedit-amount" type="number" value="${s.amount}" style="width:80px;"></td>
-        <td>
-          <select class="dt-input" id="sedit-unit" style="width:90px;">
-            <option value="month" ${s.interval_unit==='month'?'selected':''}>Monthly</option>
-            <option value="year"  ${s.interval_unit==='year' ?'selected':''}>Yearly</option>
-            <option value="week"  ${s.interval_unit==='week' ?'selected':''}>Weekly</option>
-          </select>
-        </td>
-        <td><input class="dt-input" id="sedit-due" type="date" value="${s.next_due_date||''}" style="width:130px;"></td>
-        <td>$${fmt(mo)}/mo</td>
-        <td class="dt-actions">
-          <button class="bill-btn edit" onclick="saveSubEdit(${s.id})">Save</button>
-          <button class="bill-btn" onclick="cancelSubEdit()">Cancel</button>
-        </td>
-      </tr>`;
-    }
     return `<tr id="sub-row-${s.id}">
       <td><strong>${escHtml(s.name)}</strong></td>
       <td>$${fmt(s.amount)}</td>
@@ -954,7 +1217,7 @@ function renderSubscriptions() {
       <td>${s.next_due_date ? fmtDate(s.next_due_date) : '<span class="dt-empty">—</span>'}</td>
       <td>$${fmt(mo)}/mo</td>
       <td class="dt-actions">
-        <button class="bill-btn edit" onclick="startSubEdit(${s.id})">Edit</button>
+        <button class="bill-btn edit" onclick="openSubEditModal(${s.id})">Edit</button>
         <button class="bill-btn" style="border-color:var(--danger);color:var(--danger);" onclick="deleteSub(${s.id})">Delete</button>
       </td>
     </tr>`;
@@ -985,20 +1248,700 @@ function renderSubscriptions() {
     </div>`;
 }
 
+// ── Subscription due-date helper ──────────────────────────────────────────────
+// Returns the due date string (YYYY-MM-DD) if sub falls in targetYear/targetMonth, else null.
+function subDueInMonth(sub, targetYear, targetMonth) {
+  if (!sub.next_due_date) return null;
+  const next = new Date(sub.next_due_date + 'T00:00:00');
+  const n    = sub.interval_count || 1;
+  const unit = sub.interval_unit  || 'month';
+  const ny   = next.getFullYear();
+  const nm   = next.getMonth(); // 0-indexed
+
+  if (unit === 'month' || unit === 'year') {
+    const cycleMonths = unit === 'year' ? n * 12 : n;
+    const offset = (targetYear - ny) * 12 + (targetMonth - nm);
+    if (offset % cycleMonths !== 0) return null;
+    // Clamp day to end of target month
+    const maxDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+    const day    = Math.min(next.getDate(), maxDay);
+    return `${targetYear}-${String(targetMonth + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  }
+
+  if (unit === 'week') {
+    const daysPerCycle = n * 7;
+    const targetFirst  = new Date(targetYear, targetMonth, 1);
+    const targetLast   = new Date(targetYear, targetMonth + 1, 0);
+    const daysToFirst  = Math.round((targetFirst - next) / 86400000);
+    // Find k such that next + k*cycle lands in target month
+    const kBase = daysToFirst >= 0
+      ? Math.ceil(daysToFirst / daysPerCycle)
+      : -Math.ceil(Math.abs(daysToFirst) / daysPerCycle);
+    for (const k of [kBase - 1, kBase, kBase + 1]) {
+      const d = new Date(next.getTime() + k * daysPerCycle * 86400000);
+      if (d >= targetFirst && d <= targetLast) return d.toISOString().slice(0, 10);
+    }
+    return null;
+  }
+  return null;
+}
+
+// Shared helper — converts any subscription to its monthly cost equivalent
+function subToMonthly(s) {
+  const n = s.interval_count || 1;
+  if (s.interval_unit === 'month') return s.amount / n;
+  if (s.interval_unit === 'year')  return s.amount / (n * 12);
+  if (s.interval_unit === 'week')  return (s.amount * 52) / (n * 12);
+  return s.amount;
+}
+
 function calcMonthlySubTotal() {
-  return state.subscriptions.reduce((sum, s) => {
-    if (s.interval_unit === 'month') return sum + s.amount * s.interval_count;
-    if (s.interval_unit === 'year')  return sum + (s.amount * s.interval_count) / 12;
-    if (s.interval_unit === 'week')  return sum + (s.amount * 52) / 12;
-    return sum + s.amount;
-  }, 0);
+  return state.subscriptions.reduce((sum, s) => sum + subToMonthly(s), 0);
 }
 
 function cycleLabel(s) {
-  if (s.interval_unit === 'month' && s.interval_count === 1) return 'Monthly';
-  if (s.interval_unit === 'year'  && s.interval_count === 1) return 'Yearly';
-  if (s.interval_unit === 'week'  && s.interval_count === 1) return 'Weekly';
-  return `Every ${s.interval_count} ${s.interval_unit}${s.interval_count !== 1 ? 's' : ''}`;
+  const n = s.interval_count || 1;
+  if (n === 1 && s.interval_unit === 'week')  return 'Weekly';
+  if (n === 2 && s.interval_unit === 'week')  return 'Biweekly';
+  if (n === 1 && s.interval_unit === 'month') return 'Monthly';
+  if (n === 3 && s.interval_unit === 'month') return 'Quarterly';
+  if (n === 6 && s.interval_unit === 'month') return 'Every 6 Months';
+  if (n === 1 && s.interval_unit === 'year')  return 'Yearly';
+  return `Every ${n} ${s.interval_unit}${n !== 1 ? 's' : ''}`;
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// FORECAST
+// ═══════════════════════════════════════════════════════════════
+let _fcHorizon   = 6;          // months to project
+let _fcPurchases = [];         // [{id, name, amount, month}]  (month = 'YYYY-MM')
+let _fcCharts    = {};         // Chart.js instances keyed by canvas id
+
+function setForecastHorizon(n) {
+  _fcHorizon = n;
+  document.querySelectorAll('.fc-chip').forEach(c => c.classList.toggle('active', +c.dataset.months === n));
+  renderForecast();
+}
+
+function resetForecastOverrides() {
+  document.getElementById('fc-start-balance').value    = '';
+  document.getElementById('fc-income-override').value  = '';
+  document.getElementById('fc-expense-override').value = '';
+  renderForecast();
+}
+
+// ── Smart data detection ──────────────────────────────────────────────────────
+
+function fcDetectMonthlyIncome() {
+  // Average the last 3 months of PAYCHECK income only (exclude bonus/extra)
+  const byMonth = {};
+  state.paychecks.forEach(p => {
+    if (!p.date) return;
+    if (p.income_type === 'bonus') return;   // exclude Extra/Bonus from forecast
+    const mo = p.date.slice(0, 7);
+    byMonth[mo] = (byMonth[mo] || 0) + p.amount;
+  });
+  const sorted = Object.entries(byMonth).sort((a,b) => b[0].localeCompare(a[0]));
+  if (!sorted.length) return 0;
+  const sample = sorted.slice(0, Math.min(3, sorted.length)).map(([,v]) => v);
+  return sample.reduce((s,v) => s + v, 0) / sample.length;
+}
+
+function fcDetectMonthlyExpenses() {
+  // Average the last 3 months of bill totals (by due_date month) + monthly subscription cost
+  const byMonth = {};
+  state.bills.forEach(b => {
+    if (!b.due_date) return;
+    const mo = b.due_date.slice(0, 7);
+    byMonth[mo] = (byMonth[mo] || 0) + b.amount;
+  });
+  const sorted = Object.entries(byMonth).sort((a,b) => b[0].localeCompare(a[0]));
+  const billsAvg = sorted.length
+    ? sorted.slice(0, Math.min(3, sorted.length)).map(([,v]) => v).reduce((s,v) => s+v, 0)
+      / Math.min(3, sorted.length)
+    : 0;
+  return billsAvg + calcMonthlySubTotal();
+}
+
+function fcDetectStartBalance() {
+  // Best estimate = this month's projected net (income - ALL bills, paid or not)
+  // This is exactly what the planner calculates as "month-end balance."
+  // It represents roughly what you'll have at the end of the current month.
+  const today   = state.today;
+  const mo      = today.slice(0, 7);
+  const income  = state.paychecks
+    .filter(p => p.date && p.date.slice(0,7) === mo && p.income_type !== 'bonus')
+    .reduce((s,p) => s + p.amount, 0);
+  const expenses = state.bills
+    .filter(b => b.due_date && b.due_date.slice(0,7) === mo && !b.is_postponed)
+    .reduce((s,b) => s + b.amount, 0);
+  return income - expenses;  // can be negative — that's useful info
+}
+
+// ── Planned purchases helpers ─────────────────────────────────────────────────
+function addFcPurchase() {
+  const today = new Date(state.today + 'T00:00:00');
+  const next  = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+  const mo    = `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}`;
+  const id    = Date.now();
+  _fcPurchases.push({ id, name: '', amount: 0, month: mo, type: 'lump' });
+  renderForecast();
+}
+function removeFcPurchase(id) {
+  _fcPurchases = _fcPurchases.filter(p => p.id !== id);
+  renderForecast();
+}
+function setFcPurchaseType(id, type) {
+  const p = _fcPurchases.find(x => x.id === id);
+  if (p) p.type = type;
+  renderForecast();
+}
+function updateFcPurchase(id, field, value) {
+  const p = _fcPurchases.find(x => x.id === id);
+  if (!p) return;
+  p[field] = field === 'amount' ? parseFloat(value) || 0 : value;
+  // Auto-recalculate on month change (definitive picker action); name/amount needs Calculate btn
+  if (field === 'month') renderForecast();
+}
+
+function renderFcPurchases(ctx) {
+  // ctx = { monthlyIncome, monthlyExpenses, startBalance }
+  const el = document.getElementById('fc-purchases-list');
+  if (!el) return;
+
+  if (!_fcPurchases.length) {
+    el.innerHTML = `<p style="color:var(--text-lt);font-size:0.83rem;padding:0.4rem 0;">No purchases added yet. Hit <strong>+ Add</strong> to plan a big expense or a new financed payment.</p>`;
+    return;
+  }
+
+  const todayDate = new Date(state.today + 'T00:00:00');
+
+  el.innerHTML = _fcPurchases.map(p => {
+    const isFinanced = p.type === 'financed';
+
+    // ── Analysis block ──────────────────────────────────────────
+    let analysisHtml = '';
+    if (ctx && p.amount > 0) {
+      if (isFinanced) {
+        // How does this monthly payment change the budget?
+        const newMonthlyExp = ctx.monthlyExpenses + p.amount;
+        const newNet        = ctx.monthlyIncome - newMonthlyExp;
+        const ratio         = ctx.monthlyIncome > 0 ? newNet / ctx.monthlyIncome : -1;
+        let sColor, sIcon, sLabel;
+        if (ratio >= 0.20)      { sColor = 'var(--sage-dk)'; sIcon = '✅'; sLabel = 'Manageable'; }
+        else if (ratio >= 0.05) { sColor = '#b45309';        sIcon = '⚠️'; sLabel = 'Tight'; }
+        else                    { sColor = 'var(--danger)';  sIcon = '❌'; sLabel = 'Risky'; }
+        const startLabel = p.month
+          ? p.month.slice(5,7) + '/' + p.month.slice(0,4)
+          : 'selected month';
+        analysisHtml = `
+          <div class="fc-purchase-analysis">
+            <div class="fc-pa-row"><span class="fc-pa-label">Monthly expenses:</span>
+              <span>$${fmt(ctx.monthlyExpenses)} → <strong>$${fmt(newMonthlyExp)}</strong> (+$${fmt(p.amount)}/mo)</span></div>
+            <div class="fc-pa-row"><span class="fc-pa-label">New monthly net:</span>
+              <span style="color:${newNet>=0?'var(--sage-dk)':'var(--danger)'}"><strong>${newNet>=0?'+':''}$${fmt(newNet)}/mo</strong></span></div>
+            <div class="fc-pa-row"><span class="fc-pa-label">Starting:</span><span>${startLabel}</span></div>
+            <div class="fc-pa-verdict" style="color:${sColor}">${sIcon} ${sLabel}</div>
+          </div>`;
+      } else {
+        // Lump sum — project balance up to target month
+        if (p.month) {
+          const purchaseDate  = new Date(p.month + '-02');
+          const monthsUntil   = Math.max(0,
+            (purchaseDate.getFullYear() - todayDate.getFullYear()) * 12
+            + (purchaseDate.getMonth()  - todayDate.getMonth()));
+
+          // Walk the forecast to that month (same logic as renderForecast loop)
+          let proj = ctx.startBalance;
+          for (let i = 1; i <= Math.max(monthsUntil, 1); i++) {
+            const d  = new Date(todayDate.getFullYear(), todayDate.getMonth() + i, 1);
+            const mo = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+            const otherLumps    = _fcPurchases.filter(op => op.id !== p.id && op.type !== 'financed' && op.month === mo).reduce((s,op) => s+(op.amount||0), 0);
+            const financedTotal = _fcPurchases.filter(op => op.type === 'financed' && op.month && op.month <= mo).reduce((s,op) => s+(op.amount||0), 0);
+            proj += ctx.monthlyIncome - ctx.monthlyExpenses - otherLumps - financedTotal;
+          }
+
+          const balBefore = proj;
+          const balAfter  = proj - p.amount;
+          const gap       = Math.max(0, p.amount - balBefore);
+          const savePerMo = monthsUntil > 0 ? gap / monthsUntil : gap;
+
+          let sColor, sIcon, sLabel;
+          if (balAfter >= 0)                    { sColor = 'var(--sage-dk)'; sIcon = '✅'; sLabel = 'On track — you\'ll have enough'; }
+          else if (balBefore >= p.amount * 0.7) { sColor = '#b45309';        sIcon = '⚠️'; sLabel = 'Tight — close but may fall short'; }
+          else                                  { sColor = 'var(--danger)';  sIcon = '❌'; sLabel = `Short by $${fmt(Math.abs(balAfter))}`; }
+
+          const moLabel = p.month.slice(5,7) + '/' + p.month.slice(0,4);
+          analysisHtml = `
+            <div class="fc-purchase-analysis">
+              ${monthsUntil > 0 ? `<div class="fc-pa-row"><span class="fc-pa-label">Time until purchase:</span><span>${monthsUntil} month${monthsUntil!==1?'s':''} (${moLabel})</span></div>` : `<div class="fc-pa-row"><span class="fc-pa-label">Month:</span><span>${moLabel}</span></div>`}
+              <div class="fc-pa-row"><span class="fc-pa-label">Projected balance before:</span><span style="color:${balBefore>=0?'var(--sage-dk)':'var(--danger)'}"><strong>$${fmt(balBefore)}</strong></span></div>
+              <div class="fc-pa-row"><span class="fc-pa-label">Balance after purchase:</span><span style="color:${balAfter>=0?'var(--sage-dk)':'var(--danger)'}"><strong>$${fmt(balAfter)}</strong></span></div>
+              ${savePerMo > 0 ? `<div class="fc-pa-row"><span class="fc-pa-label">💡 Save to close gap:</span><span><strong>$${fmt(savePerMo)}/mo</strong> for ${monthsUntil} months</span></div>` : ''}
+              <div class="fc-pa-verdict" style="color:${sColor}">${sIcon} ${sLabel}</div>
+            </div>`;
+        } else {
+          analysisHtml = `<div class="fc-purchase-analysis"><span style="color:var(--text-lt);font-size:0.82rem;">Pick a month to see impact analysis.</span></div>`;
+        }
+      }
+    } else if (p.amount <= 0) {
+      analysisHtml = `<div class="fc-purchase-analysis"><span style="color:var(--text-lt);font-size:0.82rem;">Enter an amount to see the analysis.</span></div>`;
+    }
+
+    const amountLabel = isFinanced ? 'Monthly Payment ($)' : 'Total Cost ($)';
+    const monthLabel  = isFinanced ? 'Start Month'         : 'Target Month';
+
+    return `
+    <div class="fc-purchase-card">
+      <div class="fc-purchase-card-top">
+        <input class="fc-purchase-input fc-purchase-name" placeholder="e.g. Tesla, Vacation, New Laptop…"
+          value="${escHtml(p.name)}" oninput="updateFcPurchase(${p.id},'name',this.value)"/>
+        <button onclick="removeFcPurchase(${p.id})" class="fc-purchase-remove" title="Remove">✕</button>
+      </div>
+      <div class="fc-purchase-type-toggle">
+        <button class="fc-type-btn${!isFinanced?' fc-type-active':''}" onclick="setFcPurchaseType(${p.id},'lump')">💰 One-Time</button>
+        <button class="fc-type-btn${isFinanced?' fc-type-active':''}" onclick="setFcPurchaseType(${p.id},'financed')">📅 Financed</button>
+      </div>
+      <div class="fc-purchase-fields">
+        <div class="fc-purchase-field">
+          <label class="fc-purchase-field-label">${amountLabel}</label>
+          <input class="fc-purchase-input" type="number" placeholder="0.00" value="${p.amount||''}"
+            oninput="updateFcPurchase(${p.id},'amount',this.value)"/>
+        </div>
+        <div class="fc-purchase-field">
+          <label class="fc-purchase-field-label">${monthLabel}</label>
+          <input class="fc-purchase-input" type="month" value="${p.month}"
+            onchange="updateFcPurchase(${p.id},'month',this.value)"/>
+        </div>
+      </div>
+      ${analysisHtml}
+    </div>`;
+  }).join('');
+}
+
+// ── Main render ───────────────────────────────────────────────────────────────
+function renderForecast() {
+  // ── Resolve inputs ──────────────────────────────────────────────
+  const rawBalance  = parseFloat(document.getElementById('fc-start-balance')?.value);
+  const rawIncome   = parseFloat(document.getElementById('fc-income-override')?.value);
+  const rawExpenses = parseFloat(document.getElementById('fc-expense-override')?.value);
+
+  const autoIncome   = fcDetectMonthlyIncome();
+  const autoExpenses = fcDetectMonthlyExpenses();
+  const autoBalance  = fcDetectStartBalance();
+
+  const monthlyIncome   = isNaN(rawIncome)   ? autoIncome   : rawIncome;
+  const monthlyExpenses = isNaN(rawExpenses)  ? autoExpenses : rawExpenses;
+  const startBalance    = isNaN(rawBalance)   ? autoBalance  : rawBalance;
+
+  // Update override panel hint labels
+  const balHint = document.getElementById('fc-balance-hint');
+  const incHint = document.getElementById('fc-income-hint');
+  const expHint = document.getElementById('fc-expense-hint');
+  if (balHint) balHint.textContent = `Planner projects: $${fmt(autoBalance)} this month`;
+  if (incHint) incHint.textContent = `3-month avg: $${fmt(autoIncome)}/mo`;
+  if (expHint) expHint.textContent = `3-month avg + subs: $${fmt(autoExpenses)}/mo`;
+
+  // Source callout bar
+  const srcEl = document.getElementById('fc-source-bar');
+  const hasOverride = !isNaN(rawBalance) || !isNaN(rawIncome) || !isNaN(rawExpenses);
+  if (srcEl) {
+    const balLabel = isNaN(rawBalance)   ? `<strong>$${fmt(autoBalance)}</strong> <em>(from planner)</em>` : `<strong>$${fmt(rawBalance)}</strong> <em>(manual)</em>`;
+    const incLabel = isNaN(rawIncome)    ? `<strong>$${fmt(autoIncome)}/mo</strong> <em>(from paychecks)</em>` : `<strong>$${fmt(rawIncome)}/mo</strong> <em>(manual)</em>`;
+    const expLabel = isNaN(rawExpenses)  ? `<strong>$${fmt(autoExpenses)}/mo</strong> <em>(from bills + subs)</em>` : `<strong>$${fmt(rawExpenses)}/mo</strong> <em>(manual)</em>`;
+    srcEl.innerHTML = `
+      <span class="fc-src-item">🏦 Start: ${balLabel}</span>
+      <span class="fc-src-divider">·</span>
+      <span class="fc-src-item">📥 Income: ${incLabel}</span>
+      <span class="fc-src-divider">·</span>
+      <span class="fc-src-item">📤 Expenses: ${expLabel}</span>
+      ${hasOverride ? `<button class="fc-src-reset" onclick="resetForecastOverrides()">↺ Reset to auto</button>` : ''}`;
+  }
+
+  // ── Build month-by-month data ───────────────────────────────────
+  const labels   = [];
+  const balances = [];
+  const incomes  = [];
+  const expenses = [];
+  const nets     = [];
+
+  let runningBalance = startBalance;
+  const today = new Date(state.today + 'T00:00:00');
+
+  for (let i = 1; i <= _fcHorizon; i++) {
+    const d   = new Date(today.getFullYear(), today.getMonth() + i, 1);
+    const mo  = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    labels.push(d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }));
+
+    // One-time lump purchases this month
+    const lumpThisMo = _fcPurchases
+      .filter(p => p.type !== 'financed' && p.month === mo)
+      .reduce((s, p) => s + (p.amount || 0), 0);
+
+    // Financed (recurring monthly payments active from their start month)
+    const financedThisMo = _fcPurchases
+      .filter(p => p.type === 'financed' && p.month && p.month <= mo)
+      .reduce((s, p) => s + (p.amount || 0), 0);
+
+    const inc = monthlyIncome;
+    const exp = monthlyExpenses + lumpThisMo + financedThisMo;
+    const net = inc - exp;
+    runningBalance += net;
+
+    incomes.push(inc);
+    expenses.push(exp);
+    nets.push(net);
+    balances.push(runningBalance);
+  }
+
+  // ── Stat tiles ─────────────────────────────────────────────────
+  const endBalance   = balances[balances.length - 1];
+  const avgNet       = nets.reduce((s,v) => s+v, 0) / nets.length;
+  const bestMonth    = labels[nets.indexOf(Math.max(...nets))];
+  const worstMonth   = labels[nets.indexOf(Math.min(...nets))];
+  const breakEven    = nets.every(n => n >= 0) ? null : labels[nets.findIndex(n => n < 0)];
+  const totalLumpPlanned    = _fcPurchases.filter(p => p.type !== 'financed').reduce((s,p) => s+(p.amount||0), 0);
+  const totalFinancedPerMo  = _fcPurchases.filter(p => p.type === 'financed').reduce((s,p) => s+(p.amount||0), 0);
+
+  const statsEl = document.getElementById('fc-stats');
+  if (statsEl) {
+    const endColor = endBalance >= 0 ? 'var(--sage-dk)' : 'var(--danger)';
+    const netColor = avgNet    >= 0 ? 'var(--sage-dk)' : 'var(--danger)';
+    statsEl.innerHTML = `
+      <div class="fc-stat-tile">
+        <div class="fc-stat-label">Projected Balance<br><small>(end of ${_fcHorizon} months)</small></div>
+        <div class="fc-stat-value" style="color:${endColor}">$${fmt(endBalance)}</div>
+      </div>
+      <div class="fc-stat-tile">
+        <div class="fc-stat-label">Est. Monthly Income</div>
+        <div class="fc-stat-value green">$${fmt(monthlyIncome)}<span style="font-size:0.75rem;font-weight:400;color:var(--text-lt)">/mo</span></div>
+      </div>
+      <div class="fc-stat-tile">
+        <div class="fc-stat-label">Est. Monthly Expenses</div>
+        <div class="fc-stat-value" style="color:var(--danger)">$${fmt(monthlyExpenses)}<span style="font-size:0.75rem;font-weight:400;color:var(--text-lt)">/mo</span></div>
+      </div>
+      <div class="fc-stat-tile">
+        <div class="fc-stat-label">Avg Monthly Net</div>
+        <div class="fc-stat-value" style="color:${netColor}">$${fmt(avgNet)}<span style="font-size:0.75rem;font-weight:400;color:var(--text-lt)">/mo</span></div>
+      </div>
+      ${totalLumpPlanned > 0 ? `
+      <div class="fc-stat-tile">
+        <div class="fc-stat-label">📦 One-Time Purchases</div>
+        <div class="fc-stat-value" style="color:#b45309">$${fmt(totalLumpPlanned)}</div>
+      </div>` : ''}
+      ${totalFinancedPerMo > 0 ? `
+      <div class="fc-stat-tile">
+        <div class="fc-stat-label">📅 Financed Payments</div>
+        <div class="fc-stat-value" style="color:#b45309">+$${fmt(totalFinancedPerMo)}<span style="font-size:0.75rem;font-weight:400;color:var(--text-lt)">/mo</span></div>
+      </div>` : ''}
+      ${breakEven ? `
+      <div class="fc-stat-tile">
+        <div class="fc-stat-label">⚠️ First Deficit Month</div>
+        <div class="fc-stat-value" style="color:var(--danger)">${breakEven}</div>
+      </div>` : `
+      <div class="fc-stat-tile">
+        <div class="fc-stat-label">📈 Best Month</div>
+        <div class="fc-stat-value green">${bestMonth}</div>
+      </div>`}`;
+  }
+
+  // Sub-label for balance chart
+  const subEl = document.getElementById('fc-balance-sub');
+  if (subEl) {
+    const trend = endBalance > startBalance ? '📈 Trending up' : endBalance < startBalance ? '📉 Trending down' : '➡️ Flat';
+    subEl.textContent = `${trend} · Starting $${fmt(startBalance)} → Ending $${fmt(endBalance)}`;
+  }
+
+  // ── Charts ────────────────────────────────────────────────────────
+  const darkMode = document.body.classList.contains('dark-mode');
+  const gridColor  = darkMode ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
+  const textColor  = darkMode ? '#9ca3af' : '#6b7280';
+  const green  = '#3d7a5f';
+  const red    = '#e85d5d';
+  const blue   = '#4a90d9';
+  const amber  = '#f59e0b';
+
+  Chart.defaults.font.family = "'DM Sans', sans-serif";
+  Chart.defaults.font.size   = 11;
+
+  function makeOrUpdate(id, config) {
+    if (_fcCharts[id]) { _fcCharts[id].destroy(); }
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+    _fcCharts[id] = new Chart(canvas.getContext('2d'), config);
+  }
+
+  // 1. Running balance line chart
+  makeOrUpdate('fc-balance-chart', {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Projected Balance',
+        data: balances,
+        borderColor: green,
+        backgroundColor: darkMode ? 'rgba(61,122,95,0.15)' : 'rgba(61,122,95,0.08)',
+        fill: true,
+        tension: 0.35,
+        pointRadius: 4,
+        pointHoverRadius: 6,
+        pointBackgroundColor: balances.map(v => v < 0 ? red : green),
+        borderWidth: 2.5,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` $${fmt(ctx.raw)}` } }
+      },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: textColor } },
+        y: { grid: { color: gridColor }, ticks: { color: textColor, callback: v => '$' + fmt(v) } }
+      }
+    }
+  });
+
+  // 2. Income vs Expense grouped bar
+  makeOrUpdate('fc-income-expense-chart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Income',   data: incomes,  backgroundColor: green + 'cc', borderRadius: 4 },
+        { label: 'Expenses', data: expenses, backgroundColor: red   + 'cc', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: textColor, boxWidth: 12, padding: 10 } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: $${fmt(ctx.raw)}` } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: textColor } },
+        y: { grid: { color: gridColor }, ticks: { color: textColor, callback: v => '$' + fmt(v) } }
+      }
+    }
+  });
+
+  // 3. Net savings bar (green positive / red negative)
+  makeOrUpdate('fc-net-chart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Net',
+        data: nets,
+        backgroundColor: nets.map(v => v >= 0 ? green + 'cc' : red + 'cc'),
+        borderRadius: 4,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` Net: $${fmt(ctx.raw)}` } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: textColor } },
+        y: { grid: { color: gridColor }, ticks: { color: textColor, callback: v => '$' + fmt(v) },
+          afterDataLimits: scale => { scale.min = Math.min(scale.min, 0); }
+        }
+      }
+    }
+  });
+
+  // ── Breakdown table ──────────────────────────────────────────
+  const tableEl = document.getElementById('fc-breakdown-table');
+  if (tableEl) {
+    const rows = labels.map((lbl, i) => {
+      const hasPurchase = _fcPurchases.filter(p => {
+        const d = new Date(today.getFullYear(), today.getMonth() + (i+1), 1);
+        const mo = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        return p.month === mo;
+      });
+      const purchaseNote = hasPurchase.length
+        ? `<span style="font-size:0.72rem;color:#b45309;margin-left:4px;">📦 ${hasPurchase.map(p => escHtml(p.name)).join(', ')}</span>` : '';
+      const netStyle = nets[i] >= 0 ? 'color:var(--sage-dk)' : 'color:var(--danger)';
+      const balStyle = balances[i] >= 0 ? 'color:var(--sage-dk)' : 'color:var(--danger)';
+      return `<tr>
+        <td style="font-weight:600;">${lbl}${purchaseNote}</td>
+        <td style="color:var(--sage-dk)">$${fmt(incomes[i])}</td>
+        <td style="color:var(--danger)">$${fmt(expenses[i])}</td>
+        <td style="${netStyle}">${nets[i] >= 0 ? '+' : ''}$${fmt(nets[i])}</td>
+        <td style="${balStyle};font-weight:700;">$${fmt(balances[i])}</td>
+      </tr>`;
+    }).join('');
+    tableEl.innerHTML = `
+      <table class="debt-table">
+        <thead><tr><th>Month</th><th>Income</th><th>Expenses</th><th>Net</th><th>Balance</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  renderFcPurchases({ monthlyIncome, monthlyExpenses, startBalance });
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// SALARY CALCULATOR
+// ═══════════════════════════════════════════════════════════════
+
+// 2025 Federal income tax brackets
+const FED_BRACKETS = {
+  single: [
+    { limit: 11925,  rate: 0.10 },
+    { limit: 48475,  rate: 0.12 },
+    { limit: 103350, rate: 0.22 },
+    { limit: 197300, rate: 0.24 },
+    { limit: 250525, rate: 0.32 },
+    { limit: 626350, rate: 0.35 },
+    { limit: Infinity, rate: 0.37 },
+  ],
+  married: [
+    { limit: 23850,  rate: 0.10 },
+    { limit: 96950,  rate: 0.12 },
+    { limit: 206700, rate: 0.22 },
+    { limit: 394600, rate: 0.24 },
+    { limit: 501050, rate: 0.32 },
+    { limit: 751600, rate: 0.35 },
+    { limit: Infinity, rate: 0.37 },
+  ],
+  hoh: [
+    { limit: 17000,  rate: 0.10 },
+    { limit: 64850,  rate: 0.12 },
+    { limit: 103350, rate: 0.22 },
+    { limit: 197300, rate: 0.24 },
+    { limit: 250500, rate: 0.32 },
+    { limit: 626350, rate: 0.35 },
+    { limit: Infinity, rate: 0.37 },
+  ],
+};
+
+// 2025 Standard deductions
+const FED_STD_DED = { single: 15000, married: 30000, hoh: 22500 };
+
+// 2025 SS wage base
+const SS_WAGE_BASE = 176100;
+
+// Approximate state income tax rates (effective marginal rate at $50k-$100k income).
+// States with no income tax use 0. Noted as approximate.
+const STATE_TAX = {
+  AL:0.05,  AK:0.00,  AZ:0.025, AR:0.044, CA:0.093, CO:0.044, CT:0.065,
+  DE:0.066, FL:0.00,  GA:0.055, HI:0.088, ID:0.058, IL:0.0495,IN:0.0305,
+  IA:0.057, KS:0.057, KY:0.045, LA:0.042, ME:0.075, MD:0.0575,MA:0.05,
+  MI:0.0425,MN:0.0785,MS:0.047, MO:0.048, MT:0.069, NE:0.0664,NV:0.00,
+  NH:0.00,  NJ:0.0637,NM:0.049, NY:0.0685,NC:0.0475,ND:0.029, OH:0.04,
+  OK:0.05,  OR:0.099, PA:0.0307,RI:0.0599,SC:0.064, SD:0.00,  TN:0.00,
+  TX:0.00,  UT:0.0465,VT:0.0875,VA:0.0575,WA:0.00,  WV:0.065, WI:0.0765,
+  WY:0.00,  DC:0.085,
+};
+
+function calcFederalTax(taxableIncome, status) {
+  const brackets = FED_BRACKETS[status] || FED_BRACKETS.single;
+  let tax = 0, prev = 0;
+  for (const b of brackets) {
+    const chunk = Math.min(Math.max(taxableIncome - prev, 0), b.limit - prev);
+    tax += chunk * b.rate;
+    prev = b.limit;
+    if (taxableIncome <= b.limit) break;
+  }
+  return tax;
+}
+
+function runSalaryCalc() {
+  const gross     = parseFloat(document.getElementById('sal-gross')?.value)   || 0;
+  const freqPerYr = parseInt(document.getElementById('sal-freq')?.value)       || 26;
+  const status    = document.getElementById('sal-status')?.value               || 'single';
+  const stateCode = document.getElementById('sal-state')?.value                || 'TX';
+  const k401pct   = parseFloat(document.getElementById('sal-401k')?.value)     || 0;
+  const preTaxMo  = parseFloat(document.getElementById('sal-pretax')?.value)   || 0;
+  const resultEl  = document.getElementById('sal-result');
+  if (!resultEl || gross <= 0) { if (resultEl) resultEl.innerHTML = ''; return; }
+
+  const preTaxAnnual = (preTaxMo * 12);
+  const k401annual   = gross * (k401pct / 100);
+
+  // FICA
+  const ssWages   = Math.min(gross, SS_WAGE_BASE);
+  const ssTax     = ssWages * 0.062;
+  const medicareTax = gross * 0.0145 + (gross > 200000 ? (gross - 200000) * 0.009 : 0);
+  const ficaTotal = ssTax + medicareTax;
+
+  // Federal taxable income
+  const stdDed        = FED_STD_DED[status] || 15000;
+  const fedTaxable    = Math.max(0, gross - k401annual - preTaxAnnual - stdDed);
+  const fedTax        = calcFederalTax(fedTaxable, status);
+
+  // State tax (applied to gross minus 401k, simplified)
+  const stateRate     = STATE_TAX[stateCode] ?? 0;
+  const stateTaxable  = Math.max(0, gross - k401annual - preTaxAnnual);
+  const stateTax      = stateTaxable * stateRate;
+
+  // Totals
+  const totalDeductions = fedTax + stateTax + ficaTotal + k401annual + preTaxAnnual;
+  const annualTakeHome  = gross - totalDeductions;
+  const perPaycheck     = annualTakeHome / freqPerYr;
+  const perMonth        = annualTakeHome / 12;
+  const effectiveRate   = (totalDeductions / gross) * 100;
+
+  const noStateTax = stateRate === 0;
+  const stateLabel = noStateTax ? `${stateCode} — No State Income Tax` : `${stateCode} (~${(stateRate*100).toFixed(2)}% approx.)`;
+
+  resultEl.innerHTML = `
+    <div class="sal-result-card">
+      <div class="sal-result-header">
+        <div>
+          <div class="sal-takeHome-label">Estimated Take-Home</div>
+          <div class="sal-takeHome-value">$${fmt(perPaycheck)}<span class="sal-per"> / paycheck</span></div>
+          <div class="sal-takeHome-sub">$${fmt(perMonth)}/mo &nbsp;·&nbsp; $${fmt(annualTakeHome)}/yr &nbsp;·&nbsp; ${effectiveRate.toFixed(1)}% effective tax rate</div>
+        </div>
+        <button class="btn-primary" style="white-space:nowrap;font-size:0.8rem;" onclick="useSalaryInForecast(${perMonth})">
+          Use in Forecast ↗
+        </button>
+      </div>
+      <div class="sal-breakdown">
+        <div class="sal-row sal-row-gross">
+          <span>Gross Salary</span>
+          <span>$${fmt(gross)}</span>
+        </div>
+        ${k401annual > 0 ? `<div class="sal-row sal-deduction"><span>401(k) Contribution (${k401pct}%)</span><span>−$${fmt(k401annual)}</span></div>` : ''}
+        ${preTaxAnnual > 0 ? `<div class="sal-row sal-deduction"><span>Other Pre-Tax Deductions</span><span>−$${fmt(preTaxAnnual)}</span></div>` : ''}
+        <div class="sal-row sal-deduction">
+          <span>Federal Income Tax</span>
+          <span>−$${fmt(fedTax)}</span>
+        </div>
+        <div class="sal-row sal-deduction">
+          <span>State Tax <small style="color:var(--text-lt)">${stateLabel}</small></span>
+          <span>−$${fmt(stateTax)}</span>
+        </div>
+        <div class="sal-row sal-deduction">
+          <span>Social Security (6.2%)</span>
+          <span>−$${fmt(ssTax)}</span>
+        </div>
+        <div class="sal-row sal-deduction">
+          <span>Medicare (1.45%)</span>
+          <span>−$${fmt(medicareTax)}</span>
+        </div>
+        <div class="sal-row sal-row-total">
+          <span>Take-Home Pay</span>
+          <span>$${fmt(annualTakeHome)}/yr</span>
+        </div>
+      </div>
+      <p style="font-size:0.7rem;color:var(--text-lt);margin-top:0.75rem;margin-bottom:0;">
+        ⚠️ Estimates only. State tax rates are approximate and may not reflect your specific bracket, local taxes, or deductions. Consult a tax professional for exact figures.
+      </p>
+    </div>`;
+}
+
+function useSalaryInForecast(perMonth) {
+  // Open overrides panel and set the income field
+  const panel = document.getElementById('fc-overrides-panel');
+  if (panel) panel.open = true;
+  const el = document.getElementById('fc-income-override');
+  if (el) { el.value = perMonth.toFixed(2); }
+  renderForecast();
+  // Scroll to forecast charts
+  document.getElementById('fc-stats')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 
@@ -1212,6 +2155,87 @@ function renderInsights() {
         </div>
       </div>
     </div>
+
+    <!-- Snapshot History -->
+    <div class="ins-card ins-card-full ins-snapshot-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+        <div class="ins-card-title" style="margin:0;">📸 Debt & Savings History</div>
+        <button class="btn-primary" style="font-size:0.8rem;padding:0.35rem 0.9rem;" onclick="takeSnapshot()">📸 Update Snapshot</button>
+      </div>
+      ${state.snapshots.length < 2 ? `
+        <p style="color:var(--text-lt);font-size:0.85rem;">
+          ${state.snapshots.length === 0
+            ? 'No snapshots yet — one will be recorded automatically each month you open the app.'
+            : 'Only 1 month recorded so far. Come back next month to see trends!'}
+        </p>` : (() => {
+          const snaps = state.snapshots;
+          const labels = snaps.map(s => s.month.slice(5,7) + '/' + s.month.slice(0,4));
+          const maxVal = Math.max(...snaps.map(s => Math.max(s.total_debt, s.total_savings)), 1);
+          const W = 100 / snaps.length;
+          // SVG line chart
+          const pts = (getter, color) => {
+            const points = snaps.map((s, i) => {
+              const x = (i / (snaps.length - 1)) * 100;
+              const y = 100 - (getter(s) / maxVal) * 90;
+              return `${x},${y}`;
+            }).join(' ');
+            return `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+          };
+          const dots = (getter, color) => snaps.map((s, i) => {
+            const x = (i / (snaps.length - 1)) * 100;
+            const y = 100 - (getter(s) / maxVal) * 90;
+            return `<circle cx="${x}" cy="${y}" r="3" fill="${color}" title="${labels[i]}: $${fmt(getter(s))}"/>`;
+          }).join('');
+          const first = snaps[0], last = snaps[snaps.length - 1];
+          const debtChange    = last.total_debt    - first.total_debt;
+          const savingsChange = last.total_savings - first.total_savings;
+          const nwChange      = last.net_worth     - first.net_worth;
+          return `
+          <div class="ins-legend" style="margin-bottom:0.6rem;">
+            <span class="ins-legend-dot red-dot"></span><span>Debt</span>
+            <span class="ins-legend-dot green-dot" style="margin-left:1rem;"></span><span>Savings</span>
+            <span class="ins-legend-dot" style="margin-left:1rem;background:#6366f1;width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle;"></span><span>Net Worth</span>
+          </div>
+          <div class="ins-snap-chart-wrap">
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="ins-snap-svg">
+              <line x1="0" y1="100" x2="100" y2="100" stroke="var(--border)" stroke-width="0.5"/>
+              ${pts(s => s.total_debt,    'var(--danger)')}
+              ${pts(s => s.total_savings, 'var(--sage-dk)')}
+              ${pts(s => s.net_worth,     '#6366f1')}
+              ${dots(s => s.total_debt,    'var(--danger)')}
+              ${dots(s => s.total_savings, 'var(--sage-dk)')}
+              ${dots(s => s.net_worth,     '#6366f1')}
+            </svg>
+            <div class="ins-snap-labels">
+              ${labels.map(l => `<span>${l}</span>`).join('')}
+            </div>
+          </div>
+          <div class="ins-snap-summary">
+            <div class="ins-snap-stat">
+              <span>Debt change</span>
+              <strong style="color:${debtChange <= 0 ? 'var(--sage-dk)' : 'var(--danger)'}">
+                ${debtChange <= 0 ? '↓' : '↑'} $${fmt(Math.abs(debtChange))}
+              </strong>
+            </div>
+            <div class="ins-snap-stat">
+              <span>Savings change</span>
+              <strong style="color:${savingsChange >= 0 ? 'var(--sage-dk)' : 'var(--danger)'}">
+                ${savingsChange >= 0 ? '↑' : '↓'} $${fmt(Math.abs(savingsChange))}
+              </strong>
+            </div>
+            <div class="ins-snap-stat">
+              <span>Net worth change</span>
+              <strong style="color:${nwChange >= 0 ? 'var(--sage-dk)' : 'var(--danger)'}">
+                ${nwChange >= 0 ? '↑' : '↓'} $${fmt(Math.abs(nwChange))}
+              </strong>
+            </div>
+            <div class="ins-snap-stat">
+              <span>Months tracked</span>
+              <strong>${snaps.length}</strong>
+            </div>
+          </div>`;
+        })()}
+    </div>
   `}`;
 }
 
@@ -1277,15 +2301,17 @@ function nextMonth() { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++;
 // ACTIONS — Paychecks
 // ═══════════════════════════════════════════════════════════════
 async function addPaycheck() {
-  const date   = document.getElementById('pc-date').value;
-  const amount = parseFloat(document.getElementById('pc-amount').value);
-  const notes  = document.getElementById('pc-notes').value;
+  const date        = document.getElementById('pc-date').value;
+  const amount      = parseFloat(document.getElementById('pc-amount').value);
+  const notes       = document.getElementById('pc-notes').value;
+  const income_type = document.getElementById('pc-income-type')?.value || 'paycheck';
   if (!date || !amount) return alert('Date and amount are required.');
 
-  const data = await api('POST', '/api/paychecks', { date, amount, notes });
+  const data = await api('POST', '/api/paychecks', { date, amount, notes, income_type });
   state.paychecks.push(data);
   closeModal('modal-add-paycheck');
   clearFields(['pc-date','pc-amount','pc-notes']);
+  document.getElementById('pc-income-type').value = 'paycheck';
   populatePaycheckDropdowns();
   renderPlanner();
   renderDashboard();
@@ -1295,21 +2321,24 @@ async function addPaycheck() {
 function openEditPaycheck(id) {
   const p = state.paychecks.find(x => x.id === id);
   if (!p) return;
-  document.getElementById('edit-pc-id').value     = id;
-  document.getElementById('edit-pc-date').value   = p.date;
-  document.getElementById('edit-pc-amount').value = p.amount;
-  document.getElementById('edit-pc-notes').value  = p.notes || '';
+  document.getElementById('edit-pc-id').value          = id;
+  document.getElementById('edit-pc-date').value        = p.date;
+  document.getElementById('edit-pc-amount').value      = p.amount;
+  document.getElementById('edit-pc-notes').value       = p.notes || '';
+  const typeEl = document.getElementById('edit-pc-income-type');
+  if (typeEl) typeEl.value = p.income_type || 'paycheck';
   openModal('modal-edit-paycheck');
 }
 
 async function saveEditPaycheck() {
-  const id     = parseInt(document.getElementById('edit-pc-id').value);
-  const date   = document.getElementById('edit-pc-date').value;
-  const amount = parseFloat(document.getElementById('edit-pc-amount').value);
-  const notes  = document.getElementById('edit-pc-notes').value;
+  const id          = parseInt(document.getElementById('edit-pc-id').value);
+  const date        = document.getElementById('edit-pc-date').value;
+  const amount      = parseFloat(document.getElementById('edit-pc-amount').value);
+  const notes       = document.getElementById('edit-pc-notes').value;
+  const income_type = document.getElementById('edit-pc-income-type')?.value || 'paycheck';
   if (!date || !amount) return alert('Date and amount are required.');
 
-  const data = await api('PUT', `/api/paychecks/${id}`, { date, amount, notes });
+  const data = await api('PUT', `/api/paychecks/${id}`, { date, amount, notes, income_type });
   const idx = state.paychecks.findIndex(p => p.id === id);
   if (idx > -1) state.paychecks[idx] = { ...state.paychecks[idx], ...data };
   closeModal('modal-edit-paycheck');
@@ -1814,18 +2843,26 @@ async function deleteGoal(id) {
   renderDashboard();
 }
 
-async function editGoal(id) {
+function editGoal(id) {
   const goal = state.savingsGoals.find(g => g.id === id);
   if (!goal) return;
-  const newName    = prompt('Goal name:', goal.name);
-  if (newName === null) return;
-  const newTarget  = parseFloat(prompt('Target amount:', goal.target_amount));
-  const newCurrent = parseFloat(prompt('Current saved amount:', goal.current_amount));
-  const newDate    = prompt('Target date (YYYY-MM-DD, or blank):', goal.target_date || '');
+  document.getElementById('edit-goal-id').value      = id;
+  document.getElementById('edit-goal-name').value    = goal.name;
+  document.getElementById('edit-goal-target').value  = goal.target_amount;
+  document.getElementById('edit-goal-current').value = goal.current_amount;
+  document.getElementById('edit-goal-date').value    = goal.target_date || '';
+  openModal('modal-edit-goal');
+}
+
+async function saveGoalEdit() {
+  const id      = parseInt(document.getElementById('edit-goal-id').value);
+  const name    = document.getElementById('edit-goal-name').value.trim();
+  const target  = parseFloat(document.getElementById('edit-goal-target').value);
+  const current = parseFloat(document.getElementById('edit-goal-current').value);
+  const date    = document.getElementById('edit-goal-date').value || null;
+  if (!name || isNaN(target) || isNaN(current)) return alert('Name and amounts are required.');
   const data = await api('PUT', `/api/savings/goals/${id}`, {
-    name: newName, target_amount: newTarget,
-    current_amount: isNaN(newCurrent) ? goal.current_amount : newCurrent,
-    target_date: newDate || null
+    name, target_amount: target, current_amount: current, target_date: date
   });
   const idx = state.savingsGoals.findIndex(g => g.id === id);
   if (idx > -1) {
@@ -1835,6 +2872,7 @@ async function editGoal(id) {
       showCelebration(`Goal reached! "${data.name}" is fully funded! 🎯`);
     }
   }
+  closeModal('modal-edit-goal');
   populateSavingsGoalDropdowns();
   renderSavings();
   renderDashboard();
@@ -1918,19 +2956,35 @@ async function markPromoPaid(id) {
 // ═══════════════════════════════════════════════════════════════
 // ACTIONS — Subscriptions
 // ═══════════════════════════════════════════════════════════════
+
+// Preset quick-pick buttons
+function setSubPreset(count, unit) {
+  document.getElementById('sub-interval-count').value = count;
+  document.getElementById('sub-interval-unit').value  = unit;
+  document.querySelectorAll('.sub-preset-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+}
+function clearSubPresets() {
+  document.querySelectorAll('.sub-preset-btn').forEach(b => b.classList.remove('active'));
+}
+
 async function addSubscription() {
-  const name     = document.getElementById('sub-name').value.trim();
-  const amount   = parseFloat(document.getElementById('sub-amount').value);
-  const interval = document.getElementById('sub-interval').value;
-  const nextDue  = document.getElementById('sub-next-due').value || null;
+  const name    = document.getElementById('sub-name').value.trim();
+  const amount  = parseFloat(document.getElementById('sub-amount').value);
+  const count   = parseInt(document.getElementById('sub-interval-count').value) || 1;
+  const unit    = document.getElementById('sub-interval-unit').value;
+  const nextDue = document.getElementById('sub-next-due').value || null;
   if (!name || !amount) return alert('Name and amount are required.');
 
   const data = await api('POST', '/api/subscriptions', {
-    name, amount, interval_unit: interval, interval_count: 1, next_due_date: nextDue
+    name, amount, interval_unit: unit, interval_count: count, next_due_date: nextDue
   });
   state.subscriptions.push(data);
   closeModal('modal-add-sub');
   clearFields(['sub-name','sub-amount','sub-next-due']);
+  document.getElementById('sub-interval-count').value = 1;
+  document.getElementById('sub-interval-unit').value  = 'month';
+  document.querySelectorAll('.sub-preset-btn').forEach((b, i) => b.classList.toggle('active', i === 2));
   renderSubscriptions();
   renderDashboard();
 }
@@ -1943,30 +2997,212 @@ async function deleteSub(id) {
   renderDashboard();
 }
 
-function startSubEdit(id) {
-  _subEditId = id;
-  renderSubscriptions();
-}
-function cancelSubEdit() {
-  _subEditId = null;
-  renderSubscriptions();
-}
-async function saveSubEdit(id) {
+function startSubEdit(id) { openSubEditModal(id); }
+function cancelSubEdit()   { closeModal('modal-edit-sub'); }
+async function editSub(id) { openSubEditModal(id); }
+
+function openSubEditModal(id) {
   const s = state.subscriptions.find(x => x.id === id);
   if (!s) return;
-  const name   = document.getElementById('sedit-name').value.trim();
-  const amount = parseFloat(document.getElementById('sedit-amount').value);
-  const unit   = document.getElementById('sedit-unit').value;
-  const due    = document.getElementById('sedit-due').value || null;
+  document.getElementById('edit-sub-id').value     = id;
+  document.getElementById('edit-sub-name').value   = s.name;
+  document.getElementById('edit-sub-amount').value = s.amount;
+  document.getElementById('edit-sub-count').value  = s.interval_count || 1;
+  document.getElementById('edit-sub-unit').value   = s.interval_unit  || 'month';
+  document.getElementById('edit-sub-due').value    = s.next_due_date  || '';
+  // Highlight matching preset
+  clearSubPresetsEdit();
+  const n = s.interval_count || 1, u = s.interval_unit || 'month';
+  document.querySelectorAll('#edit-sub-presets .sub-preset-btn').forEach(btn => {
+    const matches = (n===1&&u==='week'&&btn.textContent==='Weekly') ||
+                    (n===2&&u==='week'&&btn.textContent==='Biweekly') ||
+                    (n===1&&u==='month'&&btn.textContent==='Monthly') ||
+                    (n===3&&u==='month'&&btn.textContent==='Quarterly') ||
+                    (n===6&&u==='month'&&btn.textContent==='Every 6 Mo') ||
+                    (n===1&&u==='year'&&btn.textContent==='Yearly');
+    if (matches) btn.classList.add('active');
+  });
+  updateEditSubPreview();
+  openModal('modal-edit-sub');
+}
+
+function setSubPresetEdit(count, unit) {
+  document.getElementById('edit-sub-count').value = count;
+  document.getElementById('edit-sub-unit').value  = unit;
+  clearSubPresetsEdit();
+  event.target.classList.add('active');
+  updateEditSubPreview();
+}
+function clearSubPresetsEdit() {
+  document.querySelectorAll('#edit-sub-presets .sub-preset-btn').forEach(b => b.classList.remove('active'));
+}
+function updateEditSubPreview() {
+  const amt    = parseFloat(document.getElementById('edit-sub-amount').value) || 0;
+  const count  = parseInt(document.getElementById('edit-sub-count').value)    || 1;
+  const unit   = document.getElementById('edit-sub-unit').value;
+  const mock   = { amount: amt, interval_count: count, interval_unit: unit };
+  const mo     = subToMonthly(mock);
+  const el     = document.getElementById('edit-sub-preview');
+  if (el && amt > 0) el.textContent = `= $${fmt(mo)}/month`;
+  else if (el) el.textContent = '';
+}
+
+async function saveSubModal() {
+  const id     = parseInt(document.getElementById('edit-sub-id').value);
+  const s      = state.subscriptions.find(x => x.id === id);
+  if (!s) return;
+  const name   = document.getElementById('edit-sub-name').value.trim();
+  const amount = parseFloat(document.getElementById('edit-sub-amount').value);
+  const count  = parseInt(document.getElementById('edit-sub-count').value)  || 1;
+  const unit   = document.getElementById('edit-sub-unit').value;
+  const due    = document.getElementById('edit-sub-due').value || null;
   if (!name || isNaN(amount)) return alert('Name and amount are required.');
-  const data = await api('PUT', `/api/subscriptions/${id}`, { ...s, name, amount, interval_unit: unit, next_due_date: due });
+  const data = await api('PUT', `/api/subscriptions/${id}`,
+    { ...s, name, amount, interval_count: count, interval_unit: unit, next_due_date: due });
   const idx = state.subscriptions.findIndex(x => x.id === id);
   if (idx > -1) state.subscriptions[idx] = { ...state.subscriptions[idx], ...data };
-  _subEditId = null;
+  closeModal('modal-edit-sub');
   renderSubscriptions();
   renderDashboard();
 }
-async function editSub(id) { startSubEdit(id); }
+
+// Legacy inline edit stubs (kept so old references don't break)
+async function saveSubEdit(id) { await saveSubModal(); }
+
+
+// ═══════════════════════════════════════════════════════════════
+// PURCHASE PLANNER
+// ═══════════════════════════════════════════════════════════════
+
+function openPurchasePlanner() {
+  // Auto-fill monthly savings from current month's projected net
+  autoFillMonthlySavings();
+  document.getElementById('pp-result').innerHTML = '';
+  openModal('modal-purchase-planner');
+}
+
+function autoFillMonthlySavings() {
+  // Estimate monthly net = this month's paychecks - this month's bills (from state)
+  const thisMonth = `${plannerYear}-${String(plannerMonth + 1).padStart(2, '0')}`;
+  const income = state.paychecks
+    .filter(p => p.date && p.date.slice(0, 7) === thisMonth)
+    .reduce((s, p) => s + p.amount, 0);
+  const bills = state.bills
+    .filter(b => b.due_date && b.due_date.slice(0, 7) === thisMonth && !b.is_postponed)
+    .reduce((s, b) => s + b.amount, 0);
+  const subs  = calcMonthlySubTotal();
+  const net   = income - bills - subs;
+
+  const autoEl = document.getElementById('pp-monthly-auto');
+  if (autoEl) {
+    if (income > 0) {
+      autoEl.textContent = `← Use projected net: $${fmt(Math.max(0, net))}/mo`;
+      autoEl.onclick = () => {
+        document.getElementById('pp-monthly-savings').value = Math.max(0, net).toFixed(2);
+        runPurchasePlanner();
+      };
+    } else {
+      autoEl.textContent = 'Add paychecks to auto-calculate';
+    }
+  }
+}
+
+function runPurchasePlanner() {
+  const name     = (document.getElementById('pp-name').value || 'Purchase').trim();
+  const target   = parseFloat(document.getElementById('pp-amount').value) || 0;
+  const balance  = parseFloat(document.getElementById('pp-start-balance').value) || 0;
+  const monthly  = parseFloat(document.getElementById('pp-monthly-savings').value) || 0;
+  const resultEl = document.getElementById('pp-result');
+  if (!target || !resultEl) return;
+
+  const remaining = Math.max(0, target - balance);
+
+  if (remaining <= 0) {
+    resultEl.innerHTML = `
+      <div class="pp-result pp-result-good">
+        <div class="pp-result-icon">🎉</div>
+        <div>
+          <div class="pp-result-title">You can afford it now!</div>
+          <div class="pp-result-sub">Your starting balance covers the full cost of ${escHtml(name)}.</div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  if (monthly <= 0) {
+    resultEl.innerHTML = `
+      <div class="pp-result pp-result-neutral">
+        <div>Enter your monthly net savings to see a projection.</div>
+      </div>`;
+    return;
+  }
+
+  const monthsNeeded = Math.ceil(remaining / monthly);
+  const targetDate   = new Date(plannerYear, plannerMonth + monthsNeeded, 1);
+  const targetLabel  = targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  // Build a 12-month timeline preview
+  const maxMonths = Math.min(monthsNeeded, 36);
+  let timelineRows = '';
+  for (let i = 1; i <= Math.min(maxMonths, 6); i++) {
+    const proj = Math.min(balance + monthly * i, target);
+    const pct  = Math.round((proj / target) * 100);
+    const d    = new Date(plannerYear, plannerMonth + i, 1);
+    const lbl  = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    const done = proj >= target;
+    timelineRows += `
+      <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.4rem;font-size:0.8rem;">
+        <span style="width:70px;color:var(--text-lt);">${lbl}</span>
+        <div style="flex:1;height:8px;background:var(--cream);border-radius:50px;overflow:hidden;">
+          <div style="width:${pct}%;height:100%;background:${done ? 'var(--sage-dk)' : 'var(--gold)'};border-radius:50px;transition:width .4s;"></div>
+        </div>
+        <span style="width:50px;text-align:right;font-weight:600;color:${done ? 'var(--sage-dk)' : 'var(--text)'};">$${fmt(proj)}</span>
+      </div>`;
+  }
+
+  // What-if: how much extra per month to hit it in a shorter time?
+  const fasterMonths = [3, 6, 12].filter(m => m < monthsNeeded);
+  let fasterHtml = '';
+  if (fasterMonths.length) {
+    fasterHtml = `<div class="pp-whatif">
+      <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--text-lt);margin-bottom:0.5rem;">⚡ To get there faster</div>
+      ${fasterMonths.map(m => {
+        const needed = remaining / m;
+        const extra  = Math.max(0, needed - monthly);
+        return `<div style="display:flex;justify-content:space-between;font-size:0.8rem;padding:0.3rem 0;">
+          <span>${m} months (${new Date(plannerYear, plannerMonth + m, 1).toLocaleDateString('en-US',{month:'short',year:'numeric'})})</span>
+          <span style="font-weight:600;color:var(--sage-dk);">save $${fmt(needed)}/mo (+$${fmt(extra)})</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  const urgency = monthsNeeded <= 3 ? 'pp-result-good' : monthsNeeded <= 12 ? 'pp-result-neutral' : 'pp-result-long';
+  resultEl.innerHTML = `
+    <div class="pp-result ${urgency}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.8rem;">
+        <div>
+          <div class="pp-result-title">${escHtml(name)} — ${targetLabel}</div>
+          <div class="pp-result-sub">$${fmt(monthly)}/mo · $${fmt(remaining)} needed · ${monthsNeeded} month${monthsNeeded !== 1 ? 's' : ''}</div>
+        </div>
+        <div style="font-size:2rem;font-weight:800;color:var(--sage-dk);">${monthsNeeded}mo</div>
+      </div>
+      ${timelineRows}
+      ${monthsNeeded > 6 ? `<div style="font-size:0.75rem;color:var(--text-lt);text-align:center;padding:0.3rem 0;">…${monthsNeeded - 6} more months</div>` : ''}
+    </div>
+    ${fasterHtml}`;
+}
+
+function savePurchasePlannerGoal() {
+  const name   = (document.getElementById('pp-name').value || '').trim();
+  const target = parseFloat(document.getElementById('pp-amount').value) || 0;
+  if (!name || !target) return alert('Enter a name and amount first.');
+  closeModal('modal-purchase-planner');
+  // Pre-fill the savings goal modal
+  document.getElementById('goal-name').value   = name;
+  document.getElementById('goal-target').value = target;
+  openModal('modal-add-goal');
+}
 
 
 // ═══════════════════════════════════════════════════════════════

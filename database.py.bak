@@ -185,18 +185,6 @@ def init_db():
         created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )''')
 
-    c.execute('''CREATE TABLE IF NOT EXISTS snapshots (
-        id             INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id        INTEGER NOT NULL,
-        month          TEXT    NOT NULL,
-        total_debt     REAL    DEFAULT 0,
-        total_savings  REAL    DEFAULT 0,
-        net_worth      REAL    DEFAULT 0,
-        created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        UNIQUE(user_id, month)
-    )''')
-
     # ── Migrations: add columns added after initial schema ────────────────────
     for col, definition in [
         ('autopay',   'INTEGER DEFAULT 0'),
@@ -211,12 +199,6 @@ def init_db():
     # Add deleted_at to users for soft deletes
     try:
         c.execute('ALTER TABLE users ADD COLUMN deleted_at TIMESTAMP')
-    except Exception:
-        pass
-
-    # Paychecks: income type (paycheck vs bonus/extra)
-    try:
-        c.execute("ALTER TABLE paychecks ADD COLUMN income_type TEXT DEFAULT 'paycheck'")
     except Exception:
         pass
 
