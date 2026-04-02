@@ -561,14 +561,18 @@ def mark_bill_paid(bid):
     if not row:
         db.close()
         return jsonify({'error': 'Not found'}), 404
+    data       = request.get_json() or {}
     # Toggle paid — record paid_date when marking paid, clear when unmarking
-    new_status = 0 if row['is_paid'] else 1
-    paid_date  = date.today().isoformat() if new_status else None
-    db.execute('UPDATE bills SET is_paid=?, is_postponed=0, paid_date=? WHERE id=?',
-               (new_status, paid_date, bid))
+    new_status   = 0 if row['is_paid'] else 1
+    paid_date    = date.today().isoformat() if new_status else None
+    # When marking paid, allow caller to pass a paycheck_id to reassign the bill
+    # When unmarking, restore original paycheck assignment (caller passes it back)
+    new_paycheck = data.get('paycheck_id', row['paycheck_id'])
+    db.execute('UPDATE bills SET is_paid=?, is_postponed=0, paid_date=?, paycheck_id=? WHERE id=?',
+               (new_status, paid_date, new_paycheck, bid))
     db.commit()
     db.close()
-    return jsonify({'is_paid': new_status, 'paid_date': paid_date})
+    return jsonify({'is_paid': new_status, 'paid_date': paid_date, 'paycheck_id': new_paycheck})
 
 
 @app.route('/api/bills/<int:bid>/paid-date', methods=['POST'])
@@ -580,12 +584,13 @@ def update_paid_date(bid):
     if not row:
         db.close()
         return jsonify({'error': 'Not found'}), 404
-    data      = request.get_json()
-    paid_date = data.get('paid_date')
-    db.execute('UPDATE bills SET paid_date=? WHERE id=?', (paid_date, bid))
+    data         = request.get_json()
+    paid_date    = data.get('paid_date')
+    new_paycheck = data.get('paycheck_id', row['paycheck_id'])
+    db.execute('UPDATE bills SET paid_date=?, paycheck_id=? WHERE id=?', (paid_date, new_paycheck, bid))
     db.commit()
     db.close()
-    return jsonify({'paid_date': paid_date})
+    return jsonify({'paid_date': paid_date, 'paycheck_id': new_paycheck})
 
 
 @app.route('/api/bills/<int:bid>/postpone', methods=['POST'])
