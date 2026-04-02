@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico"/>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Create Account — NorthStar Ledger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body class="auth-page">
+
+  <div class="auth-container">
+    <div class="auth-brand">
+      <a href="/" class="auth-logo">NorthStar <span>Ledger</span></a>
+      <p class="auth-tagline"><em>Your financial north star. ⭐</em></p>
+    </div>
+
+    <div class="auth-card">
+      <h1>Create your account</h1>
+      <p class="auth-sub">Free to join. No credit card needed.</p>
+
+      {% if error %}
+        <div class="alert alert-error">{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="/register">
+        <div class="form-group">
+          <label for="name">Full name</label>
+          <input type="text" id="name" name="name" required placeholder="Jane Smith"/>
+        </div>
+        <div class="form-group">
+          <label for="email">Email address</label>
+          <input type="email" id="email" name="email" required placeholder="you@example.com"/>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required placeholder="Min 8 characters"/>
+          </div>
+          <div class="form-group">
+            <label for="confirm_password">Confirm password</label>
+            <input type="password" id="confirm_password" name="confirm_password" required placeholder="Repeat password"/>
+          </div>
+        </div>
+
+        <div class="form-section-label">Security questions — used for password recovery</div>
+
+        <div class="form-group">
+          <label for="security_q1">Security question 1</label>
+          <select id="security_q1" name="security_q1" required>
+            <option value="">— Choose a question —</option>
+            <option>What was the name of your first pet?</option>
+            <option>What city were you born in?</option>
+            <option>What is your mother's maiden name?</option>
+            <option>What was the name of your elementary school?</option>
+            <option>What street did you grow up on?</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="security_a1">Your answer</label>
+          <input type="text" id="security_a1" name="security_a1" required placeholder="Answer (not case-sensitive)"/>
+        </div>
+
+        <div class="form-group">
+          <label for="security_q2">Security question 2</label>
+          <select id="security_q2" name="security_q2" required>
+            <option value="">— Choose a question —</option>
+            <option>What is the name of your childhood best friend?</option>
+            <option>What was your first car?</option>
+            <option>What is your oldest sibling's middle name?</option>
+            <option>What was the make of your first computer?</option>
+            <option>What is the name of the town where your parents met?</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="security_a2">Your answer</label>
+          <input type="text" id="security_a2" name="security_a2" required placeholder="Answer (not case-sensitive)"/>
+        </div>
+
+        <button type="submit" class="btn-auth">Create Account</button>
+      </form>
+
+      <div class="auth-links">
+        <a href="/login">Already have an account? Log in</a>
+      </div>
+    </div>
+
+    <div class="auth-footer">
+      <a href="/privacy">Privacy Policy</a>
+      <span class="auth-footer-dot">·</span>
+      <a href="/support">Support</a>
+    </div>
+  </div>
+
+</body>
+</html>

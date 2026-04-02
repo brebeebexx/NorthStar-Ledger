@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico"/>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NorthStar Ledger — Personal Finance, Thoughtfully Organized</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sage:     #7BA68C;
+      --sage-lt:  #A8C5B4;
+      --sage-dk:  #3D6B54;
+      --cream:    #F8F7F3;
+      --blush:    #D4A853;
+      --blush-lt: #F5E8C8;
+      --plum:     #2C4A7C;
+      --plum-lt:  #B8CCE8;
+      --gold:     #D4A853;
+      --text:     #2D2D2D;
+      --text-md:  #5A5A5A;
+      --text-lt:  #8A8A8A;
+      --white:    #FFFFFF;
+      --border:   #E8E2DA;
+      --shadow:   0 4px 24px rgba(0,0,0,0.07);
+      --shadow-lg:0 12px 48px rgba(0,0,0,0.11);
+      --r:        16px;
+      --r-sm:     10px;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--cream);
+      color: var(--text);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ─── NAV ─── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(250,248,244,0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 5%;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 68px;
+    }
+    .nav-logo {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.6rem;
+      color: var(--gold);
+      text-decoration: none;
+      letter-spacing: -0.5px;
+      display: flex; flex-direction: column; line-height: 1.1;
+    }
+    .nav-logo span { color: var(--sage-dk); }
+    .nav-tagline {
+      font-family: 'DM Serif Display', serif;
+      font-style: italic; font-size: 0.72rem;
+      color: var(--text-lt); font-weight: 400;
+      letter-spacing: 0.2px;
+    }
+    .nav-links {
+      display: flex; gap: 2rem; list-style: none;
+    }
+    .nav-links a {
+      text-decoration: none; color: var(--text-md);
+      font-size: 0.9rem; font-weight: 500;
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--sage-dk); }
+    .nav-login {
+      border: 1.5px solid var(--sage-dk); color: var(--sage-dk) !important;
+      padding: 0.4rem 1.1rem; border-radius: 50px;
+      transition: background .2s, color .2s !important;
+    }
+    .nav-login:hover { background: var(--sage-dk); color: var(--white) !important; }
+    .nav-cta {
+      background: var(--sage-dk); color: var(--white) !important;
+      padding: 0.45rem 1.2rem; border-radius: 50px;
+      transition: background .2s !important;
+    }
+    .nav-cta:hover { background: var(--sage) !important; }
+
+    /* ─── HERO ─── */
+    .hero {
+      min-height: 92vh;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center;
+      padding: 6rem 5% 4rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-blob {
+      position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.35; pointer-events: none;
+    }
+    .blob1 { width: 600px; height: 600px; background: var(--sage-lt); top: -150px; left: -150px; }
+    .blob2 { width: 500px; height: 500px; background: var(--blush); bottom: -100px; right: -100px; }
+    .blob3 { width: 300px; height: 300px; background: var(--plum-lt); top: 200px; right: 20%; }
+
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: 50px; padding: 0.35rem 1rem;
+      font-size: 0.82rem; color: var(--sage-dk); font-weight: 500;
+      margin-bottom: 1.8rem;
+      box-shadow: var(--shadow);
+    }
+    .hero-badge .dot {
+      width: 8px; height: 8px; background: var(--sage); border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.5; transform: scale(1.4); }
+    }
+
+    .hero h1 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(2.6rem, 6vw, 5rem);
+      line-height: 1.1;
+      color: var(--text);
+      max-width: 780px;
+      margin-bottom: 1.4rem;
+      position: relative;
+    }
+    .hero h1 em {
+      font-style: italic;
+      color: var(--sage-dk);
+    }
+    .hero-sub {
+      font-size: clamp(1rem, 2vw, 1.2rem);
+      color: var(--text-md);
+      max-width: 560px;
+      margin-bottom: 2.4rem;
+      position: relative;
+    }
+    .hero-btns {
+      display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;
+      position: relative;
+    }
+    .btn-primary {
+      background: var(--sage-dk); color: var(--white);
+      padding: 0.85rem 2rem; border-radius: 50px;
+      font-size: 0.95rem; font-weight: 600; text-decoration: none;
+      border: none; cursor: pointer;
+      transition: transform .2s, box-shadow .2s, background .2s;
+      box-shadow: 0 4px 16px rgba(79,125,101,0.35);
+    }
+    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(79,125,101,0.4); background: var(--sage); }
+    .btn-outline {
+      background: transparent; color: var(--sage-dk);
+      padding: 0.85rem 2rem; border-radius: 50px;
+      font-size: 0.95rem; font-weight: 600; text-decoration: none;
+      border: 2px solid var(--sage-dk); cursor: pointer;
+      transition: transform .2s, background .2s, color .2s;
+    }
+    .btn-outline:hover { transform: translateY(-2px); background: var(--sage-dk); color: var(--white); }
+
+    /* ─── MOCKUP STRIP ─── */
+    .mockup-strip {
+      padding: 0 5% 5rem;
+      display: flex; justify-content: center;
+    }
+    .mockup-card {
+      background: var(--white);
+      border-radius: 20px;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      width: 100%; max-width: 920px;
+    }
+    .mockup-bar {
+      background: #F0EDE8;
+      padding: 0.65rem 1rem;
+      display: flex; align-items: center; gap: 0.5rem;
+    }
+    .mock-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .mock-dot:nth-child(1) { background: #FF6B6B; }
+    .mock-dot:nth-child(2) { background: #FFD93D; }
+    .mock-dot:nth-child(3) { background: #6BCB77; }
+    .mock-url {
+      flex: 1; background: var(--white); border-radius: 50px;
+      padding: 0.25rem 0.8rem; font-size: 0.78rem; color: var(--text-lt);
+      margin-left: 0.5rem;
+    }
+    .mockup-body {
+      padding: 1.5rem;
+      display: grid; grid-template-columns: 200px 1fr; gap: 1.2rem;
+      min-height: 320px;
+    }
+    .mock-sidebar {
+      background: var(--cream);
+      border-radius: var(--r-sm);
+      padding: 1rem;
+    }
+    .mock-app-name {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.1rem; color: var(--sage-dk);
+      margin-bottom: 1rem;
+    }
+    .mock-nav-item {
+      display: flex; align-items: center; gap: 0.5rem;
+      padding: 0.5rem 0.6rem; border-radius: 8px;
+      font-size: 0.8rem; color: var(--text-md);
+      margin-bottom: 0.25rem;
+      cursor: default;
+    }
+    .mock-nav-item.active {
+      background: var(--sage-dk); color: var(--white);
+    }
+    .mock-nav-item .icon { font-size: 0.9rem; }
+    .mock-nav-badge {
+      margin-left: auto; background: var(--blush);
+      color: var(--text); font-size: 0.65rem; font-weight: 700;
+      border-radius: 50px; padding: 0.1rem 0.4rem;
+    }
+    .mock-main { display: flex; flex-direction: column; gap: 1rem; }
+    .mock-stat-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 0.8rem; }
+    .mock-stat {
+      background: var(--cream); border-radius: var(--r-sm);
+      padding: 0.8rem 1rem;
+    }
+    .mock-stat-label { font-size: 0.72rem; color: var(--text-lt); margin-bottom: 0.2rem; }
+    .mock-stat-val { font-size: 1.2rem; font-weight: 700; color: var(--text); }
+    .mock-stat-val.green { color: var(--sage-dk); }
+    .mock-stat-val.red   { color: #C0392B; }
+    .mock-bucket {
+      background: var(--cream); border-radius: var(--r-sm); padding: 0.8rem 1rem;
+    }
+    .mock-bucket-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.6rem;
+    }
+    .mock-bucket-title { font-size: 0.82rem; font-weight: 600; }
+    .mock-current-badge {
+      background: var(--sage); color: var(--white);
+      font-size: 0.65rem; font-weight: 700; padding: 0.15rem 0.5rem;
+      border-radius: 50px; letter-spacing: 0.5px;
+    }
+    .mock-bill-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.3rem 0; border-bottom: 1px solid var(--border);
+      font-size: 0.76rem;
+    }
+    .mock-bill-row:last-child { border-bottom: none; }
+    .mock-paid { color: var(--sage-dk); font-weight: 500; }
+    .mock-unpaid { color: var(--text-lt); }
+    .mock-pill {
+      font-size: 0.65rem; font-weight: 600; padding: 0.1rem 0.45rem;
+      border-radius: 50px;
+    }
+    .pill-paid { background: #D4F0E0; color: var(--sage-dk); }
+    .pill-due  { background: #FFF0E0; color: #C07020; }
+    .pill-post { background: #EEE8F5; color: var(--plum); }
+
+    /* ─── SECTION BASE ─── */
+    section { padding: 5rem 5%; }
+    .section-label {
+      display: inline-block;
+      font-size: 0.75rem; font-weight: 700; letter-spacing: 1.5px;
+      text-transform: uppercase; color: var(--sage-dk);
+      margin-bottom: 0.8rem;
+    }
+    h2 {
+      font-family: 'DM Serif Display', serif;
+      font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+      line-height: 1.2;
+      color: var(--text);
+      margin-bottom: 1rem;
+    }
+    h2 em { font-style: italic; color: var(--sage-dk); }
+    .section-sub {
+      font-size: 1.05rem; color: var(--text-md);
+      max-width: 560px; margin-bottom: 3rem;
+    }
+
+    /* ─── FEATURE GRID ─── */
+    .features-section { background: var(--white); }
+    .features-section .inner { max-width: 1100px; margin: 0 auto; }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+    }
+    .feat-card {
+      background: var(--cream);
+      border-radius: var(--r);
+      padding: 1.8rem;
+      border: 1px solid var(--border);
+      transition: transform .25s, box-shadow .25s;
+      position: relative;
+      overflow: hidden;
+    }
+    .feat-card::before {
+      content: ''; position: absolute;
+      top: 0; left: 0; right: 0; height: 4px;
+      border-radius: var(--r) var(--r) 0 0;
+    }
+    .feat-card.c-sage::before  { background: linear-gradient(90deg, var(--sage), var(--sage-lt)); }
+    .feat-card.c-blush::before { background: linear-gradient(90deg, var(--blush), #f8d5c8); }
+    .feat-card.c-plum::before  { background: linear-gradient(90deg, var(--plum), var(--plum-lt)); }
+    .feat-card.c-gold::before  { background: linear-gradient(90deg, var(--gold), #e8c97a); }
+    .feat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
+    .feat-icon { font-size: 2rem; margin-bottom: 1rem; }
+    .feat-card h3 {
+      font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem;
+    }
+    .feat-card p { font-size: 0.9rem; color: var(--text-md); line-height: 1.6; }
+
+    /* ─── DETAIL ROWS ─── */
+    .detail-row {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 4rem; align-items: center;
+      max-width: 1100px; margin: 0 auto 6rem;
+    }
+    .detail-row.reverse { direction: rtl; }
+    .detail-row.reverse > * { direction: ltr; }
+    .detail-row:last-child { margin-bottom: 0; }
+    .detail-text {}
+    .detail-text h2 { margin-bottom: 0.6rem; }
+    .detail-text .section-label { margin-bottom: 0.5rem; }
+    .detail-text p { color: var(--text-md); font-size: 1rem; margin-bottom: 1rem; }
+    .detail-list { list-style: none; display: flex; flex-direction: column; gap: 0.6rem; margin-top: 1.2rem; }
+    .detail-list li {
+      display: flex; align-items: flex-start; gap: 0.7rem;
+      font-size: 0.92rem; color: var(--text-md);
+    }
+    .detail-list li .check {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: var(--sage-lt); color: var(--sage-dk);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; flex-shrink: 0; margin-top: 2px;
+    }
+    .detail-visual {
+      background: var(--white);
+      border-radius: 20px;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid var(--border);
+      overflow: hidden;
+      padding: 1.5rem;
+    }
+    .detail-visual-header {
+      font-size: 0.78rem; font-weight: 600; color: var(--text-lt);
+      text-transform: uppercase; letter-spacing: 1px;
+      margin-bottom: 1.2rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    /* Bucket visual */
+    .bucket-visual {}
+    .bucket-period {
+      background: var(--cream); border-radius: 12px;
+      padding: 1rem; margin-bottom: 0.8rem;
+      border: 1px solid var(--border);
+    }
+    .bucket-period.current {
+      border-color: var(--sage);
+      box-shadow: 0 0 0 2px rgba(123,166,140,0.2);
+    }
+    .bucket-period-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.7rem;
+    }
+    .bp-date { font-size: 0.82rem; font-weight: 600; }
+    .bp-income { font-size: 0.82rem; color: var(--sage-dk); font-weight: 600; }
+    .bp-balance { font-size: 1.1rem; font-weight: 700; }
+    .bp-balance.pos { color: var(--sage-dk); }
+    .bp-balance.neg { color: #C0392B; }
+    .bp-bill-row {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.78rem; padding: 0.25rem 0;
+      border-bottom: 1px solid rgba(0,0,0,0.05);
+    }
+    .bp-bill-row:last-child { border-bottom: none; }
+    .bp-bill-name { color: var(--text-md); }
+    .bp-bill-amt  { font-weight: 600; }
+
+    /* Savings visual */
+    .savings-goals {}
+    .goal-item { margin-bottom: 1.2rem; }
+    .goal-item:last-child { margin-bottom: 0; }
+    .goal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.4rem;
+    }
+    .goal-name { font-size: 0.85rem; font-weight: 600; }
+    .goal-pct  { font-size: 0.78rem; color: var(--text-lt); }
+    .goal-bar-bg {
+      width: 100%; height: 10px; background: var(--cream);
+      border-radius: 50px; overflow: hidden; border: 1px solid var(--border);
+    }
+    .goal-bar-fill { height: 100%; border-radius: 50px; transition: width 1s; }
+    .fill-sage  { background: linear-gradient(90deg, var(--sage-dk), var(--sage-lt)); }
+    .fill-blush { background: linear-gradient(90deg, var(--blush), #f9d5c9); }
+    .fill-plum  { background: linear-gradient(90deg, var(--plum), var(--plum-lt)); }
+    .goal-amounts { font-size: 0.76rem; color: var(--text-lt); margin-top: 0.3rem; }
+
+    /* Debt visual */
+    .debt-visual {}
+    .debt-card {
+      background: var(--cream); border-radius: 10px;
+      padding: 0.9rem 1rem; margin-bottom: 0.8rem;
+      border: 1px solid var(--border);
+    }
+    .debt-card:last-child { margin-bottom: 0; }
+    .debt-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 0.5rem;
+    }
+    .debt-name { font-size: 0.85rem; font-weight: 600; }
+    .debt-alert {
+      font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem;
+      border-radius: 50px;
+    }
+    .alert-promo { background: #FFF3CD; color: #856404; }
+    .alert-ok    { background: #D4F0E0; color: var(--sage-dk); }
+    .debt-row { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-md); }
+    .debt-util-bar-bg {
+      width: 100%; height: 6px; background: var(--border);
+      border-radius: 50px; overflow: hidden; margin-top: 0.6rem;
+    }
+    .debt-util-fill {
+      height: 100%; border-radius: 50px;
+    }
+    .util-low  { background: var(--sage); }
+    .util-mid  { background: var(--gold); }
+    .util-high { background: #E74C3C; }
+
+    /* Calendar visual */
+    .cal-visual {}
+    .cal-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    .cal-day-name {
+      font-size: 0.65rem; font-weight: 700; color: var(--text-lt);
+      text-align: center; padding: 0.2rem 0;
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .cal-day {
+      background: var(--cream); border-radius: 8px;
+      padding: 0.3rem 0.3rem 0.4rem;
+      min-height: 52px; font-size: 0.72rem; font-weight: 600;
+      color: var(--text-md); position: relative;
+    }
+    .cal-day.today {
+      background: var(--sage-dk); color: var(--white);
+    }
+    .cal-day.other { opacity: 0.35; }
+    .cal-event {
+      font-size: 0.6rem; font-weight: 600; border-radius: 4px;
+      padding: 0.1rem 0.3rem; margin-top: 0.2rem; line-height: 1.2;
+    }
+    .ev-bill { background: #FEE8D8; color: #A04010; }
+    .ev-pay  { background: #D4F0E0; color: var(--sage-dk); }
+    .ev-sub  { background: #E8E0F5; color: var(--plum); }
+    .ev-goal { background: #FFF3CD; color: #856404; }
+
+    /* Admin visual */
+    .admin-visual {}
+    .admin-tabs {
+      display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 1.2rem;
+    }
+    .admin-tab {
+      padding: 0.35rem 0.9rem; border-radius: 50px;
+      font-size: 0.76rem; font-weight: 600;
+      background: var(--cream); color: var(--text-md);
+      border: 1px solid var(--border); cursor: default;
+      display: flex; align-items: center; gap: 0.35rem;
+    }
+    .admin-tab.active { background: var(--sage-dk); color: var(--white); border-color: transparent; }
+    .admin-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+    .admin-table th {
+      text-align: left; padding: 0.5rem 0.6rem;
+      background: var(--cream); color: var(--text-lt);
+      font-weight: 600; font-size: 0.72rem; letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .admin-table td {
+      padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--border);
+      color: var(--text-md);
+    }
+    .admin-table tr:last-child td { border-bottom: none; }
+    .badge { display: inline-block; padding: 0.15rem 0.55rem; border-radius: 50px; font-size: 0.68rem; font-weight: 700; }
+    .badge-admin   { background: #E8E0F5; color: var(--plum); }
+    .badge-user    { background: var(--cream); color: var(--text-lt); border: 1px solid var(--border); }
+    .badge-testing { background: #FFF3CD; color: #856404; }
+    .badge-live    { background: #D4F0E0; color: var(--sage-dk); }
+
+    /* Maint entries */
+    .maint-entry {
+      background: var(--cream); border-radius: 10px;
+      padding: 0.8rem 1rem; margin-bottom: 0.6rem;
+      border: 1px solid var(--border);
+    }
+    .maint-entry:last-child { margin-bottom: 0; }
+    .maint-entry-head {
+      display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem;
+    }
+    .maint-entry-title { font-size: 0.83rem; font-weight: 600; flex: 1; }
+    .maint-entry-body  { font-size: 0.76rem; color: var(--text-lt); }
+
+    /* Export visual */
+    .export-visual { display: flex; flex-direction: column; gap: 0.8rem; }
+    .export-sheet {
+      display: flex; align-items: center; gap: 0.9rem;
+      background: var(--cream); border-radius: 10px;
+      padding: 0.8rem 1rem; border: 1px solid var(--border);
+    }
+    .sheet-icon { font-size: 1.4rem; }
+    .sheet-info { flex: 1; }
+    .sheet-name  { font-size: 0.85rem; font-weight: 600; }
+    .sheet-rows  { font-size: 0.73rem; color: var(--text-lt); }
+    .sheet-dl    { font-size: 0.75rem; font-weight: 600; color: var(--sage-dk); }
+
+    /* ─── RECONCILE SECTION ─── */
+    .reconcile-section {
+      background: var(--white);
+    }
+    .reconcile-inner {
+      max-width: 1100px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center;
+    }
+    .recon-visual {
+      background: var(--cream); border-radius: 20px;
+      border: 1px solid var(--border);
+      padding: 1.5rem;
+    }
+    .recon-step {
+      display: flex; gap: 1rem; align-items: flex-start;
+      margin-bottom: 1.2rem;
+    }
+    .recon-step:last-child { margin-bottom: 0; }
+    .recon-num {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--sage-dk); color: var(--white);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.8rem; font-weight: 700; flex-shrink: 0;
+    }
+    .recon-body {}
+    .recon-title { font-size: 0.88rem; font-weight: 600; margin-bottom: 0.2rem; }
+    .recon-desc  { font-size: 0.8rem; color: var(--text-lt); }
+    .recon-result {
+      background: var(--white); border-radius: 10px;
+      border: 1px solid var(--border); padding: 1rem;
+      margin-top: 1.2rem;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .recon-result-label { font-size: 0.8rem; color: var(--text-lt); }
+    .recon-result-val   { font-size: 1.1rem; font-weight: 700; color: var(--sage-dk); }
+
+    /* ─── AUTH SECTION ─── */
+    .auth-section { background: var(--cream); }
+    .auth-inner {
+      max-width: 1100px; margin: 0 auto;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 4rem; align-items: center;
+    }
+    .auth-form-mock {
+      background: var(--white); border-radius: 20px;
+      border: 1px solid var(--border); box-shadow: var(--shadow-lg);
+      padding: 2rem;
+    }
+    .auth-form-title {
+      font-family: 'DM Serif Display', serif; font-size: 1.5rem;
+      margin-bottom: 0.3rem;
+    }
+    .auth-form-sub { font-size: 0.85rem; color: var(--text-lt); margin-bottom: 1.5rem; }
+    .form-field { margin-bottom: 1rem; }
+    .form-label { font-size: 0.78rem; font-weight: 600; color: var(--text-md); display: block; margin-bottom: 0.35rem; }
+    .form-input-mock {
+      width: 100%; background: var(--cream);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 0.6rem 0.9rem; font-size: 0.85rem; color: var(--text-lt);
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
+    .form-btn-mock {
+      width: 100%; background: var(--sage-dk); color: var(--white);
+      border: none; border-radius: 50px; padding: 0.75rem;
+      font-size: 0.9rem; font-weight: 600; cursor: default;
+      margin-top: 0.5rem;
+    }
+    .form-links {
+      display: flex; justify-content: space-between;
+      margin-top: 0.8rem;
+    }
+    .form-link { font-size: 0.78rem; color: var(--sage-dk); text-decoration: none; }
+
+    /* ─── SUBSCRIPTIONS ─── */
+    .sub-visual {}
+    .sub-item {
+      display: flex; align-items: center; gap: 0.9rem;
+      background: var(--cream); border-radius: 10px;
+      padding: 0.7rem 1rem; margin-bottom: 0.6rem;
+      border: 1px solid var(--border);
+    }
+    .sub-icon { font-size: 1.3rem; width: 36px; text-align: center; }
+    .sub-name { font-size: 0.85rem; font-weight: 600; flex: 1; }
+    .sub-interval { font-size: 0.73rem; color: var(--text-lt); }
+    .sub-cost { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+    .sub-total {
+      background: var(--sage-dk); color: var(--white);
+      border-radius: 10px; padding: 0.8rem 1rem;
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 0.4rem;
+    }
+    .sub-total-label { font-size: 0.85rem; font-weight: 600; }
+    .sub-total-val   { font-size: 1.1rem; font-weight: 700; }
+
+    /* ─── CTA BANNER ─── */
+    .cta-section {
+      background: linear-gradient(135deg, var(--sage-dk) 0%, var(--plum) 100%);
+      text-align: center; padding: 5rem 5%;
+    }
+    .cta-section h2 {
+      color: var(--white); max-width: 600px; margin: 0 auto 1rem;
+    }
+    .cta-section p { color: rgba(255,255,255,0.8); max-width: 480px; margin: 0 auto 2.5rem; }
+    .btn-white {
+      background: var(--white); color: var(--sage-dk);
+      padding: 0.9rem 2.2rem; border-radius: 50px;
+      font-size: 1rem; font-weight: 700; text-decoration: none;
+      display: inline-block;
+      transition: transform .2s, box-shadow .2s;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    }
+    .btn-white:hover { transform: translateY(-3px); box-shadow: 0 8px 32px rgba(0,0,0,0.25); }
+
+    /* ─── FOOTER ─── */
+    footer {
+      background: #1E2820;
+      color: rgba(255,255,255,0.65);
+      padding: 3rem 5%;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 1.5rem;
+    }
+    .footer-logo {
+      font-family: 'DM Serif Display', serif; font-size: 1.5rem;
+      color: var(--gold); text-decoration: none;
+    }
+    .footer-logo span { color: var(--sage-lt); }
+    .footer-tagline { font-size: 0.82rem; margin-top: 0.3rem; }
+    .footer-links { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    .footer-links a {
+      text-decoration: none; color: rgba(255,255,255,0.55);
+      font-size: 0.85rem; transition: color .2s;
+    }
+    .footer-links a:hover { color: var(--white); }
+    .footer-copy { font-size: 0.78rem; }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 768px) {
+      .mockup-body { grid-template-columns: 1fr; }
+      .mock-sidebar { display: none; }
+      .detail-row { grid-template-columns: 1fr; gap: 2rem; }
+      .detail-row.reverse { direction: ltr; }
+      .reconcile-inner, .auth-inner { grid-template-columns: 1fr; gap: 2rem; }
+      .nav-links { display: none; }
+      .cal-grid .cal-day { min-height: 38px; }
+    }
+
+    /* fade-in on scroll */
+    .fade-in {
+      opacity: 0; transform: translateY(28px);
+      transition: opacity 0.7s ease, transform 0.7s ease;
+    }
+    .fade-in.visible { opacity: 1; transform: none; }
+  </style>
+</head>
+<body>
+
+<!-- ─── NAV ─── -->
+<nav>
+  <a class="nav-logo" href="#"><div>NorthStar <span>Ledger</span></div><span class="nav-tagline">Your financial north star. ⭐</span></a>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#planner">Planner</a></li>
+    <li><a href="#savings">Savings</a></li>
+    <li><a href="#calendar">Calendar</a></li>
+    <li><a href="/support">Support</a></li>
+    <li><a href="/privacy">Privacy</a></li>
+    <li><a href="/login" class="nav-login">Log In</a></li>
+    <li><a href="/register" class="nav-cta">Get Started</a></li>
+  </ul>
+</nav>
+
+<!-- ─── HERO ─── -->
+<section class="hero">
+  <div class="hero-blob blob1"></div>
+  <div class="hero-blob blob2"></div>
+  <div class="hero-blob blob3"></div>
+
+  <div class="hero-badge"><span class="dot"></span>Free to join · Your finances, your way</div>
+
+  <h1>Personal finance that <em>finally</em> makes sense</h1>
+
+  <p class="hero-sub">
+    Organize every paycheck, bill, savings goal, and subscription in one beautiful
+    web app — built around how money actually moves through your life.
+  </p>
+  <div class="hero-btns">
+    <a href="/register" class="btn-primary">⭐ Get Started</a>
+    <a href="#features" class="btn-outline">See All Features</a>
+  </div>
+  <p style="margin-top:1rem; font-size:0.85rem; color:var(--text-lt); position:relative;">Already have an account? <a href="/login" style="color:var(--sage-dk); font-weight:600; text-decoration:none;">Log in</a></p>
+</section>
+
+<!-- ─── BROWSER MOCKUP ─── -->
+<div class="mockup-strip fade-in">
+  <div class="mockup-card">
+    <div class="mockup-bar">
+      <div class="mock-dot"></div>
+      <div class="mock-dot"></div>
+      <div class="mock-dot"></div>
+      <div class="mock-url">localhost:5000/planner</div>
+    </div>
+    <div class="mockup-body">
+      <div class="mock-sidebar">
+        <div class="mock-app-name">NS Ledger ⭐</div>
+        <div class="mock-nav-item active"><span class="icon">📋</span> Planner</div>
+        <div class="mock-nav-item"><span class="icon">🏠</span> Dashboard</div>
+        <div class="mock-nav-item"><span class="icon">🎯</span> Savings</div>
+        <div class="mock-nav-item"><span class="icon">💳</span> Debt</div>
+        <div class="mock-nav-item"><span class="icon">📅</span> Calendar</div>
+        <div class="mock-nav-item"><span class="icon">🔁</span> Subscriptions</div>
+        <div class="mock-nav-item"><span class="icon">❓</span> Help <span class="mock-nav-badge">2</span></div>
+      </div>
+      <div class="mock-main">
+        <div class="mock-stat-row">
+          <div class="mock-stat">
+            <div class="mock-stat-label">Available Now</div>
+            <div class="mock-stat-val green">$1,248.00</div>
+          </div>
+          <div class="mock-stat">
+            <div class="mock-stat-label">Remaining Bills</div>
+            <div class="mock-stat-val">$640.00</div>
+          </div>
+          <div class="mock-stat">
+            <div class="mock-stat-label">After Bills</div>
+            <div class="mock-stat-val green">$608.00</div>
+          </div>
+        </div>
+        <div class="mock-bucket">
+          <div class="mock-bucket-header">
+            <span class="mock-bucket-title">Paycheck — Mar 28</span>
+            <span class="mock-current-badge">CURRENT</span>
+          </div>
+          <div class="mock-bill-row">
+            <span class="mock-paid">Rent</span>
+            <span>$1,200.00</span>
+            <span class="mock-pill pill-paid">Paid</span>
+          </div>
+          <div class="mock-bill-row">
+            <span class="mock-unpaid">Electric Bill</span>
+            <span>$95.00</span>
+            <span class="mock-pill pill-due">Due Apr 2</span>
+          </div>
+          <div class="mock-bill-row">
+            <span class="mock-unpaid">Car Insurance</span>
+            <span>$148.00</span>
+            <span class="mock-pill pill-post">Postponed</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── FEATURES GRID ─── -->
+<section class="features-section" id="features">
+  <div class="inner">
+    <span class="section-label">Everything you need</span>
+    <h2>Built around your <em>real</em> financial life</h2>
+    <p class="section-sub">Create a free account and get a clear, powerful view of your money — paychecks, bills, goals, and more in one place.</p>
+
+    <div class="features-grid">
+      <div class="feat-card c-sage fade-in">
+        <div class="feat-icon">💵</div>
+        <h3>Paycheck-Bucket Planner</h3>
+        <p>Every bill lives inside a paycheck period. See your running balance, spot shortfalls before they happen, and always know exactly where you stand.</p>
+      </div>
+      <div class="feat-card c-blush fade-in">
+        <div class="feat-icon">🏖️</div>
+        <h3>Trips & Savings Goals</h3>
+        <p>Create named goals — vacations, emergency funds, big purchases — with progress bars and automatic contributions from your bill entries.</p>
+      </div>
+      <div class="feat-card c-plum fade-in">
+        <div class="feat-icon">💳</div>
+        <h3>Debt Tracker</h3>
+        <p>Track 0% promo deadlines, credit utilization, and loan payoff timelines. A built-in calculator shows you exactly when you'll be debt-free.</p>
+      </div>
+      <div class="feat-card c-gold fade-in">
+        <div class="feat-icon">📅</div>
+        <h3>Calendar View</h3>
+        <p>Every bill, paycheck, subscription, savings milestone, and promo deadline plotted on a monthly grid — click any event to edit it.</p>
+      </div>
+      <div class="feat-card c-sage fade-in">
+        <div class="feat-icon">🔁</div>
+        <h3>Subscriptions Tracker</h3>
+        <p>Log every recurring service with monthly, yearly, or custom billing cycles. See your total estimated monthly cost at a glance.</p>
+      </div>
+      <div class="feat-card c-blush fade-in">
+        <div class="feat-icon">⚖️</div>
+        <h3>Reconcile to Bank</h3>
+        <p>Enter your real bank balance and the app auto-calculates a correction entry using only paid bills — keeping your planner perfectly in sync.</p>
+      </div>
+      <div class="feat-card c-plum fade-in">
+        <div class="feat-icon">📊</div>
+        <h3>Spending Charts</h3>
+        <p>Recurring bill names are linked across months, generating charts showing how much you've spent on any given expense over time.</p>
+      </div>
+      <div class="feat-card c-gold fade-in">
+        <div class="feat-icon">📤</div>
+        <h3>Excel Export</h3>
+        <p>Export your entire financial history — bills, paychecks, ledger, trips, promotions — to a clean multi-sheet Excel file anytime.</p>
+      </div>
+      <div class="feat-card c-sage fade-in">
+        <div class="feat-icon">🔐</div>
+        <h3>Secure Auth</h3>
+        <p>Email + password login with security-question account recovery. Household support keeps your data private and exactly yours.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── PLANNER DETAIL ─── -->
+<section style="padding: 6rem 5%; background: var(--cream);" id="planner">
+  <div class="detail-row fade-in">
+    <div class="detail-text">
+      <span class="section-label">The Core Model</span>
+      <h2>Bills that live inside <em>paychecks</em></h2>
+      <p>
+        Instead of a generic calendar, NorthStar Ledger organizes every bill under the paycheck it belongs to.
+        Each period shows a running balance — income in, bills out — so you can see exactly how much
+        you'll have left before your next paycheck arrives.
+      </p>
+      <ul class="detail-list">
+        <li><span class="check">✓</span>The current paycheck is automatically flagged and expanded</li>
+        <li><span class="check">✓</span>Paycheck sections with negative balances are highlighted as warnings</li>
+        <li><span class="check">✓</span>Move bills to a different bucket without changing their due date</li>
+        <li><span class="check">✓</span>Mark bills paid, postponed, or moved — postponed bills don't subtract from your balance</li>
+        <li><span class="check">✓</span>Recurring bills auto-generate at the start of each month</li>
+      </ul>
+    </div>
+    <div class="detail-visual">
+      <div class="detail-visual-header">
+        <span>Bills / Planner</span>
+        <span style="color:var(--sage-dk); font-weight:700;">March 2026</span>
+      </div>
+      <div class="bucket-visual">
+        <div class="bucket-period" style="opacity:0.6;">
+          <div class="bucket-period-head">
+            <span class="bp-date">Mar 14 Paycheck</span>
+            <span class="bp-income">+$2,400.00</span>
+          </div>
+          <div class="bp-bill-row"><span class="bp-bill-name">Rent</span><span class="bp-bill-amt" style="color:#C0392B;">−$1,400.00</span></div>
+          <div class="bp-bill-row"><span class="bp-bill-name">Car Payment</span><span class="bp-bill-amt" style="color:#C0392B;">−$285.00</span></div>
+          <div style="display:flex;justify-content:space-between;margin-top:0.5rem;font-size:0.78rem;font-weight:700;">
+            <span>Remaining</span><span class="bp-balance pos">$715.00</span>
+          </div>
+        </div>
+        <div class="bucket-period current">
+          <div class="bucket-period-head">
+            <span class="bp-date">Mar 28 Paycheck</span>
+            <span class="bp-income">+$2,400.00</span>
+            <span class="mock-current-badge" style="font-size:0.65rem; font-weight:700; padding:0.15rem 0.5rem; background:var(--sage); color:#fff; border-radius:50px;">CURRENT</span>
+          </div>
+          <div class="bp-bill-row"><span class="bp-bill-name">Electric Bill</span><span class="bp-bill-amt" style="color:#C0392B;">−$95.00</span></div>
+          <div class="bp-bill-row"><span class="bp-bill-name">Internet</span><span class="bp-bill-amt" style="color:#C0392B;">−$65.00</span></div>
+          <div class="bp-bill-row">
+            <span class="bp-bill-name" style="color:var(--text-lt);">Car Insurance (postponed)</span>
+            <span class="bp-bill-amt" style="color:var(--text-lt);">—</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:0.5rem;font-size:0.78rem;font-weight:700;">
+            <span>Remaining</span><span class="bp-balance pos">$2,240.00</span>
+          </div>
+        </div>
+        <div class="bucket-period" style="border-color:#E74C3C; background:#FFF5F5;">
+          <div class="bucket-period-head">
+            <span class="bp-date">Apr 11 Paycheck</span>
+            <span class="bp-income">+$2,400.00</span>
+          </div>
+          <div class="bp-bill-row"><span class="bp-bill-name">Rent</span><span class="bp-bill-amt" style="color:#C0392B;">−$1,400.00</span></div>
+          <div class="bp-bill-row"><span class="bp-bill-name">Car Payment</span><span class="bp-bill-amt" style="color:#C0392B;">−$285.00</span></div>
+          <div class="bp-bill-row"><span class="bp-bill-name">Car Insurance</span><span class="bp-bill-amt" style="color:#C0392B;">−$148.00</span></div>
+          <div class="bp-bill-row"><span class="bp-bill-name">Vacation Fund</span><span class="bp-bill-amt" style="color:#C0392B;">−$200.00</span></div>
+          <div style="display:flex;justify-content:space-between;margin-top:0.5rem;font-size:0.78rem;font-weight:700;">
+            <span>Remaining</span><span class="bp-balance neg">−$33.00 ⚠️</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── RECONCILE ─── -->
+<section class="reconcile-section fade-in">
+  <div class="reconcile-inner">
+    <div class="detail-text">
+      <span class="section-label">Stay Accurate</span>
+      <h2>Reconcile to your <em>real</em> bank balance</h2>
+      <p>
+        Life is messy. A forgotten charge here, a pending transaction there — and suddenly your
+        planner doesn't match your bank. NorthStar Ledger's reconcile tool fixes that in seconds.
+      </p>
+      <ul class="detail-list">
+        <li><span class="check">✓</span>Enter your actual bank balance and a date</li>
+        <li><span class="check">✓</span>NorthStar Ledger calculates the difference using only paid bills</li>
+        <li><span class="check">✓</span>A Balance Adjustment entry is inserted automatically</li>
+        <li><span class="check">✓</span>Your running balance snaps back to reality — no manual hunting</li>
+      </ul>
+    </div>
+    <div class="recon-visual">
+      <div class="detail-visual-header" style="margin-bottom:1.2rem;">
+        <span>⚖️ Reconcile to Bank</span>
+        <span style="font-size:0.73rem; background:var(--sage-dk); color:#fff; padding:0.2rem 0.6rem; border-radius:50px;">Mar 30, 2026</span>
+      </div>
+      <div class="recon-step">
+        <div class="recon-num">1</div>
+        <div class="recon-body">
+          <div class="recon-title">Enter your bank balance</div>
+          <div class="recon-desc" style="background:var(--white); border:1px solid var(--border); border-radius:8px; padding:0.4rem 0.7rem; margin-top:0.3rem; font-size:0.85rem; color:var(--text);">$1,184.37</div>
+        </div>
+      </div>
+      <div class="recon-step">
+        <div class="recon-num">2</div>
+        <div class="recon-body">
+          <div class="recon-title">NorthStar Ledger tallies your paid bills</div>
+          <div class="recon-desc">Rent $1,200 + Electric $95 = $1,295 deducted from $2,400 paycheck → expected $1,105.00</div>
+        </div>
+      </div>
+      <div class="recon-step">
+        <div class="recon-num">3</div>
+        <div class="recon-body">
+          <div class="recon-title">A correction entry is added</div>
+          <div class="recon-desc">Difference of +$79.37 is inserted as a Balance Adjustment</div>
+        </div>
+      </div>
+      <div class="recon-result">
+        <div>
+          <div class="recon-result-label">New Running Balance</div>
+          <div class="recon-result-val">$1,184.37 ✓</div>
+        </div>
+        <span style="font-size:1.8rem;">🎯</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── SAVINGS ─── -->
+<section style="padding: 6rem 5%; background: var(--cream);" id="savings">
+  <div class="detail-row reverse fade-in">
+    <div class="detail-text">
+      <span class="section-label">Goals & Milestones</span>
+      <h2>Save for the things that <em>matter</em></h2>
+      <p>
+        Create named savings goals for anything — a dream vacation, a new car, an emergency fund.
+        Whenever you add a bill tagged as "savings," NorthStar Ledger automatically counts it toward the right goal.
+      </p>
+      <ul class="detail-list">
+        <li><span class="check">✓</span>Progress bars that update in real time as contributions come in</li>
+        <li><span class="check">✓</span>Bills marked as Trips/Savings auto-link to your goals</li>
+        <li><span class="check">✓</span>Contributions flow from the planner and vice versa seamlessly</li>
+        <li><span class="check">✓</span>Set a target amount and track how close you are</li>
+      </ul>
+    </div>
+    <div class="detail-visual">
+      <div class="detail-visual-header"><span>🎯 Savings Goals</span></div>
+      <div class="savings-goals">
+        <div class="goal-item">
+          <div class="goal-header">
+            <span class="goal-name">🏖️ Cancun Trip — July 2026</span>
+            <span class="goal-pct">68%</span>
+          </div>
+          <div class="goal-bar-bg"><div class="goal-bar-fill fill-sage" style="width:68%"></div></div>
+          <div class="goal-amounts">$1,360 saved of $2,000 goal</div>
+        </div>
+        <div class="goal-item">
+          <div class="goal-header">
+            <span class="goal-name">🚗 Car Down Payment</span>
+            <span class="goal-pct">42%</span>
+          </div>
+          <div class="goal-bar-bg"><div class="goal-bar-fill fill-blush" style="width:42%"></div></div>
+          <div class="goal-amounts">$2,100 saved of $5,000 goal</div>
+        </div>
+        <div class="goal-item">
+          <div class="goal-header">
+            <span class="goal-name">🌧️ Emergency Fund</span>
+            <span class="goal-pct">91%</span>
+          </div>
+          <div class="goal-bar-bg"><div class="goal-bar-fill fill-plum" style="width:91%"></div></div>
+          <div class="goal-amounts">$9,100 saved of $10,000 goal</div>
+        </div>
+        <div class="goal-item">
+          <div class="goal-header">
+            <span class="goal-name">💻 New Laptop</span>
+            <span class="goal-pct">25%</span>
+          </div>
+          <div class="goal-bar-bg"><div class="goal-bar-fill fill-sage" style="width:25%"></div></div>
+          <div class="goal-amounts">$375 saved of $1,500 goal</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── DEBT ─── -->
+<section style="padding: 6rem 5%; background: var(--white);">
+  <div class="detail-row fade-in">
+    <div class="detail-text">
+      <span class="section-label">Debt Tracker</span>
+      <h2>Get out of debt with a <em>real</em> plan</h2>
+      <p>
+        Track every card, loan, and 0% promotion in one place. NorthStar Ledger alerts you before promotional
+        rates expire and shows you a payoff timeline so you always have a clear finish line.
+      </p>
+      <ul class="detail-list">
+        <li><span class="check">✓</span>0% interest promo deadlines with expiration alerts</li>
+        <li><span class="check">✓</span>Credit card limits, balances, and utilization tracking</li>
+        <li><span class="check">✓</span>Loan payoff timelines with amortization modeling</li>
+        <li><span class="check">✓</span>Built-in debt payoff calculator — enter a payment, see the date</li>
+      </ul>
+    </div>
+    <div class="detail-visual">
+      <div class="detail-visual-header"><span>💳 Debt Tracker</span></div>
+      <div class="debt-visual">
+        <div class="debt-card">
+          <div class="debt-header">
+            <span class="debt-name">Chase Sapphire — 0% Promo</span>
+            <span class="debt-alert alert-promo">⏰ Expires Jun 15</span>
+          </div>
+          <div class="debt-row"><span>Balance: $2,840</span><span>Limit: $8,000</span></div>
+          <div class="debt-util-bar-bg"><div class="debt-util-fill util-low" style="width:35%"></div></div>
+          <div class="goal-amounts" style="margin-top:0.4rem;">35% utilization — Pay $473/mo to clear before promo ends</div>
+        </div>
+        <div class="debt-card">
+          <div class="debt-header">
+            <span class="debt-name">Capital One Quicksilver</span>
+            <span class="debt-alert alert-ok">22.99% APR</span>
+          </div>
+          <div class="debt-row"><span>Balance: $5,200</span><span>Limit: $6,500</span></div>
+          <div class="debt-util-bar-bg"><div class="debt-util-fill util-high" style="width:80%"></div></div>
+          <div class="goal-amounts" style="margin-top:0.4rem;">80% utilization ⚠️ — Pay $200/mo → payoff in 34 months</div>
+        </div>
+        <div class="debt-card">
+          <div class="debt-header">
+            <span class="debt-name">Car Loan — Toyota Financial</span>
+            <span class="debt-alert alert-ok">3.9% APR</span>
+          </div>
+          <div class="debt-row"><span>Balance: $9,485</span><span>$285/mo payment</span></div>
+          <div class="debt-util-bar-bg"><div class="debt-util-fill util-mid" style="width:55%"></div></div>
+          <div class="goal-amounts" style="margin-top:0.4rem;">55% remaining — Payoff estimated Nov 2028</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── SUBSCRIPTIONS ─── -->
+<section style="padding: 6rem 5%; background: var(--cream);" id="calendar">
+  <div class="detail-row reverse fade-in">
+    <div class="detail-text">
+      <span class="section-label">Subscriptions</span>
+      <h2>Know what you're <em>actually</em> paying every month</h2>
+      <p>
+        Log every recurring service — streaming, gym, software, anything — with flexible billing cycles.
+        NorthStar Ledger normalizes them all to a monthly cost so you see the true total instantly.
+      </p>
+      <ul class="detail-list">
+        <li><span class="check">✓</span>Monthly, yearly, or custom billing intervals</li>
+        <li><span class="check">✓</span>Estimated monthly cost summary across all subscriptions</li>
+        <li><span class="check">✓</span>Renewal dates plotted on the calendar view</li>
+      </ul>
+    </div>
+    <div class="detail-visual">
+      <div class="detail-visual-header"><span>🔁 Subscriptions</span></div>
+      <div class="sub-visual">
+        <div class="sub-item"><div class="sub-icon">📺</div><div class="sub-name">Netflix<div class="sub-interval">Monthly</div></div><div class="sub-cost">$15.99</div></div>
+        <div class="sub-item"><div class="sub-icon">🎵</div><div class="sub-name">Spotify Family<div class="sub-interval">Monthly</div></div><div class="sub-cost">$16.99</div></div>
+        <div class="sub-item"><div class="sub-icon">💪</div><div class="sub-name">Planet Fitness<div class="sub-interval">Monthly</div></div><div class="sub-cost">$25.00</div></div>
+        <div class="sub-item"><div class="sub-icon">☁️</div><div class="sub-name">iCloud 200GB<div class="sub-interval">Monthly</div></div><div class="sub-cost">$2.99</div></div>
+        <div class="sub-item"><div class="sub-icon">🖥️</div><div class="sub-name">Adobe CC<div class="sub-interval">Yearly ($599.88/yr)</div></div><div class="sub-cost">$49.99</div></div>
+        <div class="sub-total">
+          <span class="sub-total-label">Total estimated monthly</span>
+          <span class="sub-total-val">$110.96/mo</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── CALENDAR ─── -->
+<section style="padding: 6rem 5%; background: var(--white);">
+  <div class="detail-row fade-in">
+    <div class="detail-text">
+      <span class="section-label">Calendar View</span>
+      <h2>Every financial event in <em>one</em> view</h2>
+      <p>
+        A monthly calendar grid plots every bill, paycheck, savings goal deadline, subscription renewal,
+        and promo expiration — color-coded so you can read the month in seconds.
+      </p>
+      <ul class="detail-list">
+        <li><span class="check">✓</span>Bills, paychecks, goals, promos, and subscriptions all in one place</li>
+        <li><span class="check">✓</span>Click any event to edit it directly from the calendar</li>
+        <li><span class="check">✓</span>Color-coded by event type for instant visual scanning</li>
+      </ul>
+    </div>
+    <div class="detail-visual">
+      <div class="detail-visual-header"><span>📅 April 2026</span></div>
+      <div class="cal-visual">
+        <div class="cal-grid">
+          <div class="cal-day-name">Sun</div>
+          <div class="cal-day-name">Mon</div>
+          <div class="cal-day-name">Tue</div>
+          <div class="cal-day-name">Wed</div>
+          <div class="cal-day-name">Thu</div>
+          <div class="cal-day-name">Fri</div>
+          <div class="cal-day-name">Sat</div>
+
+          <div class="cal-day other">30</div>
+          <div class="cal-day other">31</div>
+          <div class="cal-day">1<div class="cal-event ev-sub">Netflix</div></div>
+          <div class="cal-day">2<div class="cal-event ev-bill">Electric</div></div>
+          <div class="cal-day">3</div>
+          <div class="cal-day">4<div class="cal-event ev-bill">Internet</div></div>
+          <div class="cal-day">5</div>
+
+          <div class="cal-day">6</div>
+          <div class="cal-day">7</div>
+          <div class="cal-day">8</div>
+          <div class="cal-day">9<div class="cal-event ev-goal">Cancun Fund</div></div>
+          <div class="cal-day">10</div>
+          <div class="cal-day">11<div class="cal-event ev-pay">Paycheck</div></div>
+          <div class="cal-day">12</div>
+
+          <div class="cal-day">13</div>
+          <div class="cal-day">14<div class="cal-event ev-bill">Rent</div></div>
+          <div class="cal-day today">15</div>
+          <div class="cal-day">16</div>
+          <div class="cal-day">17<div class="cal-event ev-sub">Adobe CC</div></div>
+          <div class="cal-day">18</div>
+          <div class="cal-day">19</div>
+
+          <div class="cal-day">20</div>
+          <div class="cal-day">21</div>
+          <div class="cal-day">22<div class="cal-event ev-bill">Car Ins.</div></div>
+          <div class="cal-day">23</div>
+          <div class="cal-day">24</div>
+          <div class="cal-day">25<div class="cal-event ev-pay">Paycheck</div></div>
+          <div class="cal-day">26</div>
+        </div>
+        <div style="display:flex; gap:0.8rem; flex-wrap:wrap; margin-top:1rem;">
+          <span style="display:flex;align-items:center;gap:0.3rem;font-size:0.72rem;"><span class="cal-event ev-pay" style="margin:0;padding:0.15rem 0.5rem;">Paycheck</span></span>
+          <span style="display:flex;align-items:center;gap:0.3rem;font-size:0.72rem;"><span class="cal-event ev-bill" style="margin:0;padding:0.15rem 0.5rem;">Bill</span></span>
+          <span style="display:flex;align-items:center;gap:0.3rem;font-size:0.72rem;"><span class="cal-event ev-sub" style="margin:0;padding:0.15rem 0.5rem;">Subscription</span></span>
+          <span style="display:flex;align-items:center;gap:0.3rem;font-size:0.72rem;"><span class="cal-event ev-goal" style="margin:0;padding:0.15rem 0.5rem;">Goal</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── AUTH ─── -->
+<section class="auth-section fade-in">
+  <div class="auth-inner">
+    <div class="detail-text">
+      <span class="section-label">Security & Access</span>
+      <h2>Your account, your <em>data</em></h2>
+      <p>
+        NorthStar Ledger is a hosted platform — just create an account and start using it. Your financial data
+        is private to you, protected by secure authentication and account recovery built right in.
+      </p>
+      <ul class="detail-list">
+        <li><span class="check">✓</span>Email + password login with secure session management</li>
+        <li><span class="check">✓</span>Two security questions for password recovery — no waiting on reset emails</li>
+        <li><span class="check">✓</span>Sign up in seconds — no invite needed, open to everyone</li>
+      </ul>
+    </div>
+    <div class="auth-form-mock">
+      <div class="auth-form-title">Welcome back ⭐</div>
+      <div class="auth-form-sub">Sign in to your NorthStar Ledger account</div>
+      <div class="form-field">
+        <label class="form-label">Email address</label>
+        <div class="form-input-mock">you@example.com</div>
+      </div>
+      <div class="form-field">
+        <label class="form-label">Password</label>
+        <div class="form-input-mock">••••••••••</div>
+      </div>
+      <button class="form-btn-mock">Sign In</button>
+      <div class="form-links">
+        <a href="#" class="form-link">Create an account</a>
+        <a href="#" class="form-link">Forgot password?</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── EXPORT ─── -->
+<section style="padding: 6rem 5%; background: var(--cream);" class="fade-in">
+  <div style="max-width: 1100px; margin: 0 auto; display:grid; grid-template-columns:1fr 1fr; gap:4rem; align-items:center;">
+    <div class="detail-text">
+      <span class="section-label">Data Export</span>
+      <h2>Your data, <em>always</em> exportable</h2>
+      <p>
+        Export everything to a clean multi-sheet Excel file at any time. Bills, paychecks, ledger history,
+        savings goals, trips, and promotions — all organized, all yours.
+      </p>
+      <ul class="detail-list">
+        <li><span class="check">✓</span>Multi-sheet Excel export — one sheet per data type</li>
+        <li><span class="check">✓</span>Complete history, not just the current month</li>
+        <li><span class="check">✓</span>Download anytime from your settings page</li>
+      </ul>
+    </div>
+    <div class="detail-visual">
+      <div class="detail-visual-header"><span>📤 Export to Excel</span><span style="background:var(--sage-dk);color:#fff;font-size:0.72rem;font-weight:700;padding:0.2rem 0.7rem;border-radius:50px;">Ready</span></div>
+      <div class="export-visual">
+        <div class="export-sheet"><div class="sheet-icon">🧾</div><div class="sheet-info"><div class="sheet-name">Bills &amp; Paychecks</div><div class="sheet-rows">248 rows · Mar 2024 – Mar 2026</div></div><div class="sheet-dl">↓ Sheet 1</div></div>
+        <div class="export-sheet"><div class="sheet-icon">📒</div><div class="sheet-info"><div class="sheet-name">Ledger History</div><div class="sheet-rows">512 rows · Full transaction log</div></div><div class="sheet-dl">↓ Sheet 2</div></div>
+        <div class="export-sheet"><div class="sheet-icon">🏖️</div><div class="sheet-info"><div class="sheet-name">Trips &amp; Savings</div><div class="sheet-rows">14 goals · contribution history</div></div><div class="sheet-dl">↓ Sheet 3</div></div>
+        <div class="export-sheet"><div class="sheet-icon">💳</div><div class="sheet-info"><div class="sheet-name">Promotions &amp; Debt</div><div class="sheet-rows">8 cards/loans tracked</div></div><div class="sheet-dl">↓ Sheet 4</div></div>
+        <div style="margin-top:0.8rem;">
+          <button class="btn-primary" style="width:100%; text-align:center; border-radius:12px;">Download All Sheets (.xlsx)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── CTA ─── -->
+<section class="cta-section fade-in">
+  <h2>Ready to take control of your finances?</h2>
+  <p>Sign up for free and start organizing your money the way it actually works — paycheck by paycheck.</p>
+  <a href="/register" class="btn-white">⭐ Create Your Free Account</a>
+</section>
+
+<!-- ─── FOOTER ─── -->
+<footer>
+  <div>
+    <a class="footer-logo" href="#">NorthStar <span>Ledger</span></a>
+    <div class="footer-tagline">Your financial north star. ⭐</div>
+  </div>
+  <div class="footer-links">
+    <a href="#features">Features</a>
+    <a href="#planner">Planner</a>
+    <a href="#savings">Savings</a>
+    <a href="#calendar">Calendar</a>
+  </div>
+  <div class="footer-links">
+    <a href="/privacy">Privacy Policy</a>
+    <a href="/support">Support</a>
+  </div>
+</footer>
+
+<script>
+  // Fade-in on scroll
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.12 });
+
+  document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>

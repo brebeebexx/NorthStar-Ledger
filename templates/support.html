@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico"/>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Support — NorthStar Ledger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"/>
+</head>
+<body class="auth-page">
+
+  <div class="policy-container">
+    <div class="policy-brand">
+      <a href="/" class="auth-logo">NorthStar <span>Ledger</span></a>
+    </div>
+
+    <div class="policy-card">
+      <h1>Support</h1>
+      <p class="policy-updated">We're here to help.</p>
+
+      <p>NorthStar Ledger is a personal finance planning tool built to help you stay on top of your bills, paychecks, savings, and debt — all in one place.</p>
+
+      <h2>Getting Started</h2>
+      <p>After signing in, start by adding your paychecks under <strong>Bills / Planner</strong>. From there you can add bills and assign them to paycheck buckets based on due date. Use the Dashboard for a month-at-a-glance view, and Trips & Savings to track your savings goals.</p>
+
+      <h2>Common Questions</h2>
+
+      <div class="support-faq">
+        <div class="faq-item">
+          <div class="faq-q">How do I assign a bill to a paycheck?</div>
+          <div class="faq-a">When adding a bill, the paycheck is automatically assigned based on the due date. You can also change the assignment manually by editing the bill and selecting a different paycheck.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">What does "Reconcile to Bank" do?</div>
+          <div class="faq-a">Reconcile to Bank lets you enter your actual bank balance so the app can calculate an adjustment entry. This keeps your running balance accurate if it drifts from reality.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">How do recurring bills work?</div>
+          <div class="faq-a">Mark a bill as Recurring when adding or editing it, and set its frequency (monthly, quarterly, etc.). Use the Recurring Bills manager to generate new bill entries for the current month based on your templates.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">Can I export my data?</div>
+          <div class="faq-a">Yes — use the Export option inside the app to download your financial data.</div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">How do I reset my password?</div>
+          <div class="faq-a">On the login screen, tap "Forgot password?" and answer your security questions to reset your password.</div>
+        </div>
+      </div>
+
+      <h2>Contact</h2>
+      <p>If you have a question not covered here or need to report an issue, email us at:</p>
+      <p><strong><a href="mailto:support@nsledger.com">support@nsledger.com</a></strong></p>
+      <p style="font-size:0.85rem;color:var(--text-lt);">If you are signed in, you can also send a message directly from the <strong>Help</strong> tab inside the app.</p>
+    </div>
+
+    <div class="auth-footer">
+      <a href="/login">← Back to Login</a>
+      <span class="auth-footer-dot">·</span>
+      <a href="/privacy">Privacy Policy</a>
+    </div>
+  </div>
+
+</body>
+</html>

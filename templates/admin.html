@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <link rel="icon" type="image/x-icon" href="/static/favicon.ico"/>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Admin — NorthStar Ledger</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --sage-dk: #3D6B54;
+      --sage:    #5A8A6F;
+      --gold:    #D4A853;
+      --navy:    #2C4A7C;
+      --danger:  #C0392B;
+      --warning: #E67E22;
+      --cream:   #F8F7F3;
+      --white:   #FFFFFF;
+      --border:  #E2DDD5;
+      --text:    #2D2D2D;
+      --text-md: #5A5A5A;
+      --text-lt: #9A9A9A;
+      --r:       10px;
+      --shadow:  0 2px 8px rgba(0,0,0,0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); min-height: 100vh; }
+
+    /* ── Top Bar ── */
+    .topbar {
+      background: var(--navy); color: #fff;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.9rem 2rem; position: sticky; top: 0; z-index: 50;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+    .topbar-logo { font-family: 'DM Serif Display', serif; font-size: 1.3rem; }
+    .topbar-logo span { color: var(--gold); }
+    .topbar-logo em { color: var(--sage); font-style: normal; }
+    .topbar-meta { font-size: 0.8rem; opacity: 0.7; }
+    .topbar-actions { display: flex; gap: 0.7rem; align-items: center; }
+    .btn-sm {
+      padding: 0.35rem 0.85rem; border-radius: 6px; font-size: 0.8rem;
+      font-family: 'DM Sans', sans-serif; font-weight: 600; cursor: pointer;
+      border: 1.5px solid rgba(255,255,255,0.35); background: transparent;
+      color: #fff; text-decoration: none; transition: background .15s;
+    }
+    .btn-sm:hover { background: rgba(255,255,255,0.12); }
+    .btn-sm.primary { background: var(--gold); border-color: var(--gold); color: var(--navy); }
+
+    /* ── Layout ── */
+    .admin-layout { display: flex; min-height: calc(100vh - 54px); }
+
+    .sidebar {
+      width: 210px; background: var(--white); border-right: 1px solid var(--border);
+      padding: 1.5rem 0; flex-shrink: 0;
+    }
+    .sidebar-section { padding: 0.4rem 1rem 0.2rem; font-size: 0.65rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-lt); }
+    .nav-item {
+      display: flex; align-items: center; gap: 0.55rem;
+      padding: 0.6rem 1.2rem; font-size: 0.875rem; font-weight: 500;
+      color: var(--text-md); text-decoration: none; cursor: pointer;
+      border-left: 3px solid transparent; transition: all .15s;
+    }
+    .nav-item:hover { background: var(--cream); color: var(--text); }
+    .nav-item.active { background: #edf4f0; color: var(--sage-dk); border-left-color: var(--sage-dk); font-weight: 600; }
+    .badge { background: var(--danger); color: #fff; border-radius: 999px;
+      font-size: 0.65rem; font-weight: 700; padding: 0.1rem 0.45rem; margin-left: auto; }
+
+    /* ── Main content ── */
+    .admin-main { flex: 1; padding: 2rem; overflow-x: auto; }
+    .tab-section { display: none; }
+    .tab-section.active { display: block; }
+    .page-title { font-family: 'DM Serif Display', serif; font-size: 1.6rem; color: var(--navy); margin-bottom: 0.25rem; }
+    .page-sub { font-size: 0.875rem; color: var(--text-lt); margin-bottom: 1.5rem; }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--r); box-shadow: var(--shadow); margin-bottom: 1.5rem;
+    }
+    .card-header {
+      padding: 1rem 1.4rem; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 0.5rem;
+    }
+    .card-title { font-weight: 700; font-size: 0.95rem; color: var(--navy); }
+
+    /* ── Stats row ── */
+    .stat-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .stat-card {
+      flex: 1; min-width: 130px; background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 1rem 1.2rem; box-shadow: var(--shadow); text-align: center;
+    }
+    .stat-val { font-family: 'DM Serif Display', serif; font-size: 2rem; line-height: 1.1; }
+    .stat-val.gold { color: var(--gold); }
+    .stat-val.green { color: var(--sage-dk); }
+    .stat-val.red { color: var(--danger); }
+    .stat-lbl { font-size: 0.75rem; color: var(--text-lt); margin-top: 0.2rem; }
+
+    /* ── Table ── */
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    th { text-align: left; padding: 0.65rem 1rem; background: var(--cream);
+      font-size: 0.73rem; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--text-md); border-bottom: 1px solid var(--border); }
+    td { padding: 0.7rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #fafaf8; }
+
+    /* ── Pill badges ── */
+    .pill {
+      display: inline-block; padding: 0.15rem 0.6rem; border-radius: 999px;
+      font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+    }
+    .pill-admin   { background: #fef3c7; color: #92400e; }
+    .pill-user    { background: #f0fdf4; color: #166534; }
+    .pill-unread  { background: #fee2e2; color: var(--danger); }
+    .pill-read    { background: #f0fdf4; color: #166534; }
+    .pill-open    { background: #fef3c7; color: #92400e; }
+    .pill-closed  { background: #f0fdf4; color: #166534; }
+    .pill-testing { background: #ede9fe; color: #5b21b6; }
+    .pill-live    { background: #d1fae5; color: #065f46; }
+
+    /* ── Buttons ── */
+    .btn-danger {
+      background: none; border: 1.5px solid var(--danger); color: var(--danger);
+      border-radius: 6px; padding: 0.25rem 0.65rem; font-size: 0.75rem;
+      font-family: 'DM Sans', sans-serif; font-weight: 600; cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-danger:hover { background: #fee2e2; }
+    .btn-outline {
+      background: none; border: 1.5px solid var(--border); color: var(--text-md);
+      border-radius: 6px; padding: 0.25rem 0.65rem; font-size: 0.75rem;
+      font-family: 'DM Sans', sans-serif; font-weight: 600; cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-outline:hover { background: var(--cream); }
+    .btn-primary {
+      background: var(--sage-dk); border: none; color: #fff;
+      border-radius: 6px; padding: 0.45rem 1rem; font-size: 0.82rem;
+      font-family: 'DM Sans', sans-serif; font-weight: 600; cursor: pointer;
+      transition: opacity .15s;
+    }
+    .btn-primary:hover { opacity: 0.88; }
+
+    /* ── Forms ── */
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.8rem; padding: 1.2rem; }
+    .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
+    .form-group label { font-size: 0.75rem; font-weight: 600; color: var(--text-md); }
+    .form-group input, .form-group select, .form-group textarea {
+      border: 1.5px solid var(--border); border-radius: 6px; padding: 0.45rem 0.7rem;
+      font-family: 'DM Sans', sans-serif; font-size: 0.875rem; background: var(--white);
+      outline: none; transition: border-color .15s;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      border-color: var(--sage-dk);
+    }
+    .form-footer { padding: 0.8rem 1.2rem; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; }
+
+    /* ── Help message expand ── */
+    .help-body { font-size: 0.82rem; color: var(--text-md); padding: 0.6rem 1rem;
+      background: var(--cream); border-radius: 6px; margin-top: 0.3rem; white-space: pre-wrap; }
+    .expandable { cursor: pointer; }
+    .expandable:hover { text-decoration: underline; }
+
+    /* ── Empty state ── */
+    .empty { padding: 2.5rem; text-align: center; color: var(--text-lt); font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <div class="topbar-logo">⭐ <span>NorthStar</span> <em>Ledger</em> <span style="font-family:'DM Sans',sans-serif;font-size:0.8rem;opacity:0.6;font-weight:400;">Admin</span></div>
+  <div class="topbar-meta">Logged in as {{ session.get('user_name', '') }}</div>
+  <div class="topbar-actions">
+    <a class="btn-sm" href="/app">← Back to App</a>
+    <a class="btn-sm" href="/logout">Log Out</a>
+  </div>
+</div>
+
+<div class="admin-layout">
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="sidebar-section">Manage</div>
+    <a class="nav-item {% if active_tab == 'users' %}active{% endif %}" onclick="switchAdminTab('users')">👤 Users</a>
+    <a class="nav-item {% if active_tab == 'help' %}active{% endif %}" onclick="switchAdminTab('help')">
+      💬 Help Messages
+      {% if unread_count > 0 %}<span class="badge">{{ unread_count }}</span>{% endif %}
+    </a>
+    <div class="sidebar-section" style="margin-top:1rem;">Log</div>
+    <a class="nav-item {% if active_tab == 'maintenance' %}active{% endif %}" onclick="switchAdminTab('maintenance')">🔧 Maintenance Log</a>
+    <a class="nav-item {% if active_tab == 'versions' %}active{% endif %}" onclick="switchAdminTab('versions')">🚀 Versions</a>
+    <a class="nav-item {% if active_tab == 'ios' %}active{% endif %}" onclick="switchAdminTab('ios')">📱 iOS Releases</a>
+  </nav>
+
+  <!-- Main -->
+  <main class="admin-main">
+
+    <!-- ══════════════════ USERS ══════════════════ -->
+    <div id="tab-users" class="tab-section {% if active_tab == 'users' %}active{% endif %}">
+      <div class="page-title">Users</div>
+      <div class="page-sub">All registered accounts on NorthStar Ledger.</div>
+
+      <div class="stat-row">
+        <div class="stat-card"><div class="stat-val gold">{{ users | length }}</div><div class="stat-lbl">Active Accounts</div></div>
+        <div class="stat-card"><div class="stat-val green">{{ users | selectattr('is_admin') | list | length }}</div><div class="stat-lbl">Admins</div></div>
+        <div class="stat-card"><div class="stat-val" style="color:var(--danger);">{{ deleted_users | length }}</div><div class="stat-lbl">Deleted</div></div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Active Users</div></div>
+        {% if users %}
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Name</th><th>Email</th><th>Role</th>
+            <th>Joined</th><th>Last Login</th><th>Action</th>
+          </tr></thead>
+          <tbody>
+          {% for u in users %}
+          <tr>
+            <td style="color:var(--text-lt);">{{ u.id }}</td>
+            <td><strong>{{ u.name or '—' }}</strong></td>
+            <td>{{ u.email }}</td>
+            <td>
+              {% if u.is_admin %}
+                <span class="pill pill-admin">Admin</span>
+              {% else %}
+                <span class="pill pill-user">User</span>
+              {% endif %}
+            </td>
+            <td style="color:var(--text-lt);">{{ u.created_at[:10] if u.created_at else '—' }}</td>
+            <td style="color:var(--text-lt);">{{ u.last_login[:10] if u.last_login else 'Never' }}</td>
+            <td>
+              {% if not u.is_admin %}
+              <button class="btn-danger" onclick="deleteUser({{ u.id }}, '{{ u.email }}')">Delete</button>
+              {% else %}
+              <span style="font-size:0.75rem;color:var(--text-lt);">Protected</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty">No active users.</div>
+        {% endif %}
+      </div>
+
+      {% if deleted_users %}
+      <div class="card" style="border-color:#fca5a5;">
+        <div class="card-header" style="background:#fff8f8;">
+          <div class="card-title" style="color:var(--danger);">🗑 Deleted Accounts</div>
+        </div>
+        <table>
+          <thead><tr>
+            <th>ID</th><th>Name</th><th>Email</th>
+            <th>Joined</th><th>Last Login</th><th>Deleted At</th>
+          </tr></thead>
+          <tbody>
+          {% for u in deleted_users %}
+          <tr style="opacity:0.7;">
+            <td style="color:var(--text-lt);">{{ u.id }}</td>
+            <td><s>{{ u.name or '—' }}</s></td>
+            <td style="color:var(--text-lt);">{{ u.email }}</td>
+            <td style="color:var(--text-lt);">{{ u.created_at[:10] if u.created_at else '—' }}</td>
+            <td style="color:var(--text-lt);">{{ u.last_login[:10] if u.last_login else 'Never' }}</td>
+            <td>
+              <span style="font-size:0.78rem;font-weight:600;color:var(--danger);">
+                {{ u.deleted_at[:16].replace('T',' ') if u.deleted_at else '—' }} UTC
+              </span>
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+
+
+    <!-- ══════════════════ HELP MESSAGES ══════════════════ -->
+    <div id="tab-help" class="tab-section {% if active_tab == 'help' %}active{% endif %}">
+      <div class="page-title">Help Messages</div>
+      <div class="page-sub">Support messages sent by users from within the app.</div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Inbox {% if unread_count > 0 %}<span class="badge" style="font-size:0.7rem;">{{ unread_count }} unread</span>{% endif %}</div>
+        </div>
+        {% if help_msgs %}
+        <table>
+          <thead><tr>
+            <th>Status</th><th>From</th><th>Subject</th><th>Date</th><th>Action</th>
+          </tr></thead>
+          <tbody>
+          {% for m in help_msgs %}
+          <tr id="help-row-{{ m.id }}">
+            <td>
+              <span class="pill {% if m.status == 'unread' %}pill-unread{% else %}pill-read{% endif %}">
+                {{ m.status }}
+              </span>
+            </td>
+            <td>
+              <strong>{{ m.user_name or '—' }}</strong><br>
+              <span style="font-size:0.75rem;color:var(--text-lt);">{{ m.user_email }}</span>
+            </td>
+            <td>
+              <div class="expandable" onclick="toggleHelp({{ m.id }})">
+                {{ m.subject or '(no subject)' }}
+              </div>
+              <div id="help-body-{{ m.id }}" class="help-body" style="display:none;">{{ m.message }}</div>
+            </td>
+            <td style="color:var(--text-lt);white-space:nowrap;">{{ m.created_at[:10] if m.created_at else '—' }}</td>
+            <td>
+              {% if m.status == 'unread' %}
+              <button class="btn-outline" onclick="markHelp({{ m.id }}, 'read')">Mark Read</button>
+              {% else %}
+              <button class="btn-outline" onclick="markHelp({{ m.id }}, 'unread')">Mark Unread</button>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty">No help messages yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+
+    <!-- ══════════════════ MAINTENANCE LOG ══════════════════ -->
+    <div id="tab-maintenance" class="tab-section {% if active_tab == 'maintenance' %}active{% endif %}">
+      <div class="page-title">Maintenance Log</div>
+      <div class="page-sub">Track bugs, features, and improvements.</div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Add Entry</div>
+        </div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Category</label>
+            <select id="m-category">
+              <option value="bug">🐛 Bug</option>
+              <option value="feature">✨ Feature</option>
+              <option value="improvement">⚡ Improvement</option>
+              <option value="other">📌 Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="m-title" placeholder="Short description"/>
+          </div>
+          <div class="form-group">
+            <label>Status</label>
+            <select id="m-status">
+              <option value="open">Open</option>
+              <option value="in_progress">In Progress</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Stage</label>
+            <select id="m-stage">
+              <option value="testing">Testing</option>
+              <option value="live">Live</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Version</label>
+            <input type="text" id="m-version" placeholder="1.0.0"/>
+          </div>
+          <div class="form-group" style="grid-column:1/-1;">
+            <label>Description</label>
+            <textarea id="m-description" rows="2" placeholder="Optional details..."></textarea>
+          </div>
+        </div>
+        <div class="form-footer">
+          <button class="btn-primary" onclick="addMaintenance()">+ Add Entry</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Log Entries</div></div>
+        {% if maintenance %}
+        <table>
+          <thead><tr><th>Category</th><th>Title</th><th>Status</th><th>Stage</th><th>Version</th><th>Date</th><th></th></tr></thead>
+          <tbody id="maintenance-tbody">
+          {% for m in maintenance %}
+          <tr id="mrow-{{ m.id }}">
+            <td>{{ {'bug':'🐛 Bug','feature':'✨ Feature','improvement':'⚡ Improve','other':'📌 Other'}.get(m.category, m.category) }}</td>
+            <td><strong>{{ m.title }}</strong>{% if m.description %}<br><span style="font-size:0.75rem;color:var(--text-lt);">{{ m.description[:80] }}{% if m.description|length > 80 %}…{% endif %}</span>{% endif %}</td>
+            <td><span class="pill {% if m.status == 'closed' %}pill-closed{% elif m.status == 'in_progress' %}pill-testing{% else %}pill-open{% endif %}">{{ m.status }}</span></td>
+            <td><span class="pill {% if m.stage == 'live' %}pill-live{% else %}pill-testing{% endif %}">{{ m.stage }}</span></td>
+            <td style="color:var(--text-lt);">{{ m.version or '—' }}</td>
+            <td style="color:var(--text-lt);white-space:nowrap;">{{ m.created_at[:10] if m.created_at else '—' }}</td>
+            <td><button class="btn-danger" onclick="deleteMaintenance({{ m.id }})">Delete</button></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty" id="maintenance-empty">No entries yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+
+    <!-- ══════════════════ VERSIONS ══════════════════ -->
+    <div id="tab-versions" class="tab-section {% if active_tab == 'versions' %}active{% endif %}">
+      <div class="page-title">Version History</div>
+      <div class="page-sub">Track app version releases.</div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Add Version</div></div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Version Number</label>
+            <input type="text" id="v-number" placeholder="1.2.0"/>
+          </div>
+          <div class="form-group">
+            <label>Release Date</label>
+            <input type="date" id="v-date"/>
+          </div>
+          <div class="form-group" style="grid-column:1/-1;">
+            <label>Notes</label>
+            <textarea id="v-notes" rows="2" placeholder="What changed?"></textarea>
+          </div>
+        </div>
+        <div class="form-footer">
+          <button class="btn-primary" onclick="addVersion()">+ Add Version</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Releases</div></div>
+        {% if versions %}
+        <table>
+          <thead><tr><th>Version</th><th>Release Date</th><th>Notes</th></tr></thead>
+          <tbody id="versions-tbody">
+          {% for v in versions %}
+          <tr>
+            <td><strong>v{{ v.version_number }}</strong></td>
+            <td style="color:var(--text-lt);">{{ v.release_date or '—' }}</td>
+            <td style="font-size:0.82rem;">{{ v.notes or '—' }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty" id="versions-empty">No versions logged yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+
+    <!-- ══════════════════ iOS RELEASES ══════════════════ -->
+    <div id="tab-ios" class="tab-section {% if active_tab == 'ios' %}active{% endif %}">
+      <div class="page-title">iOS Releases</div>
+      <div class="page-sub">Track App Store submissions and releases.</div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">Add iOS Release</div></div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Version</label>
+            <input type="text" id="ios-version" placeholder="1.0.1"/>
+          </div>
+          <div class="form-group">
+            <label>Release Date</label>
+            <input type="date" id="ios-date"/>
+          </div>
+          <div class="form-group" style="grid-column:1/-1;">
+            <label>Notes</label>
+            <textarea id="ios-notes" rows="2" placeholder="What's new?"></textarea>
+          </div>
+        </div>
+        <div class="form-footer">
+          <button class="btn-primary" onclick="addIos()">+ Add Release</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header"><div class="card-title">iOS Release History</div></div>
+        {% if ios_releases %}
+        <table>
+          <thead><tr><th>Version</th><th>Release Date</th><th>Notes</th></tr></thead>
+          <tbody id="ios-tbody">
+          {% for r in ios_releases %}
+          <tr>
+            <td><strong>📱 {{ r.version }}</strong></td>
+            <td style="color:var(--text-lt);">{{ r.release_date or '—' }}</td>
+            <td style="font-size:0.82rem;">{{ r.notes or '—' }}</td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="empty" id="ios-empty">No iOS releases logged yet.</div>
+        {% endif %}
+      </div>
+    </div>
+
+  </main>
+</div>
+
+
+<script>
+// ── Tab switching ──────────────────────────────────────────────
+function switchAdminTab(tab) {
+  document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(a => a.classList.remove('active'));
+  const section = document.getElementById('tab-' + tab);
+  if (section) section.classList.add('active');
+  // Highlight nav
+  document.querySelectorAll('.nav-item').forEach(a => {
+    if (a.getAttribute('onclick') && a.getAttribute('onclick').includes(`'${tab}'`)) {
+      a.classList.add('active');
+    }
+  });
+  const url = new URL(window.location);
+  url.searchParams.set('tab', tab);
+  window.history.pushState({}, '', url);
+}
+
+// ── API helper ─────────────────────────────────────────────────
+async function api(method, url, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  return res.json();
+}
+
+// ── Users ──────────────────────────────────────────────────────
+async function deleteUser(id, email) {
+  if (!confirm(`Delete account for ${email}? This cannot be undone.`)) return;
+  const res = await api('DELETE', `/api/admin/users/${id}`);
+  if (res.success) {
+    const row = document.querySelector(`button[onclick="deleteUser(${id}, '${email}')"]`)?.closest('tr');
+    if (row) row.remove();
+  } else {
+    alert(res.error || 'Could not delete user.');
+  }
+}
+
+// ── Help messages ──────────────────────────────────────────────
+function toggleHelp(id) {
+  const el = document.getElementById('help-body-' + id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function markHelp(id, status) {
+  await api('PUT', `/api/admin/help/${id}`, { status });
+  // Refresh the row pill and button
+  const row = document.getElementById('help-row-' + id);
+  if (row) {
+    const pill = row.querySelector('.pill');
+    if (pill) {
+      pill.className = 'pill ' + (status === 'unread' ? 'pill-unread' : 'pill-read');
+      pill.textContent = status;
+    }
+    const btn = row.querySelector('.btn-outline');
+    if (btn) {
+      btn.textContent = status === 'unread' ? 'Mark Read' : 'Mark Unread';
+      btn.setAttribute('onclick', `markHelp(${id}, '${status === 'unread' ? 'read' : 'unread'}')`);
+    }
+  }
+}
+
+// ── Maintenance ────────────────────────────────────────────────
+async function addMaintenance() {
+  const title = document.getElementById('m-title').value.trim();
+  if (!title) return alert('Title is required.');
+  const data = await api('POST', '/api/admin/maintenance', {
+    category:    document.getElementById('m-category').value,
+    title,
+    description: document.getElementById('m-description').value,
+    status:      document.getElementById('m-status').value,
+    stage:       document.getElementById('m-stage').value,
+    version:     document.getElementById('m-version').value,
+  });
+  // Add row to table
+  const tbody = document.getElementById('maintenance-tbody');
+  const empty = document.getElementById('maintenance-empty');
+  if (empty) empty.style.display = 'none';
+  if (tbody) {
+    const catMap = { bug:'🐛 Bug', feature:'✨ Feature', improvement:'⚡ Improve', other:'📌 Other' };
+    const tr = document.createElement('tr');
+    tr.id = 'mrow-' + data.id;
+    tr.innerHTML = `
+      <td>${catMap[data.category] || data.category}</td>
+      <td><strong>${data.title}</strong></td>
+      <td><span class="pill pill-open">${data.status}</span></td>
+      <td><span class="pill pill-testing">${data.stage}</span></td>
+      <td style="color:var(--text-lt);">${data.version || '—'}</td>
+      <td style="color:var(--text-lt);">${(data.created_at||'').slice(0,10) || '—'}</td>
+      <td><button class="btn-danger" onclick="deleteMaintenance(${data.id})">Delete</button></td>`;
+    tbody.prepend(tr);
+  }
+  ['m-title','m-description','m-version'].forEach(id => document.getElementById(id).value = '');
+}
+
+async function deleteMaintenance(id) {
+  if (!confirm('Delete this entry?')) return;
+  await api('DELETE', `/api/admin/maintenance/${id}`);
+  const row = document.getElementById('mrow-' + id);
+  if (row) row.remove();
+}
+
+// ── Versions ───────────────────────────────────────────────────
+async function addVersion() {
+  const num = document.getElementById('v-number').value.trim();
+  if (!num) return alert('Version number is required.');
+  await api('POST', '/api/admin/versions', {
+    version_number: num,
+    release_date:   document.getElementById('v-date').value || null,
+    notes:          document.getElementById('v-notes').value,
+  });
+  const tbody = document.getElementById('versions-tbody');
+  const empty = document.getElementById('versions-empty');
+  if (empty) empty.style.display = 'none';
+  if (tbody) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>v${num}</strong></td>
+      <td style="color:var(--text-lt);">${document.getElementById('v-date').value || '—'}</td>
+      <td style="font-size:0.82rem;">${document.getElementById('v-notes').value || '—'}</td>`;
+    tbody.prepend(tr);
+  }
+  ['v-number','v-date','v-notes'].forEach(id => document.getElementById(id).value = '');
+}
+
+// ── iOS ────────────────────────────────────────────────────────
+async function addIos() {
+  const ver = document.getElementById('ios-version').value.trim();
+  if (!ver) return alert('Version is required.');
+  await api('POST', '/api/admin/ios', {
+    version:      ver,
+    release_date: document.getElementById('ios-date').value || null,
+    notes:        document.getElementById('ios-notes').value,
+  });
+  const tbody = document.getElementById('ios-tbody');
+  const empty = document.getElementById('ios-empty');
+  if (empty) empty.style.display = 'none';
+  if (tbody) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>📱 ${ver}</strong></td>
+      <td style="color:var(--text-lt);">${document.getElementById('ios-date').value || '—'}</td>
+      <td style="font-size:0.82rem;">${document.getElementById('ios-notes').value || '—'}</td>`;
+    tbody.prepend(tr);
+  }
+  ['ios-version','ios-date','ios-notes'].forEach(id => document.getElementById(id).value = '');
+}
+</script>
+
+</body>
+</html>
