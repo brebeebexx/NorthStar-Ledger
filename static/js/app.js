@@ -2548,7 +2548,14 @@ function openEditBill(id) {
   document.getElementById('edit-bill-name').value    = bill.name;
   document.getElementById('edit-bill-amount').value  = bill.amount;
   document.getElementById('edit-bill-due').value     = bill.due_date || '';
-  document.getElementById('edit-bill-planned').value = bill.planned_pay_date || '';
+  // If the bill is already paid, show the paid_date in the "Planned Pay Date" field
+  // and relabel it so it's clear — saving will update both paid_date and planned_pay_date
+  const plannedLabel = document.querySelector('label[for="edit-bill-planned"], #modal-edit-bill label[for="edit-bill-planned"]')
+    || [...document.querySelectorAll('#modal-edit-bill label')].find(l => l.textContent.includes('Planned') || l.textContent.includes('Paid Date'));
+  if (plannedLabel) plannedLabel.textContent = bill.is_paid ? 'Paid Date' : 'Planned Pay Date';
+  document.getElementById('edit-bill-planned').value = bill.is_paid
+    ? (bill.paid_date || bill.planned_pay_date || '')
+    : (bill.planned_pay_date || '');
   document.getElementById('edit-bill-notes').value   = bill.notes || '';
   document.getElementById('edit-bill-autopay').checked   = !!bill.autopay;
   document.getElementById('edit-bill-recurring').checked = !!bill.is_recurring;
@@ -2562,13 +2569,22 @@ function openEditBill(id) {
 
 async function saveEditBill() {
   const id      = parseInt(document.getElementById('edit-bill-id').value);
-  const bill    = state.bills.find(b => b.id === id);
+  const bill        = state.bills.find(b => b.id === id);
+  const plannedVal  = document.getElementById('edit-bill-planned').value || null;
+  // If the bill is already paid, the "Planned Pay Date" field holds the new paid date
+  const newPaidDate = bill && bill.is_paid ? plannedVal : (bill ? bill.paid_date : null);
+  // Re-assign paycheck based on paid date (if paid) or planned/due date (if not)
+  const explicitPaycheck = parseInt(document.getElementById('edit-bill-paycheck').value) || null;
+  const autoPaycheck = bill && bill.is_paid && newPaidDate
+    ? autoAssignPaycheck(newPaidDate)
+    : null;
   const payload = {
     name:             document.getElementById('edit-bill-name').value,
     amount:           parseFloat(document.getElementById('edit-bill-amount').value),
     due_date:         document.getElementById('edit-bill-due').value || null,
-    planned_pay_date: document.getElementById('edit-bill-planned').value || null,
-    paycheck_id:      parseInt(document.getElementById('edit-bill-paycheck').value) || null,
+    planned_pay_date: plannedVal,
+    paid_date:        newPaidDate,
+    paycheck_id:      explicitPaycheck || autoPaycheck || null,
     notes:            document.getElementById('edit-bill-notes').value,
     autopay:          document.getElementById('edit-bill-autopay').checked ? 1 : 0,
     is_paid:          bill ? bill.is_paid : 0,

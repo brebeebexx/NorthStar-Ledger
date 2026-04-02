@@ -529,7 +529,7 @@ def manage_bill(bid):
     db.execute('''UPDATE bills SET
         paycheck_id=?, name=?, amount=?, due_date=?, planned_pay_date=?,
         is_paid=?, is_postponed=?, is_recurring=?, autopay=?, category=?,
-        savings_goal_id=?, notes=?, frequency=?
+        savings_goal_id=?, notes=?, frequency=?, paid_date=?
         WHERE id=?''',
         (data.get('paycheck_id', row['paycheck_id']),
          data.get('name', row['name']),
@@ -544,6 +544,7 @@ def manage_bill(bid):
          data.get('savings_goal_id', row['savings_goal_id']),
          data.get('notes', row['notes']),
          data.get('frequency', row['frequency'] or 'monthly'),
+         data.get('paid_date', row['paid_date']),
          bid)
     )
     db.commit()
