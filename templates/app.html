@@ -1032,6 +1032,24 @@
 </div>
 
 
+<!-- Edit Paid Date -->
+<div class="modal-overlay" id="modal-edit-paid-date">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-header"><h3>✏️ Edit Paid Date</h3><button class="modal-close" onclick="closeModal('modal-edit-paid-date')">×</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-paid-date-bill-id"/>
+      <div class="form-group">
+        <label>Date Paid</label>
+        <input type="date" id="edit-paid-date-value"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" onclick="closeModal('modal-edit-paid-date')">Cancel</button>
+      <button class="btn-primary" onclick="saveEditPaidDate()">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- Calculator Modal -->
 <div class="modal-overlay" id="modal-calculator">
   <div class="modal" style="max-width:360px;">

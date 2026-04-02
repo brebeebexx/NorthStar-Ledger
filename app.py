@@ -571,6 +571,23 @@ def mark_bill_paid(bid):
     return jsonify({'is_paid': new_status, 'paid_date': paid_date})
 
 
+@app.route('/api/bills/<int:bid>/paid-date', methods=['POST'])
+@login_required
+def update_paid_date(bid):
+    uid  = session['user_id']
+    db   = get_db()
+    row  = db.execute('SELECT * FROM bills WHERE id=? AND user_id=?', (bid, uid)).fetchone()
+    if not row:
+        db.close()
+        return jsonify({'error': 'Not found'}), 404
+    data      = request.get_json()
+    paid_date = data.get('paid_date')
+    db.execute('UPDATE bills SET paid_date=? WHERE id=?', (paid_date, bid))
+    db.commit()
+    db.close()
+    return jsonify({'paid_date': paid_date})
+
+
 @app.route('/api/bills/<int:bid>/postpone', methods=['POST'])
 @login_required
 def postpone_bill(bid):

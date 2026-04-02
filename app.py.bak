@@ -302,7 +302,7 @@ def app_main():
     ).fetchall()]
 
     subscriptions = [dict(r) for r in db.execute(
-        'SELECT * FROM subscriptions WHERE user_id=? ORDER BY name ASC', (uid,)
+        'SELECT * FROM subscriptions WHERE user_id=? ORDER BY next_due_date IS NULL ASC, next_due_date ASC, name ASC', (uid,)
     ).fetchall()]
 
     bill_names = [dict(r) for r in db.execute(
@@ -324,6 +324,10 @@ def app_main():
         'SELECT * FROM sticky_notes WHERE user_id=? ORDER BY updated_at DESC', (uid,)
     ).fetchall()]
 
+    snapshots = [dict(r) for r in db.execute(
+        'SELECT * FROM snapshots WHERE user_id=? ORDER BY month ASC', (uid,)
+    ).fetchall()]
+
     unread_count = db.execute(
         "SELECT COUNT(*) as cnt FROM help_messages WHERE user_id=? AND status='unread'", (uid,)
     ).fetchone()['cnt']
@@ -343,10 +347,58 @@ def app_main():
         bill_names=bill_names,
         balance_adjustments=balance_adjustments,
         sticky_notes=sticky_notes,
+        snapshots=snapshots,
         unread_count=unread_count,
         today=today,
         active_tab=tab
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# API – Snapshots
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route('/api/snapshots', methods=['GET', 'POST'])
+@login_required
+def snapshots_api():
+    uid = session['user_id']
+    db  = get_db()
+    if request.method == 'GET':
+        rows = [dict(r) for r in db.execute(
+            'SELECT * FROM snapshots WHERE user_id=? ORDER BY month ASC', (uid,)
+        ).fetchall()]
+        db.close()
+        return jsonify(rows)
+
+    data         = request.get_json()
+    month        = data.get('month')
+    total_debt   = data.get('total_debt', 0)
+    total_savings= data.get('total_savings', 0)
+    net_worth    = total_savings - total_debt
+    # Insert or replace (upsert) for the given month
+    db.execute('''INSERT INTO snapshots (user_id, month, total_debt, total_savings, net_worth)
+                  VALUES (?,?,?,?,?)
+                  ON CONFLICT(user_id, month) DO UPDATE SET
+                    total_debt=excluded.total_debt,
+                    total_savings=excluded.total_savings,
+                    net_worth=excluded.net_worth,
+                    created_at=CURRENT_TIMESTAMP''',
+               (uid, month, total_debt, total_savings, net_worth))
+    db.commit()
+    row = db.execute('SELECT * FROM snapshots WHERE user_id=? AND month=?', (uid, month)).fetchone()
+    db.close()
+    return jsonify(dict(row))
+
+
+@app.route('/api/snapshots/<int:sid>', methods=['DELETE'])
+@login_required
+def delete_snapshot(sid):
+    uid = session['user_id']
+    db  = get_db()
+    db.execute('DELETE FROM snapshots WHERE id=? AND user_id=?', (sid, uid))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -359,8 +411,8 @@ def add_paycheck():
     uid  = session['user_id']
     data = request.get_json()
     db   = get_db()
-    db.execute('INSERT INTO paychecks (user_id, date, amount, notes) VALUES (?,?,?,?)',
-               (uid, data['date'], data['amount'], data.get('notes', '')))
+    db.execute('INSERT INTO paychecks (user_id, date, amount, notes, income_type) VALUES (?,?,?,?,?)',
+               (uid, data['date'], data['amount'], data.get('notes', ''), data.get('income_type', 'paycheck')))
     db.commit()
     row = db.execute('SELECT * FROM paychecks WHERE user_id=? ORDER BY id DESC LIMIT 1', (uid,)).fetchone()
     db.close()
@@ -385,8 +437,8 @@ def manage_paycheck(pid):
         return jsonify({'success': True})
 
     data = request.get_json()
-    db.execute('UPDATE paychecks SET date=?, amount=?, notes=? WHERE id=?',
-               (data['date'], data['amount'], data.get('notes', ''), pid))
+    db.execute('UPDATE paychecks SET date=?, amount=?, notes=?, income_type=? WHERE id=?',
+               (data['date'], data['amount'], data.get('notes', ''), data.get('income_type', row['income_type'] or 'paycheck'), pid))
     db.commit()
     row = db.execute('SELECT * FROM paychecks WHERE id=?', (pid,)).fetchone()
     db.close()
@@ -517,6 +569,23 @@ def mark_bill_paid(bid):
     db.commit()
     db.close()
     return jsonify({'is_paid': new_status, 'paid_date': paid_date})
+
+
+@app.route('/api/bills/<int:bid>/paid-date', methods=['POST'])
+@login_required
+def update_paid_date(bid):
+    uid  = session['user_id']
+    db   = get_db()
+    row  = db.execute('SELECT * FROM bills WHERE id=? AND user_id=?', (bid, uid)).fetchone()
+    if not row:
+        db.close()
+        return jsonify({'error': 'Not found'}), 404
+    data      = request.get_json()
+    paid_date = data.get('paid_date')
+    db.execute('UPDATE bills SET paid_date=? WHERE id=?', (paid_date, bid))
+    db.commit()
+    db.close()
+    return jsonify({'paid_date': paid_date})
 
 
 @app.route('/api/bills/<int:bid>/postpone', methods=['POST'])
@@ -850,7 +919,7 @@ def subscriptions():
 
     if request.method == 'GET':
         subs = db.execute(
-            'SELECT * FROM subscriptions WHERE user_id=? ORDER BY name ASC', (uid,)
+            'SELECT * FROM subscriptions WHERE user_id=? ORDER BY next_due_date IS NULL ASC, next_due_date ASC, name ASC', (uid,)
         ).fetchall()
         db.close()
         return jsonify([dict(s) for s in subs])
@@ -1378,7 +1447,7 @@ def mobile_data():
     ).fetchall()]
 
     subscriptions = [dict(r) for r in db.execute(
-        'SELECT * FROM subscriptions WHERE user_id=? ORDER BY name ASC', (uid,)
+        'SELECT * FROM subscriptions WHERE user_id=? ORDER BY next_due_date IS NULL ASC, next_due_date ASC, name ASC', (uid,)
     ).fetchall()]
 
     sticky_notes = [dict(r) for r in db.execute(

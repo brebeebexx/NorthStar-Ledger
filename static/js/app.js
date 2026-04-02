@@ -427,6 +427,23 @@ function viewRefDate() {
   return `${selMonth}-01`;
 }
 
+// Calculate the net ending balance for a given year/month (0-indexed month).
+// Mirrors the planner's running-balance logic: income - paid - pending + adjustments.
+function calcMonthEndBalance(year, month) {
+  const mStr = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const checks = state.paychecks.filter(p => p.date && p.date.slice(0, 7) === mStr);
+  let bal = 0;
+  for (const p of checks) {
+    const bills     = state.bills.filter(b => b.paycheck_id === p.id);
+    const paidOut   = bills.filter(b => b.is_paid    && !b.is_postponed).reduce((s, b) => s + b.amount, 0);
+    const pendingOut= bills.filter(b => !b.is_paid   && !b.is_postponed).reduce((s, b) => s + b.amount, 0);
+    const adjs      = state.balanceAdjustments.filter(a => a.paycheck_id === p.id);
+    const adjTotal  = adjs.reduce((s, a) => s + (a.adjustment_amount || 0), 0);
+    bal += p.amount - paidOut - pendingOut + adjTotal;
+  }
+  return bal;
+}
+
 function renderPlanner() {
   const container = document.getElementById('planner-buckets');
   const label = document.getElementById('planner-month-label');
@@ -526,8 +543,24 @@ function renderPlanner() {
     // Still show unassigned bills
   }
 
+  // ── Carry previous month's ending balance into this month ────────────────
+  const prevMonth     = plannerMonth === 0 ? 11 : plannerMonth - 1;
+  const prevYear      = plannerMonth === 0 ? plannerYear - 1 : plannerYear;
+  const prevMonthName = new Date(prevYear, prevMonth, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const carryover     = calcMonthEndBalance(prevYear, prevMonth);
+
+  if (carryover !== 0 && sorted.length) {
+    const carryClass = carryover >= 0 ? 'carry-positive' : 'carry-negative';
+    const sign       = carryover >= 0 ? '+' : '';
+    container.innerHTML += `
+    <div class="carryover-banner ${carryClass}">
+      <span class="carryover-label">↩ Carried from ${prevMonthName}</span>
+      <span class="carryover-amount">${sign}$${fmt(carryover)}</span>
+    </div>`;
+  }
+
   // Build buckets with a running balance that carries across all paychecks
-  let runningBalance = 0;
+  let runningBalance = carryover;
   const bucketHtmlParts = sorted.map((p, idx) => {
     const bills = state.bills.filter(b => b.paycheck_id === p.id);
     const income     = p.amount;
@@ -609,7 +642,7 @@ function renderPlanner() {
         ${entriesHtml}
         <div class="bucket-recon-row">
           <span class="bucket-running-balance">
-            This check: <strong>+$${fmt(income)}</strong> — Paid: <strong>$${fmt(paidOut)}</strong> — Pending: <strong>$${fmt(pendingOut)}</strong>
+            ${isFirst && carryover !== 0 ? `Carried in: <strong style="color:${carryover >= 0 ? 'var(--sage-dk)' : 'var(--danger)'};">${carryover >= 0 ? '+' : ''}$${fmt(carryover)}</strong> — ` : ''}This check: <strong>+$${fmt(income)}</strong> — Paid: <strong>$${fmt(paidOut)}</strong> — Pending: <strong>$${fmt(pendingOut)}</strong>
             ${adjTotal !== 0 ? `— Adj: <strong>${adjTotal >= 0 ? '+' : ''}$${fmt(adjTotal)}</strong>` : ''}
             &nbsp;·&nbsp; <span style="font-weight:700;color:${runningBalance >= 0 ? 'var(--sage-dk)' : 'var(--danger)'};">${runLabel}: $${fmt(runningBalance)}</span>
           </span>
@@ -761,8 +794,9 @@ function billRowHtml(b, runningBal) {
   const notesHtml = b.notes
     ? `<div class="bill-note">📝 ${escHtml(b.notes)}</div>` : '';
 
-  const paidDateHtml = isPaid && b.paid_date
-    ? `<div class="bill-paid-date">Paid ${fmtDate(b.paid_date)}</div>` : '';
+  const paidDateHtml = isPaid
+    ? `<div class="bill-paid-date">Paid ${b.paid_date ? fmtDate(b.paid_date) : '—'} <button class="paid-date-edit-btn" onclick="openEditPaidDate(${b.id})" title="Edit paid date">✏️</button></div>`
+    : '';
 
   const payBtnLabel = isPaid ? 'Unpay' : 'Mark Paid';
   const payBtnClass = isPaid ? 'unpay' : 'pay';
@@ -2394,7 +2428,7 @@ async function addBill() {
   const rawPaycheck = document.getElementById('bill-paycheck').value;
   // 'auto' → find the best matching paycheck by due date
   const paycheckId = rawPaycheck === 'auto'
-    ? autoAssignPaycheck(dueDate || plannedDate)
+    ? autoAssignPaycheck(plannedDate || dueDate)
     : (rawPaycheck ? parseInt(rawPaycheck) : null);
   // Auto-derive billing month from due date (or planned date as fallback)
   const month      = (dueDate || plannedDate || '').slice(0, 7) || null;
@@ -2436,6 +2470,26 @@ async function togglePay(id) {
   const data = await api('POST', `/api/bills/${id}/pay`, {});
   const bill = state.bills.find(b => b.id === id);
   if (bill) { bill.is_paid = data.is_paid; bill.is_postponed = 0; bill.paid_date = data.paid_date || null; }
+  renderPlanner();
+  renderDashboard();
+}
+
+function openEditPaidDate(id) {
+  const bill = state.bills.find(b => b.id === id);
+  if (!bill) return;
+  document.getElementById('edit-paid-date-bill-id').value = id;
+  document.getElementById('edit-paid-date-value').value   = bill.paid_date || state.today;
+  openModal('modal-edit-paid-date');
+}
+
+async function saveEditPaidDate() {
+  const id      = parseInt(document.getElementById('edit-paid-date-bill-id').value);
+  const newDate = document.getElementById('edit-paid-date-value').value;
+  if (!newDate) return;
+  const data = await api('POST', `/api/bills/${id}/paid-date`, { paid_date: newDate });
+  const bill = state.bills.find(b => b.id === id);
+  if (bill) bill.paid_date = data.paid_date;
+  closeModal('modal-edit-paid-date');
   renderPlanner();
   renderDashboard();
 }
