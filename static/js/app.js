@@ -17,8 +17,10 @@ let state = {
 };
 
 // Single shared month for all tabs (planner, dashboard, debt, savings, subs, calendar)
-let plannerYear  = new Date().getFullYear();
-let plannerMonth = new Date().getMonth(); // 0-indexed
+// Restore last-viewed month from localStorage so a page refresh stays on the same month
+const _savedMonth = localStorage.getItem('nsl_plannerMonth');
+let plannerYear  = _savedMonth ? parseInt(_savedMonth.slice(0, 4))  : new Date().getFullYear();
+let plannerMonth = _savedMonth ? parseInt(_savedMonth.slice(5, 7)) - 1 : new Date().getMonth();
 // calYear/calMonth are now aliases so calendar uses the same state
 Object.defineProperty(window, 'calYear',  { get: () => plannerYear,  set: v => { plannerYear  = v; } });
 Object.defineProperty(window, 'calMonth', { get: () => plannerMonth, set: v => { plannerMonth = v; } });
@@ -391,15 +393,20 @@ function _reRenderActiveTab() {
   else if (tab === 'calendar')        renderCalendar();
 }
 
+function _saveMonth() {
+  localStorage.setItem('nsl_plannerMonth', `${plannerYear}-${String(plannerMonth + 1).padStart(2, '0')}`);
+}
 function globalPrevMonth() {
   plannerMonth--;
   if (plannerMonth < 0) { plannerMonth = 11; plannerYear--; }
+  _saveMonth();
   syncAllMonthLabels();
   _reRenderActiveTab();
 }
 function globalNextMonth() {
   plannerMonth++;
   if (plannerMonth > 11) { plannerMonth = 0; plannerYear++; }
+  _saveMonth();
   syncAllMonthLabels();
   _reRenderActiveTab();
 }
