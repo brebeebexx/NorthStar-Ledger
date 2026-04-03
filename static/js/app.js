@@ -2571,20 +2571,23 @@ async function saveEditBill() {
   const id      = parseInt(document.getElementById('edit-bill-id').value);
   const bill        = state.bills.find(b => b.id === id);
   const plannedVal  = document.getElementById('edit-bill-planned').value || null;
-  // If the bill is already paid, the "Planned Pay Date" field holds the new paid date
+  // If the bill is already paid, the "Planned Pay Date" / "Paid Date" field holds the new paid date
   const newPaidDate = bill && bill.is_paid ? plannedVal : (bill ? bill.paid_date : null);
-  // Re-assign paycheck based on paid date (if paid) or planned/due date (if not)
-  const explicitPaycheck = parseInt(document.getElementById('edit-bill-paycheck').value) || null;
-  const autoPaycheck = bill && bill.is_paid && newPaidDate
-    ? autoAssignPaycheck(newPaidDate)
-    : null;
+  // For paid bills: always auto-assign paycheck based on paid date so it moves to the right bucket.
+  // For unpaid bills: respect the dropdown choice.
+  let resolvedPaycheckId;
+  if (bill && bill.is_paid && newPaidDate) {
+    resolvedPaycheckId = autoAssignPaycheck(newPaidDate) || parseInt(document.getElementById('edit-bill-paycheck').value) || null;
+  } else {
+    resolvedPaycheckId = parseInt(document.getElementById('edit-bill-paycheck').value) || null;
+  }
   const payload = {
     name:             document.getElementById('edit-bill-name').value,
     amount:           parseFloat(document.getElementById('edit-bill-amount').value),
     due_date:         document.getElementById('edit-bill-due').value || null,
     planned_pay_date: plannedVal,
     paid_date:        newPaidDate,
-    paycheck_id:      explicitPaycheck || autoPaycheck || null,
+    paycheck_id:      resolvedPaycheckId,
     notes:            document.getElementById('edit-bill-notes').value,
     autopay:          document.getElementById('edit-bill-autopay').checked ? 1 : 0,
     is_paid:          bill ? bill.is_paid : 0,
