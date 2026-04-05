@@ -437,16 +437,29 @@ function viewRefDate() {
 // Calculate the net ending balance for a given year/month (0-indexed month).
 // Mirrors the planner's running-balance logic: income - paid - pending + adjustments.
 function calcMonthEndBalance(year, month) {
-  const mStr = `${year}-${String(month + 1).padStart(2, '0')}`;
-  const checks = state.paychecks.filter(p => p.date && p.date.slice(0, 7) === mStr);
+  const mStr   = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const checks = state.paychecks
+    .filter(p => p.date && p.date.slice(0, 7) === mStr)
+    .sort((a, b) => a.date.localeCompare(b.date));
   let bal = 0;
   for (const p of checks) {
-    const bills     = state.bills.filter(b => b.paycheck_id === p.id);
-    const paidOut   = bills.filter(b => b.is_paid    && !b.is_postponed).reduce((s, b) => s + b.amount, 0);
-    const pendingOut= bills.filter(b => !b.is_paid   && !b.is_postponed).reduce((s, b) => s + b.amount, 0);
-    const adjs      = state.balanceAdjustments.filter(a => a.paycheck_id === p.id);
-    const adjTotal  = adjs.reduce((s, a) => s + (a.adjustment_amount || 0), 0);
-    bal += p.amount - paidOut - pendingOut + adjTotal;
+    const bills = state.bills.filter(b => b.paycheck_id === p.id);
+    const adjs  = state.balanceAdjustments.filter(a => a.paycheck_id === p.id);
+    // Build sorted entries (same order as render loop) and simulate with bank_balance snap
+    const entries = [
+      ...bills.map(b => ({
+        type: 'bill', data: b,
+        sortDate:  b.is_paid ? (b.paid_date || b.due_date || '9999-12-31') : (b.due_date || b.planned_pay_date || '9999-12-31'),
+        sortGroup: b.is_paid ? 0 : b.is_postponed ? 2 : 1,
+      })),
+      ...adjs.map(a => ({ type: 'adj', data: a, sortDate: a.adjustment_date || '9999-12-31', sortGroup: 1 })),
+    ];
+    entries.sort((a, b) => a.sortGroup !== b.sortGroup ? a.sortGroup - b.sortGroup : a.sortDate.localeCompare(b.sortDate));
+    bal += p.amount;
+    for (const entry of entries) {
+      if (entry.type === 'bill' && !entry.data.is_postponed) bal -= entry.data.amount;
+      else if (entry.type === 'adj') bal = entry.data.bank_balance; // snap
+    }
   }
   return bal;
 }
@@ -569,24 +582,15 @@ function renderPlanner() {
   // Build buckets with a running balance that carries across all paychecks
   let runningBalance = carryover;
   const bucketHtmlParts = sorted.map((p, idx) => {
-    const bills = state.bills.filter(b => b.paycheck_id === p.id);
+    const bills      = state.bills.filter(b => b.paycheck_id === p.id);
     const income     = p.amount;
-    const paidOut    = bills.filter(b => b.is_paid && !b.is_postponed).reduce((s, b) => s + b.amount, 0);
-    const pendingOut = bills.filter(b => !b.is_paid && !b.is_postponed).reduce((s, b) => s + b.amount, 0);
-    // Reconcile adjustments for this paycheck
-    const adjs    = state.balanceAdjustments.filter(a => a.paycheck_id === p.id);
-    const adjTotal = adjs.reduce((s, a) => s + (a.adjustment_amount || 0), 0);
-    const bucketNet  = income - paidOut - pendingOut + adjTotal;
+    const paidOut    = bills.filter(b => b.is_paid    && !b.is_postponed).reduce((s, b) => s + b.amount, 0);
+    const pendingOut = bills.filter(b => !b.is_paid   && !b.is_postponed).reduce((s, b) => s + b.amount, 0);
+    const adjs       = state.balanceAdjustments.filter(a => a.paycheck_id === p.id);
     const prevRunningBalance = runningBalance;   // balance carried in from prior buckets
-    runningBalance += bucketNet;
 
-    const isCurrent  = p.id === currentId;
-    const isNeg      = runningBalance < 0;
-    const isFirst    = idx === 0;
-    const isLast     = idx === sorted.length - 1;
-
-    // Merge bills + reconcile adjustments into one date-ordered list
-    // Sort groups: 0 = paid (top), 1 = pending (middle), 2 = postponed (bottom)
+    // ── Build + sort entries first so we can simulate the real running balance ──
+    // Sort groups: 0 = paid (top), 1 = pending/reconcile (middle), 2 = postponed (bottom)
     const entries = [
       ...bills.map(b => ({
         type:      'bill',
@@ -600,18 +604,36 @@ function renderPlanner() {
         type:      'adj',
         data:      a,
         sortDate:  a.adjustment_date || '9999-12-31',
-        sortGroup: 1,  // reconcile entries sort alongside pending bills
+        sortGroup: 1,
       })),
     ];
-
-    // Sort: paid first (group 0), then pending (group 1), postponed last (group 2).
-    // Within each group, sort by date ascending.
     entries.sort((a, b) => {
       if (a.sortGroup !== b.sortGroup) return a.sortGroup - b.sortGroup;
       return a.sortDate.localeCompare(b.sortDate);
     });
 
-    // Per-row running balance: start from whatever was carried in + this paycheck's income
+    // ── Simulate the row walk to get the real running balance ──
+    // Reconcile entries SNAP to bank_balance (dynamic) instead of using stale adjustment_amount.
+    // This ensures the balance is always correct regardless of carryover or prior-bucket changes.
+    let simBal     = prevRunningBalance + income;
+    let dynAdjTotal = 0;
+    for (const entry of entries) {
+      if (entry.type === 'bill' && !entry.data.is_postponed) {
+        simBal -= entry.data.amount;
+      } else if (entry.type === 'adj') {
+        const snap   = entry.data.bank_balance;
+        dynAdjTotal += (snap - simBal);
+        simBal       = snap;
+      }
+    }
+    runningBalance = simBal;
+
+    const isCurrent = p.id === currentId;
+    const isNeg     = runningBalance < 0;
+    const isFirst   = idx === 0;
+    const isLast    = idx === sorted.length - 1;
+
+    // ── Per-row running balance (same snap logic) ──
     let rowBalance = prevRunningBalance + income;
     const entriesHtml = entries.length ? entries.map(entry => {
       if (entry.type === 'bill') {
@@ -619,14 +641,14 @@ function renderPlanner() {
         if (!b.is_postponed) rowBalance -= b.amount;
         return billRowHtml(b, rowBalance);
       } else {
-        const a = entry.data;
-        rowBalance += a.adjustment_amount;
-        return adjRowHtml(a, rowBalance);
+        const a        = entry.data;
+        const snapAdj  = a.bank_balance - rowBalance;   // dynamic adjustment
+        rowBalance     = a.bank_balance;                // snap to actual bank balance
+        return adjRowHtml(a, rowBalance, snapAdj);
       }
     }).join('') :
       `<div style="padding:1rem 1.2rem;font-size:0.82rem;color:var(--text-lt);">No bills assigned to this paycheck.</div>`;
 
-    // Running balance label
     const runLabel = isLast ? 'Month-End Balance' : 'Running Balance';
 
     return `
@@ -650,7 +672,7 @@ function renderPlanner() {
         <div class="bucket-recon-row">
           <span class="bucket-running-balance">
             ${isFirst && carryover !== 0 ? `Carried in: <strong style="color:${carryover >= 0 ? 'var(--sage-dk)' : 'var(--danger)'};">${carryover >= 0 ? '+' : ''}$${fmt(carryover)}</strong> — ` : ''}This check: <strong>+$${fmt(income)}</strong> — Paid: <strong>$${fmt(paidOut)}</strong> — Pending: <strong>$${fmt(pendingOut)}</strong>
-            ${adjTotal !== 0 ? `— Adj: <strong>${adjTotal >= 0 ? '+' : ''}$${fmt(adjTotal)}</strong>` : ''}
+            ${dynAdjTotal !== 0 ? `— Reconcile adj: <strong>${dynAdjTotal >= 0 ? '+' : ''}$${fmt(dynAdjTotal)}</strong>` : ''}
             &nbsp;·&nbsp; <span style="font-weight:700;color:${runningBalance >= 0 ? 'var(--sage-dk)' : 'var(--danger)'};">${runLabel}: $${fmt(runningBalance)}</span>
           </span>
           <button class="btn-outline" style="font-size:0.78rem;padding:0.3rem 0.8rem;" onclick="openReconcile(${p.id})">⚖️ Reconcile to Bank</button>
@@ -836,10 +858,12 @@ function billRowHtml(b, runningBal) {
 }
 
 // Renders a reconcile adjustment as an inline row with running balance
-function adjRowHtml(a, runningBal) {
-  const sign = a.adjustment_amount >= 0 ? '+' : '';
+// snapAdj = dynamic adjustment computed at render time (bank_balance - rowBalance before snap)
+function adjRowHtml(a, runningBal, snapAdj) {
+  const adj      = snapAdj !== undefined ? snapAdj : a.adjustment_amount;
+  const sign     = adj >= 0 ? '+' : '';
   const balClass = runningBal >= 0 ? 'pos' : 'neg';
-  const amtClass = a.adjustment_amount >= 0 ? 'pos' : 'neg';
+  const amtClass = adj >= 0 ? 'pos' : 'neg';
   return `
   <div class="bill-row adj-row">
     <div class="bill-name-col">
@@ -849,7 +873,7 @@ function adjRowHtml(a, runningBal) {
     <div class="bill-col-status"></div>
     <div class="bill-col-auto"></div>
     <div class="bill-amount-col">
-      <div class="bill-amount ${amtClass}" style="color:${a.adjustment_amount >= 0 ? 'var(--sage-dk)' : 'var(--danger)'};">${sign}$${fmt(a.adjustment_amount)}</div>
+      <div class="bill-amount ${amtClass}" style="color:${adj >= 0 ? 'var(--sage-dk)' : 'var(--danger)'};">${sign}$${fmt(adj)}</div>
       <div class="bill-running-bal ${balClass}">$${fmt(runningBal)}</div>
     </div>
     <div class="bill-actions">
