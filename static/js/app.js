@@ -662,7 +662,7 @@ function renderPlanner() {
         </div>
         <div class="bucket-meta">
           <span class="bucket-income">+$${fmt(income)}</span>
-          <span class="bucket-balance ${runningBalance >= 0 ? 'pos' : 'neg'}" title="${runLabel}">$${fmt(runningBalance)}</span>
+          <span class="bucket-balance ${(prevRunningBalance + income) >= 0 ? 'pos' : 'neg'}" title="Available when this check lands (previous balance + paycheck)">$${fmt(prevRunningBalance + income)}</span>
           <button class="bill-btn edit" style="font-size:0.72rem;" onclick="event.stopPropagation(); openEditPaycheck(${p.id})">✏️ Edit</button>
           <span style="color:var(--text-lt);font-size:0.8rem;">${isCurrent ? '▾' : '▸'}</span>
         </div>
