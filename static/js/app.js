@@ -2716,11 +2716,12 @@ function renderRecurringInline() {
   }
   templates.sort((a, b) => a.name.localeCompare(b.name));
 
-  // Instances = generated monthly bills for this month (is_template=0 or pre-migration instances)
+  // Instances = generated monthly bills for this month — must be a DIFFERENT bill from the template
+  const templateIds = new Set(templates.map(t => t.id));
   const instancesThisMonth = state.bills.filter(b =>
-    b.is_recurring && !b.is_template && b.month === monthStr
+    b.is_recurring && b.month === monthStr && !templateIds.has(b.id)
   );
-  // Index instances by name for quick lookup (consistent key regardless of bill_name_id)
+  // Index instances by name for quick lookup
   const instanceMap = {};
   instancesThisMonth.forEach(b => {
     instanceMap[b.name.toLowerCase().trim()] = b;
