@@ -949,10 +949,11 @@ def generate_subscriptions():
         due_date = sub_due_in_month(sub, target_year, target_month)
         if not due_date:
             continue
-        # Idempotent: skip if already generated for this subscription+month
+        # Idempotent: skip if a bill with this name already exists for this month
+        # (covers both re-runs and the case where the same item is also a recurring template)
         existing = db.execute(
-            'SELECT id FROM bills WHERE user_id=? AND subscription_id=? AND month=?',
-            (uid, sub['id'], month)
+            'SELECT id FROM bills WHERE user_id=? AND month=? AND is_template=0 AND name=?',
+            (uid, month, sub['name'])
         ).fetchone()
         if existing:
             continue

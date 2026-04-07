@@ -8,6 +8,7 @@ from datetime import datetime, date, timedelta
 from calendar import monthrange
 import functools
 import json
+import math
 import jwt as pyjwt
 
 app = Flask(__name__)
@@ -848,6 +849,126 @@ def generate_recurring():
         'SELECT b.*, p.date as paycheck_date FROM bills b '
         'LEFT JOIN paychecks p ON b.paycheck_id=p.id '
         'WHERE b.user_id=? AND b.month=? AND b.is_recurring=1 AND b.is_template=0',
+        (uid, month)
+    ).fetchall()]
+    db.close()
+    return jsonify({'created': created, 'month': month, 'bills': new_bills})
+
+
+def sub_due_in_month(sub, target_year, target_month):
+    """Return YYYY-MM-DD if subscription is due in target_year/target_month, else None.
+    Mirrors the JS subDueInMonth helper exactly."""
+    if not sub['next_due_date']:
+        return None
+    try:
+        next_d = date.fromisoformat(sub['next_due_date'])
+    except Exception:
+        return None
+    n    = sub['interval_count'] or 1
+    unit = sub['interval_unit'] or 'month'
+    ny   = next_d.year
+    nm   = next_d.month - 1        # 0-indexed, mirrors JS
+    tm_0 = target_month - 1        # 0-indexed
+
+    if unit in ('month', 'year'):
+        cycle_months = n * 12 if unit == 'year' else n
+        offset = (target_year - ny) * 12 + (tm_0 - nm)
+        if offset % cycle_months != 0:
+            return None
+        max_day = monthrange(target_year, target_month)[1]
+        day = min(next_d.day, max_day)
+        return f"{target_year:04d}-{target_month:02d}-{day:02d}"
+
+    if unit == 'week':
+        days_per_cycle = n * 7
+        target_first = date(target_year, target_month, 1)
+        target_last  = date(target_year, target_month, monthrange(target_year, target_month)[1])
+        days_to_first = (target_first - next_d).days
+        k_base = (math.ceil(days_to_first / days_per_cycle) if days_to_first >= 0
+                  else -math.ceil(abs(days_to_first) / days_per_cycle))
+        for k in (k_base - 1, k_base, k_base + 1):
+            d = next_d + timedelta(days=k * days_per_cycle)
+            if target_first <= d <= target_last:
+                return d.isoformat()
+        return None
+
+    return None
+
+
+@app.route('/api/bills/generate-subscriptions', methods=['POST'])
+@login_required
+def generate_subscriptions():
+    """Generate bill instances from subscriptions for a given month (idempotent)."""
+    uid  = session['user_id']
+    data = request.get_json(force=True) or {}
+    month = data.get('month', date.today().strftime('%Y-%m'))
+
+    try:
+        target_year, target_month = int(month[:4]), int(month[5:7])
+    except Exception:
+        return jsonify({'error': 'invalid month'}), 400
+
+    db = get_db()
+
+    subs = db.execute(
+        'SELECT * FROM subscriptions WHERE user_id=? ORDER BY name ASC', (uid,)
+    ).fetchall()
+
+    paychecks = db.execute(
+        'SELECT id, date FROM paychecks WHERE user_id=? ORDER BY date ASC', (uid,)
+    ).fetchall()
+
+    def assign_paycheck(due_date_str):
+        if not due_date_str or not paychecks:
+            return None
+        # Latest paycheck on or before due date
+        best = None
+        for p in paychecks:
+            if p['date'] and p['date'] <= due_date_str:
+                best = p['id']
+        return best if best is not None else paychecks[0]['id']
+
+    def assign_paycheck_in_month(due_date_str):
+        if not due_date_str or not paychecks:
+            return None
+        month_checks = sorted(
+            [p for p in paychecks if p['date'] and p['date'][:7] == month],
+            key=lambda p: p['date']
+        )
+        if month_checks:
+            best = None
+            for p in month_checks:
+                if p['date'] <= due_date_str:
+                    best = p['id']
+            if best is not None:
+                return best
+        return assign_paycheck(due_date_str)
+
+    created = 0
+    for sub in subs:
+        due_date = sub_due_in_month(sub, target_year, target_month)
+        if not due_date:
+            continue
+        # Idempotent: skip if already generated for this subscription+month
+        existing = db.execute(
+            'SELECT id FROM bills WHERE user_id=? AND subscription_id=? AND month=?',
+            (uid, sub['id'], month)
+        ).fetchone()
+        if existing:
+            continue
+        paycheck_id = assign_paycheck_in_month(due_date)
+        db.execute(
+            '''INSERT INTO bills
+               (user_id, paycheck_id, name, amount, due_date, month, category,
+                is_paid, is_recurring, autopay, subscription_id)
+               VALUES (?,?,?,?,?,?,'subscription',0,0,0,?)''',
+            (uid, paycheck_id, sub['name'], sub['amount'], due_date, month, sub['id'])
+        )
+        created += 1
+
+    db.commit()
+    new_bills = [dict(r) for r in db.execute(
+        'SELECT * FROM bills WHERE user_id=? AND month=? AND subscription_id IS NOT NULL',
         (uid, month)
     ).fetchall()]
     db.close()

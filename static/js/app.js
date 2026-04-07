@@ -409,10 +409,10 @@ function _saveMonth() {
 }
 async function autoGenerateForMonth(monthStr) {
   try {
-    const [r1, r2] = await Promise.all([
-      api('POST', '/api/bills/generate-recurring',     { month: monthStr }),
-      api('POST', '/api/bills/generate-subscriptions', { month: monthStr }),
-    ]);
+    // Run sequentially so generate-recurring commits first; generate-subscriptions
+    // can then see those bills and skip any that already exist by name.
+    const r1 = await api('POST', '/api/bills/generate-recurring',     { month: monthStr });
+    const r2 = await api('POST', '/api/bills/generate-subscriptions', { month: monthStr });
     const existingIds = new Set(state.bills.map(b => b.id));
     for (const result of [r1, r2]) {
       if (result && !result.error && result.bills) {
