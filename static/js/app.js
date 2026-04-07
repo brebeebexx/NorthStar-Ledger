@@ -743,11 +743,12 @@ function openImportRecurring() {
     .map(t => ({ template: t, dueDate: dueInMonth(t) }))
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
-  // Skip ones already imported this month (match by name)
+  // A bill is already imported this month if a proper instance (is_template=0) exists for it.
+  // Canonical templates (is_template=1) are never counted as "already imported" — they're the source.
   const templateIds = new Set(templates.map(t => t.id));
   const existingNames = new Set(
     state.bills
-      .filter(b => b.is_recurring && b.month === monthStr && !templateIds.has(b.id))
+      .filter(b => b.is_recurring && b.month === monthStr && !b.is_template)
       .map(b => b.name.toLowerCase().trim())
   );
   const toAdd = dueThisMonth.filter(x => !existingNames.has(x.template.name.toLowerCase().trim()));
