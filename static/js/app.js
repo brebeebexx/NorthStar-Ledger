@@ -2727,6 +2727,14 @@ function renderRecurringInline() {
     instanceMap[b.name.toLowerCase().trim()] = b;
   });
 
+  // Build a set of paycheck IDs that actually belong to the current month
+  // so "In planner" only shows when the bill is in a paycheck bucket for THIS month
+  const currentMonthPaycheckIds = new Set(
+    (state.paychecks || [])
+      .filter(p => p.date && p.date.slice(0, 7) === monthStr)
+      .map(p => p.id)
+  );
+
   if (!templates.length) {
     listEl.innerHTML = '';
     emptyEl.style.display = 'block';
@@ -2760,7 +2768,7 @@ function renderRecurringInline() {
               statusHtml = '<span class="dt-empty">Not generated</span>';
             } else if (inst.is_paid) {
               statusHtml = '<span class="bucket-pill pill-paid" style="font-size:0.72rem;">✓ Paid</span>';
-            } else if (inst.paycheck_id) {
+            } else if (inst.paycheck_id && currentMonthPaycheckIds.has(inst.paycheck_id)) {
               statusHtml = '<span class="bucket-pill pill-pending" style="font-size:0.72rem;">In planner</span>';
             } else {
               statusHtml = '<span class="bucket-pill" style="font-size:0.72rem;background:var(--cream);color:var(--text-md);border:1px solid var(--border);">Unassigned</span>';
