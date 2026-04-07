@@ -718,34 +718,55 @@ function openImportRecurring() {
   const monthLabel = new Date(plannerYear, plannerMonth, 1)
     .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-  const dueThisMonth = state.subscriptions
-    .map(s => ({ sub: s, dueDate: subDueInMonth(s, plannerYear, plannerMonth) }))
-    .filter(x => x.dueDate !== null)
+  // Get all recurring bill templates
+  let templates = state.bills.filter(b => b.is_recurring && b.is_template);
+  if (!templates.length) {
+    // Fallback: deduplicate by name, keep oldest ID
+    const seen = {};
+    state.bills.filter(b => b.is_recurring).sort((a, b) => a.id - b.id)
+      .forEach(b => { const key = b.name.toLowerCase().trim(); if (!seen[key]) seen[key] = b; });
+    templates = Object.values(seen);
+  }
+
+  // Compute due date for each template in the current month
+  const ty = plannerYear, tm = plannerMonth + 1;
+  function dueInMonth(template) {
+    if (!template.due_date) return `${ty}-${String(tm).padStart(2,'0')}-01`;
+    const day = parseInt(template.due_date.slice(8, 10), 10);
+    // Clamp to last day of month (handles Feb, 31-day months, etc.)
+    const lastDay = new Date(ty, tm, 0).getDate();
+    const clamped = Math.min(day, lastDay);
+    return `${ty}-${String(tm).padStart(2,'0')}-${String(clamped).padStart(2,'0')}`;
+  }
+
+  const dueThisMonth = templates
+    .map(t => ({ template: t, dueDate: dueInMonth(t) }))
     .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
   // Skip ones already imported this month (match by name)
+  const templateIds = new Set(templates.map(t => t.id));
   const existingNames = new Set(
     state.bills
-      .filter(b => b.due_date && b.due_date.slice(0,7) === monthStr)
+      .filter(b => b.is_recurring && b.month === monthStr && !templateIds.has(b.id))
       .map(b => b.name.toLowerCase().trim())
   );
-  const toAdd = dueThisMonth.filter(x => !existingNames.has(x.sub.name.toLowerCase().trim()));
+  const toAdd = dueThisMonth.filter(x => !existingNames.has(x.template.name.toLowerCase().trim()));
 
   const el  = document.getElementById('import-recurring-body');
   const btn = document.getElementById('import-recurring-confirm');
   if (!el || !btn) return;
 
   if (!dueThisMonth.length) {
-    el.innerHTML = `<p style="color:var(--text-lt);padding:0.5rem 0;">No subscriptions are due in ${monthLabel}.</p>`;
+    el.innerHTML = `<p style="color:var(--text-lt);padding:0.5rem 0;">No recurring bills set up yet. Mark a bill as "Recurring" to get started.</p>`;
     btn.style.display = 'none';
   } else if (!toAdd.length) {
-    el.innerHTML = `<p style="color:var(--sage-dk);padding:0.5rem 0;">✅ All subscriptions due in ${monthLabel} have already been added.</p>`;
+    el.innerHTML = `<p style="color:var(--sage-dk);padding:0.5rem 0;">✅ All recurring bills for ${monthLabel} have already been added.</p>`;
     btn.style.display = 'none';
   } else {
-    const total = toAdd.reduce((s, x) => s + x.sub.amount, 0);
+    const total = toAdd.reduce((s, x) => s + x.template.amount, 0);
     el.innerHTML = `
       <p style="font-size:0.85rem;color:var(--text-lt);margin:0 0 0.75rem;">
-        These will be added as <strong>unassigned bills</strong> for <strong>${monthLabel}</strong>. You can then assign them to a paycheck as normal.
+        These recurring bills will be added for <strong>${monthLabel}</strong> and auto-assigned to the right paycheck.
       </p>
       <table style="width:100%;font-size:0.85rem;border-collapse:collapse;">
         <thead><tr style="border-bottom:2px solid var(--border);">
@@ -755,9 +776,9 @@ function openImportRecurring() {
         </tr></thead>
         <tbody>${toAdd.map(x => `
           <tr style="border-bottom:1px solid var(--border);">
-            <td style="padding:0.4rem 0.5rem;">🔁 ${escHtml(x.sub.name)}</td>
+            <td style="padding:0.4rem 0.5rem;">🔁 ${escHtml(x.template.name)}</td>
             <td style="padding:0.4rem 0.5rem;">${fmtDate(x.dueDate)}</td>
-            <td style="padding:0.4rem 0.5rem;text-align:right;">$${fmt(x.sub.amount)}</td>
+            <td style="padding:0.4rem 0.5rem;text-align:right;">$${fmt(x.template.amount)}</td>
           </tr>`).join('')}
         </tbody>
         <tfoot><tr style="border-top:2px solid var(--border);">
@@ -779,7 +800,7 @@ async function confirmImportRecurring(toAdd) {
     .filter(p => p.date && p.date.slice(0,7) === monthStr)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  for (const { sub, dueDate } of toAdd) {
+  for (const { template, dueDate } of toAdd) {
     // Auto-assign: find the most recent paycheck on or before the due date.
     // If none exists before due date, use the first paycheck of the month.
     let assigned = null;
@@ -789,20 +810,23 @@ async function confirmImportRecurring(toAdd) {
     }
 
     const data = await api('POST', '/api/bills', {
-      name:         sub.name,
-      amount:       sub.amount,
+      name:         template.name,
+      amount:       template.amount,
       due_date:     dueDate,
       month:        monthStr,
       paycheck_id:  assigned ? assigned.id : null,
       is_recurring: 1,
-      category:     'subscription',
-      notes:        'Auto-imported from Subscriptions',
+      is_template:  0,
+      category:     template.category || null,
+      notes:        template.notes || null,
+      bill_name_id: template.bill_name_id || template.id,
     });
     state.bills.push(data);
   }
   closeModal('modal-import-recurring');
   populatePaycheckDropdowns();
   renderPlanner();
+  renderRecurringInline();
   renderDashboard();
 }
 
