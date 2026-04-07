@@ -473,8 +473,12 @@ def add_bill():
         ).fetchone()['id']
 
     is_recurring = 1 if data.get('is_recurring') else 0
-    # A new recurring bill is always the canonical template
-    is_template  = 1 if is_recurring else 0
+    # Caller may pass is_template=0 explicitly (e.g. import recurring creates instances, not templates)
+    # Default: a brand-new recurring bill added manually is always the canonical template
+    if 'is_template' in data:
+        is_template = 1 if data['is_template'] else 0
+    else:
+        is_template = 1 if is_recurring else 0
 
     db.execute('''INSERT INTO bills
         (user_id, paycheck_id, bill_name_id, name, amount, due_date,

@@ -796,33 +796,22 @@ function openImportRecurring() {
 async function confirmImportRecurring(toAdd) {
   const monthStr = `${plannerYear}-${String(plannerMonth + 1).padStart(2,'0')}`;
 
-  // Paychecks for this month, sorted oldest → newest
-  const monthChecks = [...state.paychecks]
-    .filter(p => p.date && p.date.slice(0,7) === monthStr)
-    .sort((a, b) => a.date.localeCompare(b.date));
-
   for (const { template, dueDate } of toAdd) {
-    // Auto-assign: find the most recent paycheck on or before the due date.
-    // If none exists before due date, use the first paycheck of the month.
-    let assigned = null;
-    if (monthChecks.length) {
-      const before = monthChecks.filter(p => p.date <= dueDate);
-      assigned = before.length ? before[before.length - 1] : monthChecks[0];
-    }
+    // Use the same auto-assign logic as the Add Bill form
+    const paycheckId = autoAssignPaycheck(dueDate);
 
     const data = await api('POST', '/api/bills', {
       name:         template.name,
       amount:       template.amount,
       due_date:     dueDate,
       month:        monthStr,
-      paycheck_id:  assigned ? assigned.id : null,
+      paycheck_id:  paycheckId,
       is_recurring: 1,
       is_template:  0,
       category:     template.category || null,
       notes:        template.notes || null,
-      bill_name_id: template.bill_name_id || template.id,
     });
-    state.bills.push(data);
+    if (data && data.id) state.bills.push(data);
   }
   closeModal('modal-import-recurring');
   populatePaycheckDropdowns();
