@@ -2755,11 +2755,16 @@ function renderRecurringInline() {
         <tbody>
           ${templates.map(b => {
             const inst = instanceMap[b.name.toLowerCase().trim()];
-            const statusHtml = inst
-              ? (inst.is_paid
-                  ? '<span class="bucket-pill pill-paid" style="font-size:0.72rem;">✓ Paid</span>'
-                  : '<span class="bucket-pill pill-pending" style="font-size:0.72rem;">Generated</span>')
-              : '<span class="dt-empty">Not generated</span>';
+            let statusHtml;
+            if (!inst) {
+              statusHtml = '<span class="dt-empty">Not generated</span>';
+            } else if (inst.is_paid) {
+              statusHtml = '<span class="bucket-pill pill-paid" style="font-size:0.72rem;">✓ Paid</span>';
+            } else if (inst.paycheck_id) {
+              statusHtml = '<span class="bucket-pill pill-pending" style="font-size:0.72rem;">In planner</span>';
+            } else {
+              statusHtml = '<span class="bucket-pill" style="font-size:0.72rem;background:var(--cream);color:var(--text-md);border:1px solid var(--border);">Unassigned</span>';
+            }
             const dueDay = b.due_date ? b.due_date.slice(8) : '—';
             const freq = (b.frequency || 'monthly').charAt(0).toUpperCase() + (b.frequency || 'monthly').slice(1);
             return `
