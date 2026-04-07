@@ -1572,6 +1572,9 @@ def mobile_delete_account():
 # Run
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Run DB migrations on every startup (safe to run repeatedly — uses ALTER TABLE IF NOT EXISTS pattern)
+# This ensures migrations run whether the server is started via `python3 app.py` or gunicorn.
+init_db()
+
 if __name__ == '__main__':
-    init_db()
     app.run(debug=True, host='0.0.0.0', port=5000)
