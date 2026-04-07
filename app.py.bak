@@ -693,7 +693,7 @@ def generate_recurring():
             return None
         best = None
         for p in paychecks:
-            if p['date'] <= due_date_str:
+            if p['date'] and p['date'] <= due_date_str:
                 best = p['id']
         if best is None:
             best = paychecks[0]['id']  # all paychecks are after due date → use earliest

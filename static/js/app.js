@@ -184,7 +184,13 @@ async function api(method, url, body) {
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(url, opts);
-  return res.json();
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    // Server returned non-JSON (e.g. HTML error page) — throw with status for debugging
+    throw new Error(`Server error ${res.status} at ${method} ${url}: ${text.slice(0, 200)}`);
+  }
 }
 
 
@@ -795,29 +801,38 @@ function openImportRecurring() {
 
 async function confirmImportRecurring(toAdd) {
   const monthStr = `${plannerYear}-${String(plannerMonth + 1).padStart(2,'0')}`;
+  const btn = document.getElementById('import-recurring-confirm');
+  if (btn) { btn.disabled = true; btn.textContent = 'Adding…'; }
 
-  for (const { template, dueDate } of toAdd) {
-    // Use the same auto-assign logic as the Add Bill form
-    const paycheckId = autoAssignPaycheck(dueDate);
+  try {
+    for (const { template, dueDate } of toAdd) {
+      // Use the same auto-assign logic as the Add Bill form
+      const paycheckId = autoAssignPaycheck(dueDate);
 
-    const data = await api('POST', '/api/bills', {
-      name:         template.name,
-      amount:       template.amount,
-      due_date:     dueDate,
-      month:        monthStr,
-      paycheck_id:  paycheckId,
-      is_recurring: 1,
-      is_template:  0,
-      category:     template.category || null,
-      notes:        template.notes || null,
-    });
-    if (data && data.id) state.bills.push(data);
+      const data = await api('POST', '/api/bills', {
+        name:         template.name,
+        amount:       template.amount,
+        due_date:     dueDate,
+        month:        monthStr,
+        paycheck_id:  paycheckId,
+        is_recurring: 1,
+        is_template:  0,
+        category:     template.category || null,
+        notes:        template.notes || null,
+      });
+      if (data && data.id) state.bills.push(data);
+      else if (data && data.error) throw new Error(data.error);
+    }
+    closeModal('modal-import-recurring');
+    populatePaycheckDropdowns();
+    renderPlanner();
+    renderRecurringInline();
+    renderDashboard();
+  } catch (err) {
+    alert('Import failed: ' + (err.message || err));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ Add All to Planner'; }
   }
-  closeModal('modal-import-recurring');
-  populatePaycheckDropdowns();
-  renderPlanner();
-  renderRecurringInline();
-  renderDashboard();
 }
 
 // billRowHtml now accepts an optional runningBal to show per-row balance
