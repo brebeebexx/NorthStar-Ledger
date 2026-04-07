@@ -2700,19 +2700,30 @@ function renderRecurringInline() {
   if (monthEl) monthEl.value = monthStr;
 
   // Templates = the canonical recurring bill definitions (is_template=1)
-  // Instances = the generated monthly bills for this month (is_template=0, is_recurring=1)
-  const templates = state.bills
-    .filter(b => b.is_recurring && b.is_template)
-    .sort((a, b) => a.name.localeCompare(b.name));
+  // Fall back to deduplicated recurring bills when migration hasn't run yet (is_template still 0)
+  let templates = state.bills.filter(b => b.is_recurring && b.is_template);
+  if (!templates.length) {
+    // Pre-migration fallback: deduplicate by name, keep oldest per bill
+    const seen = {};
+    state.bills
+      .filter(b => b.is_recurring)
+      .sort((a, b) => a.id - b.id)  // oldest first
+      .forEach(b => {
+        const key = b.name.toLowerCase().trim();
+        if (!seen[key]) seen[key] = b;
+      });
+    templates = Object.values(seen);
+  }
+  templates.sort((a, b) => a.name.localeCompare(b.name));
 
+  // Instances = generated monthly bills for this month (is_template=0 or pre-migration instances)
   const instancesThisMonth = state.bills.filter(b =>
     b.is_recurring && !b.is_template && b.month === monthStr
   );
-  // Index instances by bill_name_id (or name) for quick lookup
+  // Index instances by name for quick lookup (consistent key regardless of bill_name_id)
   const instanceMap = {};
   instancesThisMonth.forEach(b => {
-    const key = b.bill_name_id || b.name.toLowerCase().trim();
-    instanceMap[key] = b;
+    instanceMap[b.name.toLowerCase().trim()] = b;
   });
 
   if (!templates.length) {
@@ -2742,7 +2753,7 @@ function renderRecurringInline() {
         </thead>
         <tbody>
           ${templates.map(b => {
-            const inst = instanceMap[b.bill_name_id || b.name.toLowerCase().trim()];
+            const inst = instanceMap[b.name.toLowerCase().trim()];
             const statusHtml = inst
               ? (inst.is_paid
                   ? '<span class="bucket-pill pill-paid" style="font-size:0.72rem;">✓ Paid</span>'
