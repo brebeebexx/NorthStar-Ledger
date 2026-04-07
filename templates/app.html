@@ -872,6 +872,31 @@
   </div>
 </div>
 
+<!-- Delete Recurring Bill Choice -->
+<div class="modal-overlay" id="modal-delete-recurring-bill">
+  <div class="modal" style="max-width:400px;">
+    <div class="modal-header"><h3>🔁 Delete Recurring Bill</h3><button class="modal-close" onclick="closeModal('modal-delete-recurring-bill')">×</button></div>
+    <div class="modal-body">
+      <p style="font-size:0.9rem;color:var(--text-md);margin-bottom:1.2rem;">
+        <strong id="drb-bill-name"></strong> is a recurring bill. What would you like to do?
+      </p>
+      <div style="display:flex;flex-direction:column;gap:0.75rem;">
+        <button class="btn-outline" style="text-align:left;padding:0.85rem 1rem;" onclick="doDeleteBillThisMonth()">
+          <div style="font-weight:600;margin-bottom:0.2rem;">Remove from this month only</div>
+          <div style="font-size:0.78rem;color:var(--text-lt);">Deletes this month's entry. It will still appear in future months.</div>
+        </button>
+        <button class="btn-danger" style="text-align:left;padding:0.85rem 1rem;" onclick="doDeleteBillStopRecurring()">
+          <div style="font-weight:600;margin-bottom:0.2rem;">Stop recurring entirely</div>
+          <div style="font-size:0.78rem;opacity:0.8;">Removes this bill and marks it so it won't generate in future months.</div>
+        </button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" onclick="closeModal('modal-delete-recurring-bill')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- Export -->
 <div class="modal-overlay" id="modal-export">
   <div class="modal">

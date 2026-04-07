@@ -2633,11 +2633,44 @@ async function saveEditBill() {
 }
 
 async function deleteBill() {
-  const id = parseInt(document.getElementById('edit-bill-id').value);
+  const id   = parseInt(document.getElementById('edit-bill-id').value);
+  const bill = state.bills.find(b => b.id === id);
+  if (!bill) return;
+
+  if (bill.is_recurring) {
+    // Show the two-option dialog instead of a plain confirm
+    document.getElementById('drb-bill-name').textContent = bill.name;
+    closeModal('modal-edit-bill');
+    openModal('modal-delete-recurring-bill');
+    return;
+  }
+
   if (!confirm('Delete this bill?')) return;
   await api('DELETE', `/api/bills/${id}`, null);
   state.bills = state.bills.filter(b => b.id !== id);
   closeModal('modal-edit-bill');
+  renderPlanner();
+  renderDashboard();
+}
+
+async function doDeleteBillThisMonth() {
+  // Remove only this month's instance — future months still generate from older templates
+  const id = parseInt(document.getElementById('edit-bill-id').value);
+  await api('DELETE', `/api/bills/${id}`, null);
+  state.bills = state.bills.filter(b => b.id !== id);
+  closeModal('modal-delete-recurring-bill');
+  renderPlanner();
+  renderDashboard();
+}
+
+async function doDeleteBillStopRecurring() {
+  // Delete this instance AND mark all matching instances as non-recurring
+  const id = parseInt(document.getElementById('edit-bill-id').value);
+  await api('POST', `/api/bills/${id}/stop-recurring`, null);
+  // Refresh state — stop-recurring may have updated other bill records too
+  const fresh = await api('GET', '/api/bills', null);
+  if (fresh) state.bills = fresh;
+  closeModal('modal-delete-recurring-bill');
   renderPlanner();
   renderDashboard();
 }
