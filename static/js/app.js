@@ -469,6 +469,10 @@ function renderPlanner() {
   const label = document.getElementById('planner-month-label');
   if (!container) return;
 
+  // Preserve scroll position across full DOM rebuilds
+  const _savedScrollY = window.scrollY;
+  requestAnimationFrame(() => window.scrollTo({ top: _savedScrollY, behavior: 'instant' }));
+
   // ── Preserve which buckets the user has open before rebuilding DOM ──
   const openBuckets = new Set(
     [...document.querySelectorAll('.bucket-body:not(.collapsed)')]
