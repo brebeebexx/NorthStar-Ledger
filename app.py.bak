@@ -328,6 +328,10 @@ def app_main():
         'SELECT * FROM snapshots WHERE user_id=? ORDER BY month ASC', (uid,)
     ).fetchall()]
 
+    recurring_templates_data = [dict(r) for r in db.execute(
+        'SELECT * FROM recurring_templates WHERE user_id=? ORDER BY name ASC', (uid,)
+    ).fetchall()]
+
     unread_count = db.execute(
         "SELECT COUNT(*) as cnt FROM help_messages WHERE user_id=? AND status='unread'", (uid,)
     ).fetchone()['cnt']
@@ -348,6 +352,7 @@ def app_main():
         balance_adjustments=balance_adjustments,
         sticky_notes=sticky_notes,
         snapshots=snapshots,
+        recurring_templates=recurring_templates_data,
         unread_count=unread_count,
         today=today,
         active_tab=tab
@@ -482,8 +487,8 @@ def add_bill():
 
     db.execute('''INSERT INTO bills
         (user_id, paycheck_id, bill_name_id, name, amount, due_date,
-         planned_pay_date, is_recurring, autopay, category, savings_goal_id, month, notes, frequency, is_template)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+         planned_pay_date, is_recurring, autopay, category, savings_goal_id, month, notes, frequency, is_template, template_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
         (uid,
          data.get('paycheck_id'),
          bill_name_id,
@@ -498,7 +503,8 @@ def add_bill():
          data.get('month', date.today().strftime('%Y-%m')),
          data.get('notes', ''),
          data.get('frequency', 'monthly'),
-         is_template)
+         is_template,
+         data.get('template_id'))
     )
     db.commit()
 
@@ -517,21 +523,29 @@ def add_bill():
 @app.route('/api/bills/<int:bid>/stop-recurring', methods=['POST'])
 @login_required
 def stop_recurring_bill(bid):
-    """Stop a recurring bill: marks the template as non-recurring and deletes this instance."""
+    """Stop a recurring bill: marks the legacy template non-recurring, deletes the
+    recurring_template entry, and removes this instance."""
     uid = session['user_id']
     db  = get_db()
     row = db.execute('SELECT * FROM bills WHERE id=? AND user_id=?', (bid, uid)).fetchone()
     if not row:
         db.close()
         return jsonify({'error': 'Not found'}), 404
-    # Mark the template(s) for this bill as non-recurring — this stops future generation
+
+    # Mark legacy bills-table template(s) as non-recurring (stops old-system generation)
     if row['bill_name_id']:
         db.execute('UPDATE bills SET is_recurring=0 WHERE user_id=? AND bill_name_id=? AND is_template=1',
+                   (uid, row['bill_name_id']))
+        # Delete the matching recurring_template (new system) so the Recurring tab clears it
+        db.execute('DELETE FROM recurring_templates WHERE user_id=? AND bill_name_id=?',
                    (uid, row['bill_name_id']))
     else:
         db.execute('UPDATE bills SET is_recurring=0 WHERE user_id=? AND name=? AND is_template=1',
                    (uid, row['name']))
-    # Delete only the instance (not the template itself, so history is preserved)
+        db.execute('DELETE FROM recurring_templates WHERE user_id=? AND name=?',
+                   (uid, row['name']))
+
+    # Delete only the instance (not the legacy template itself, so history is preserved)
     if not row['is_template']:
         db.execute('DELETE FROM bills WHERE id=?', (bid,))
     db.commit()
@@ -674,106 +688,279 @@ def generate_recurring():
     month = data.get('month', date.today().strftime('%Y-%m'))
 
     db = get_db()
-    # Only read canonical templates — never monthly instances
-    recurring = db.execute(
-        "SELECT * FROM bills WHERE user_id=? AND is_recurring=1 AND is_template=1 "
-        "ORDER BY name ASC",
-        (uid,)
+
+    # Prefer the new recurring_templates table; fall back to legacy is_template bills
+    templates = db.execute(
+        "SELECT * FROM recurring_templates WHERE user_id=? ORDER BY name ASC", (uid,)
     ).fetchall()
+    use_templates_table = bool(templates)
+
+    if not use_templates_table:
+        # Legacy: deduplicate is_template=1 bills by bill_name_id / name
+        legacy = db.execute(
+            "SELECT * FROM bills WHERE user_id=? AND is_recurring=1 AND is_template=1 "
+            "ORDER BY name ASC", (uid,)
+        ).fetchall()
+        seen = {}
+        for b in legacy:
+            key = b['bill_name_id'] or b['name']
+            if key not in seen:
+                seen[key] = b
+        templates = list(seen.values())
 
     # Load all paychecks for auto-assignment (sorted oldest → newest)
     paychecks = db.execute(
-        "SELECT id, date FROM paychecks WHERE user_id=? ORDER BY date ASC",
-        (uid,)
+        "SELECT id, date FROM paychecks WHERE user_id=? ORDER BY date ASC", (uid,)
     ).fetchall()
 
     def auto_assign_paycheck(due_date_str):
-        """Mirror of JS autoAssignPaycheck: most recent paycheck on or before due date."""
         if not due_date_str or not paychecks:
             return None
         best = None
         for p in paychecks:
             if p['date'] and p['date'] <= due_date_str:
                 best = p['id']
-        if best is None:
-            best = paychecks[0]['id']  # all paychecks are after due date → use earliest
-        return best
+        return best if best is not None else paychecks[0]['id']
 
-    def due_date_for_month(template_date_str, target_month):
-        """Shift a template date into the target month, preserving the day-of-month."""
-        if not template_date_str:
+    def auto_assign_paycheck_in_month(due_date_str, target_month):
+        if not due_date_str or not paychecks:
             return None
-        try:
-            day = int(template_date_str[8:10])
-            ty, tm = int(target_month[:4]), int(target_month[5:7])
-            day = min(day, monthrange(ty, tm)[1])  # clamp to valid days (e.g. Feb 28/29)
+        month_checks = sorted(
+            [p for p in paychecks if p['date'] and p['date'][:7] == target_month],
+            key=lambda p: p['date']
+        )
+        if month_checks:
+            best = None
+            for p in month_checks:
+                if p['date'] <= due_date_str:
+                    best = p['id']
+            if best is not None:
+                return best
+            # All paychecks this month are after the due date — use the last paycheck before it (prior month)
+            return auto_assign_paycheck(due_date_str)
+        return auto_assign_paycheck(due_date_str)
+
+    def due_date_for_template(template, target_month):
+        """Compute YYYY-MM-DD due date for a template in the target month."""
+        ty, tm = int(target_month[:4]), int(target_month[5:7])
+        if use_templates_table:
+            due_day = template['due_day']
+        else:
+            due_day = None
+            anchor = template['due_date'] or template['planned_pay_date']
+            if anchor:
+                try:
+                    due_day = int(anchor[8:10])
+                except Exception:
+                    pass
+        if due_day:
+            day = min(int(due_day), monthrange(ty, tm)[1])
             return f"{ty:04d}-{tm:02d}-{day:02d}"
-        except Exception:
-            return None
+        return None
 
-    # Group by bill_name_id, keep latest
-    seen = {}
-    for b in recurring:
-        key = b['bill_name_id'] or b['name']
-        if key not in seen:
-            seen[key] = b
-
-    # Helper: check if a template is due in the target month given its frequency
     freq_months_map = {'monthly': 1, 'bimonthly': 2, 'quarterly': 3, 'semiannual': 6, 'annual': 12}
+
     def is_due_this_month(template, target_month):
+        # Don't generate before the template's start date
+        start = template['start_date'] if use_templates_table else None
+        if start and target_month < start[:7]:
+            return False
         freq = (template['frequency'] or 'monthly')
         n = freq_months_map.get(freq, 1)
         if n == 1:
             return True
-        anchor_date = template['due_date'] or template['planned_pay_date']
-        if not anchor_date:
+        # Anchor: for new templates use start_date (if set) or created_at; legacy uses due_date
+        if use_templates_table:
+            anchor = template['start_date'] or template['created_at']
+        else:
+            anchor = template['due_date'] or template['planned_pay_date']
+        if not anchor:
             return True
-        anchor = anchor_date[:7]
         ay, am = int(anchor[:4]), int(anchor[5:7])
-        ty, tm = int(target_month[:4]), int(target_month[5:7])
-        diff = (ty - ay) * 12 + (tm - am)
+        ty2, tm2 = int(target_month[:4]), int(target_month[5:7])
+        diff = (ty2 - ay) * 12 + (tm2 - am)
         return diff >= 0 and diff % n == 0
 
     created = 0
-    for key, template in seen.items():
-        # Skip if not due this month based on frequency
+    for template in templates:
         if not is_due_this_month(template, month):
             continue
-        # Check if already exists for this month
-        existing = db.execute(
-            "SELECT id FROM bills WHERE user_id=? AND bill_name_id=? AND month=?",
-            (uid, template['bill_name_id'], month)
-        ).fetchone()
+
+        bill_name_id = template['bill_name_id']
+        name         = template['name']
+
+        # Check if instance already exists for this month
+        if bill_name_id is not None:
+            existing = db.execute(
+                "SELECT id FROM bills WHERE user_id=? AND bill_name_id=? AND month=? AND is_template=0",
+                (uid, bill_name_id, month)
+            ).fetchone()
+        else:
+            existing = db.execute(
+                "SELECT id FROM bills WHERE user_id=? AND name=? AND month=? AND bill_name_id IS NULL AND is_template=0",
+                (uid, name, month)
+            ).fetchone()
+
         if not existing:
-            # Calculate due/planned date in target month and auto-assign paycheck
-            template_anchor = template['due_date'] or template['planned_pay_date']
-            due   = due_date_for_month(template_anchor, month)
-            paycheck_id = auto_assign_paycheck(due)
+            due         = due_date_for_template(template, month)
+            paycheck_id = auto_assign_paycheck_in_month(due, month)
+            template_id = template['id'] if use_templates_table else None
+            savings_goal_id = None if use_templates_table else template.get('savings_goal_id')
 
             db.execute('''INSERT INTO bills
                 (user_id, paycheck_id, bill_name_id, name, amount, due_date,
                  planned_pay_date, is_recurring, autopay, category, savings_goal_id,
-                 month, notes, frequency, is_template)
-                VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,0)''',
+                 month, notes, frequency, is_template, template_id)
+                VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,0,?)''',
                 (uid,
                  paycheck_id,
-                 template['bill_name_id'],
-                 template['name'],
+                 bill_name_id,
+                 name,
                  template['amount'],
                  due,
                  due,
                  template['autopay'] or 0,
-                 template['category'],
-                 template['savings_goal_id'],
+                 template['category'] or 'bill',
+                 savings_goal_id,
                  month,
                  template['notes'],
-                 template['frequency'] or 'monthly')
+                 template['frequency'] or 'monthly',
+                 template_id)
             )
             created += 1
 
+    # Fix existing instances that landed in a paycheck after their due date
+    # (e.g. early-month bill with no prior paycheck in month — should go to last prior-month paycheck)
+    misassigned = db.execute(
+        'SELECT b.id, b.due_date FROM bills b '
+        'JOIN paychecks p ON b.paycheck_id=p.id '
+        'WHERE b.user_id=? AND b.month=? AND b.is_template=0 AND b.is_recurring=1 '
+        'AND b.is_paid=0 AND b.is_postponed=0 AND p.date > b.due_date',
+        (uid, month)
+    ).fetchall()
+    for inst in misassigned:
+        better = auto_assign_paycheck(inst['due_date'])
+        if better:
+            db.execute('UPDATE bills SET paycheck_id=? WHERE id=?', (better, inst['id']))
+
     db.commit()
+    new_bills = [dict(r) for r in db.execute(
+        'SELECT b.*, p.date as paycheck_date FROM bills b '
+        'LEFT JOIN paychecks p ON b.paycheck_id=p.id '
+        'WHERE b.user_id=? AND b.month=? AND b.is_recurring=1 AND b.is_template=0',
+        (uid, month)
+    ).fetchall()]
     db.close()
-    return jsonify({'created': created, 'month': month})
+    return jsonify({'created': created, 'month': month, 'bills': new_bills})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# API – Recurring Templates
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _upsert_bill_name(db, uid, name, category):
+    """Return bill_name_id for name, creating it if needed."""
+    row = db.execute(
+        'SELECT id FROM bill_names WHERE user_id=? AND name=?', (uid, name)
+    ).fetchone()
+    if row:
+        return row['id']
+    db.execute('INSERT INTO bill_names (user_id, name, category) VALUES (?,?,?)',
+               (uid, name, category))
+    return db.execute(
+        'SELECT id FROM bill_names WHERE user_id=? AND name=?', (uid, name)
+    ).fetchone()['id']
+
+
+@app.route('/api/recurring-templates', methods=['GET', 'POST'])
+@login_required
+def recurring_templates():
+    uid = session['user_id']
+    db  = get_db()
+
+    if request.method == 'GET':
+        rows = db.execute(
+            'SELECT * FROM recurring_templates WHERE user_id=? ORDER BY name ASC', (uid,)
+        ).fetchall()
+        db.close()
+        return jsonify([dict(r) for r in rows])
+
+    # POST – create new template
+    data = request.get_json()
+    name = (data.get('name') or '').strip()
+    if not name:
+        db.close()
+        return jsonify({'error': 'Name required'}), 400
+
+    category     = data.get('category', 'bill') or 'bill'
+    bill_name_id = _upsert_bill_name(db, uid, name, category)
+
+    db.execute('''INSERT INTO recurring_templates
+        (user_id, name, amount, due_day, frequency, autopay, category, bill_name_id, notes, start_date)
+        VALUES (?,?,?,?,?,?,?,?,?,?)''',
+        (uid, name,
+         float(data.get('amount') or 0),
+         int(data['due_day']) if data.get('due_day') else None,
+         data.get('frequency', 'monthly') or 'monthly',
+         1 if data.get('autopay') else 0,
+         category,
+         bill_name_id,
+         data.get('notes', '') or '',
+         data.get('start_date') or None)
+    )
+    db.commit()
+    row = db.execute(
+        'SELECT * FROM recurring_templates WHERE user_id=? ORDER BY id DESC LIMIT 1', (uid,)
+    ).fetchone()
+    db.close()
+    return jsonify(dict(row))
+
+
+@app.route('/api/recurring-templates/<int:tid>', methods=['PUT', 'DELETE'])
+@login_required
+def manage_recurring_template(tid):
+    uid = session['user_id']
+    db  = get_db()
+    tmpl = db.execute(
+        'SELECT * FROM recurring_templates WHERE id=? AND user_id=?', (tid, uid)
+    ).fetchone()
+    if not tmpl:
+        db.close()
+        return jsonify({'error': 'Not found'}), 404
+
+    if request.method == 'DELETE':
+        db.execute('DELETE FROM recurring_templates WHERE id=?', (tid,))
+        db.commit()
+        db.close()
+        return jsonify({'success': True})
+
+    # PUT – update template
+    data     = request.get_json()
+    name     = (data.get('name') or tmpl['name']).strip()
+    category = data.get('category', tmpl['category']) or 'bill'
+
+    bill_name_id = tmpl['bill_name_id']
+    if name != tmpl['name']:
+        bill_name_id = _upsert_bill_name(db, uid, name, category)
+
+    db.execute('''UPDATE recurring_templates SET
+        name=?, amount=?, due_day=?, frequency=?, autopay=?, category=?, bill_name_id=?, notes=?, start_date=?
+        WHERE id=? AND user_id=?''',
+        (name,
+         float(data.get('amount', tmpl['amount']) or 0),
+         int(data['due_day']) if data.get('due_day') else None,
+         data.get('frequency', tmpl['frequency']) or 'monthly',
+         1 if data.get('autopay') else 0,
+         category,
+         bill_name_id,
+         data.get('notes', tmpl['notes']) or '',
+         data.get('start_date') or tmpl['start_date'] or None,
+         tid, uid)
+    )
+    db.commit()
+    updated = db.execute('SELECT * FROM recurring_templates WHERE id=?', (tid,)).fetchone()
+    db.close()
+    return jsonify(dict(updated))
 
 
 @app.route('/api/bill-names')

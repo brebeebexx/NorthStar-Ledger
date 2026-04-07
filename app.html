@@ -30,9 +30,6 @@
     <a href="?tab=planner"       class="nav-item {% if active_tab=='planner'       %}active{% endif %}" data-tab="planner">
       <span class="nav-icon">📋</span> Bills / Planner
     </a>
-    <a href="?tab=recurring"     class="nav-item {% if active_tab=='recurring'     %}active{% endif %}" data-tab="recurring">
-      <span class="nav-icon">🔁</span> Recurring Bills
-    </a>
     <a href="?tab=savings"       class="nav-item {% if active_tab=='savings'       %}active{% endif %}" data-tab="savings">
       <span class="nav-icon">🎯</span> Trips & Savings
     </a>
@@ -147,27 +144,41 @@
 
   <!-- ── PLANNER ────────────────────────────────────────────────────── -->
   <section class="tab-section" id="tab-planner">
-    <div class="planner-header">
-      <h2 style="margin:0;">Bills / Planner</h2>
-      <div class="planner-actions">
-        <button class="btn-secondary btn-sm" onclick="openModal('modal-add-paycheck')">+ Add Income</button>
-        <button class="btn-primary btn-sm" onclick="openModal('modal-add-bill')">+ Add Bill</button>
+    <!-- Sub-view toggle -->
+    <div class="planner-view-toggle">
+      <button class="pvt-btn active" id="pvt-planner" onclick="switchPlannerView('planner')">📋 Planner</button>
+      <button class="pvt-btn" id="pvt-recurring" onclick="switchPlannerView('recurring')">🔁 Recurring Bills</button>
+    </div>
+
+    <!-- Planner view -->
+    <div id="planner-view">
+      <div class="planner-header">
+        <h2 style="margin:0;">Bills / Planner</h2>
+        <div class="planner-actions">
+          <button class="btn-secondary btn-sm" onclick="openImportRecurring()">🔁 Import Recurring</button>
+          <button class="btn-secondary btn-sm" onclick="openModal('modal-add-paycheck')">+ Add Income</button>
+          <button class="btn-primary btn-sm" onclick="openModal('modal-add-bill')">+ Add Bill</button>
+        </div>
+      </div>
+      <div id="planner-buckets">
+        <!-- Rendered by JS -->
       </div>
     </div>
-    <div id="planner-buckets">
-      <!-- Rendered by JS -->
-    </div>
-  </section>
 
-  <!-- ── RECURRING BILLS MANAGER ──────────────────────────────────── -->
-  <section class="tab-section" id="tab-recurring">
-    <div class="page-header">
-      <h2>🔁 Recurring Bills</h2>
-      <button class="btn-primary" onclick="openNewTemplate()">+ New Recurring Bill</button>
-    </div>
-    <div id="recurring-manager-list"><!-- Rendered by JS --></div>
-    <div id="recurring-manager-empty" style="display:none;padding:2rem;text-align:center;color:var(--text-lt);font-size:0.875rem;">
-      No recurring bills yet. Click "+ New Recurring Bill" to add one.
+    <!-- Recurring Bills view -->
+    <div id="recurring-view" style="display:none;">
+      <div class="planner-header">
+        <h2 style="margin:0;">🔁 Recurring Bills</h2>
+        <div class="planner-actions">
+          <button class="btn-primary btn-sm" onclick="openNewTemplate()">+ New Recurring Bill</button>
+        </div>
+      </div>
+      <div id="recurring-inline-list"><!-- Rendered by JS --></div>
+      <div id="recurring-inline-empty" style="display:none;padding:2rem;text-align:center;color:var(--text-lt);font-size:0.875rem;">
+        No recurring bills yet. Mark a bill as "Recurring" when adding or editing it.
+      </div>
+      <input type="hidden" id="recurring-month-inline"/>
+      <span id="recurring-gen-msg-inline" style="display:none;"></span>
     </div>
   </section>
 
@@ -931,10 +942,6 @@
           <option value="savings">Savings / Trip</option>
         </select>
       </div>
-      <div class="form-group" style="margin-top:0.5rem;">
-        <label>Start Date <span style="font-weight:400;color:var(--text-lt);font-size:0.78rem;">(first month to generate — leave blank to always generate)</span></label>
-        <input type="month" id="template-start-date" style="width:100%;"/>
-      </div>
       <label class="checkbox-label" style="margin-top:0.5rem;"><input type="checkbox" id="template-autopay"/> Autopay</label>
       <div class="form-group">
         <label>Notes</label>
@@ -1060,6 +1067,39 @@
   </div>
 </div>
 
+<!-- Recurring Bills Manager -->
+<div class="modal-overlay" id="modal-recurring">
+  <div class="modal" style="max-width:780px;">
+    <div class="modal-header">
+      <h3>🔁 Recurring Bills</h3>
+      <button class="modal-close" onclick="closeModal('modal-recurring')">×</button>
+    </div>
+    <div class="modal-body" style="padding:0;">
+
+      <!-- Template list -->
+      <div id="recurring-list" style="max-height:420px;overflow-y:auto;">
+        <!-- Populated by JS -->
+      </div>
+
+      <!-- Empty state -->
+      <div id="recurring-empty" style="display:none;padding:2rem;text-align:center;color:var(--text-lt);font-size:0.875rem;">
+        No recurring bills yet. Mark a bill as "Recurring" when adding or editing it.
+      </div>
+
+      <!-- Add to month footer -->
+      <div style="padding:1rem 1.5rem;border-top:1px solid var(--border);background:var(--cream);border-radius:0 0 var(--r) var(--r);">
+        <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+          <label style="font-size:0.82rem;font-weight:600;color:var(--text-md);">Generate for month:</label>
+          <input type="month" id="recurring-month" style="padding:0.4rem 0.7rem;border:1.5px solid var(--border);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:0.875rem;"/>
+          <button class="btn-primary" onclick="doGenerateRecurring()" style="padding:0.45rem 1.2rem;">
+            ↺ Add to Month
+          </button>
+          <span id="recurring-gen-msg" style="font-size:0.82rem;color:var(--sage-dk);display:none;"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Postpone Bill -->
 <div class="modal-overlay" id="modal-postpone">

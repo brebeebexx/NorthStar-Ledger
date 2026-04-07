@@ -197,16 +197,46 @@ def init_db():
         UNIQUE(user_id, month)
     )''')
 
+    # ── Recurring templates (canonical definitions, separate from instances) ──
+    c.execute('''CREATE TABLE IF NOT EXISTS recurring_templates (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id      INTEGER NOT NULL,
+        name         TEXT    NOT NULL,
+        amount       REAL    NOT NULL DEFAULT 0,
+        due_day      INTEGER,
+        frequency    TEXT    DEFAULT 'monthly',
+        autopay      INTEGER DEFAULT 0,
+        category     TEXT    DEFAULT 'bill',
+        bill_name_id INTEGER,
+        notes        TEXT,
+        created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id)      REFERENCES users(id)      ON DELETE CASCADE,
+        FOREIGN KEY (bill_name_id) REFERENCES bill_names(id) ON DELETE SET NULL
+    )''')
+
     # ── Migrations: add columns added after initial schema ────────────────────
     for col, definition in [
         ('autopay',   'INTEGER DEFAULT 0'),
         ('paid_date', 'TEXT'),
         ('frequency', "TEXT DEFAULT 'monthly'"),
+        ('is_template', 'INTEGER DEFAULT 0'),
     ]:
         try:
             c.execute(f'ALTER TABLE bills ADD COLUMN {col} {definition}')
         except Exception:
             pass  # column already exists
+
+    # Link bill instances back to their recurring_template
+    try:
+        c.execute('ALTER TABLE bills ADD COLUMN template_id INTEGER REFERENCES recurring_templates(id) ON DELETE SET NULL')
+    except Exception:
+        pass
+
+    # Start date for recurring templates — bills won't generate before this month
+    try:
+        c.execute('ALTER TABLE recurring_templates ADD COLUMN start_date TEXT')
+    except Exception:
+        pass
 
     # Add deleted_at to users for soft deletes
     try:
@@ -231,6 +261,62 @@ def init_db():
             c.execute(f'ALTER TABLE debt_accounts ADD COLUMN {col} {defn}')
         except Exception:
             pass
+
+    # ── Cleanup: remove duplicate recurring_templates, keep lowest id per (user_id, name) ──
+    c.execute('''
+        DELETE FROM recurring_templates
+        WHERE id NOT IN (
+            SELECT MIN(id) FROM recurring_templates GROUP BY user_id, name
+        )
+    ''')
+
+    # ── Data migration: populate recurring_templates from is_recurring=1 bills ──
+    # Deduplicate by (user_id, name) — use most recent bill per name as the source.
+    deduped = c.execute('''
+        SELECT * FROM bills WHERE is_recurring=1
+        AND id IN (
+            SELECT MAX(id) FROM bills WHERE is_recurring=1 GROUP BY user_id, name
+        )
+    ''').fetchall()
+    for b in deduped:
+        existing = c.execute(
+            "SELECT id FROM recurring_templates WHERE user_id=? AND name=?",
+            (b['user_id'], b['name'])
+        ).fetchone()
+        if existing:
+            if not b['template_id']:
+                c.execute('UPDATE bills SET template_id=? WHERE id=?', (existing['id'], b['id']))
+            continue
+        due_day = None
+        if b['due_date']:
+            try:
+                due_day = int(b['due_date'][8:10])
+            except Exception:
+                pass
+        c.execute('''INSERT INTO recurring_templates
+            (user_id, name, amount, due_day, frequency, autopay, category, bill_name_id, notes)
+            VALUES (?,?,?,?,?,?,?,?,?)''',
+            (b['user_id'], b['name'], b['amount'], due_day,
+             b['frequency'] or 'monthly', b['autopay'] or 0,
+             b['category'] or 'bill', b['bill_name_id'], b['notes'])
+        )
+        tmpl_id = c.execute('SELECT last_insert_rowid()').fetchone()[0]
+        c.execute('UPDATE bills SET template_id=? WHERE id=?', (tmpl_id, b['id']))
+        c.execute(
+            'UPDATE bills SET template_id=? WHERE user_id=? AND name=? AND is_template=0 AND template_id IS NULL',
+            (tmpl_id, b['user_id'], b['name'])
+        )
+
+    # ── Cleanup: fix bills where month doesn't match due_date's year-month ──────
+    # Idempotent — safe to run on every startup.
+    c.execute('''
+        UPDATE bills
+        SET month = substr(due_date, 1, 7)
+        WHERE due_date IS NOT NULL
+          AND length(due_date) >= 7
+          AND month IS NOT NULL
+          AND month != substr(due_date, 1, 7)
+    ''')
 
     conn.commit()
     conn.close()
