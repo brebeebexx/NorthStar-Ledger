@@ -505,6 +505,30 @@ def add_bill():
     return jsonify(dict(row))
 
 
+@app.route('/api/bills/<int:bid>/stop-recurring', methods=['POST'])
+@login_required
+def stop_recurring_bill(bid):
+    """Delete this bill instance AND mark all matching recurring instances as non-recurring."""
+    uid = session['user_id']
+    db  = get_db()
+    row = db.execute('SELECT * FROM bills WHERE id=? AND user_id=?', (bid, uid)).fetchone()
+    if not row:
+        db.close()
+        return jsonify({'error': 'Not found'}), 404
+    # Mark all bills sharing the same bill_name_id (or name) as non-recurring
+    if row['bill_name_id']:
+        db.execute('UPDATE bills SET is_recurring=0 WHERE user_id=? AND bill_name_id=?',
+                   (uid, row['bill_name_id']))
+    else:
+        db.execute('UPDATE bills SET is_recurring=0 WHERE user_id=? AND name=?',
+                   (uid, row['name']))
+    # Delete the specific instance
+    db.execute('DELETE FROM bills WHERE id=?', (bid,))
+    db.commit()
+    db.close()
+    return jsonify({'success': True})
+
+
 @app.route('/api/bills/<int:bid>', methods=['PUT', 'DELETE'])
 @login_required
 def manage_bill(bid):

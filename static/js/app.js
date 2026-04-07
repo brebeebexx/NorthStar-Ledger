@@ -2699,32 +2699,32 @@ function renderRecurringInline() {
     .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   if (monthEl) monthEl.value = monthStr;
 
-  // Bills for selected month — recurring bills whose due_date falls in this month
-  const thisMonthBills = state.bills.filter(b =>
-    b.is_recurring && b.due_date && b.due_date.slice(0, 7) === monthStr
-  ).sort((a, b) => a.name.localeCompare(b.name));
+  // Templates = the canonical recurring bill definitions (is_template=1)
+  // Instances = the generated monthly bills for this month (is_template=0, is_recurring=1)
+  const templates = state.bills
+    .filter(b => b.is_recurring && b.is_template)
+    .sort((a, b) => a.name.localeCompare(b.name));
 
-  // Also collect unique templates (all recurring, for the total)
-  const allRecurring = state.bills.filter(b => b.is_recurring);
-  const seen = {};
-  [...allRecurring].sort((a, b) => b.id - a.id).forEach(b => {
-    const key = b.name.toLowerCase().trim();
-    if (!seen[key]) seen[key] = b;
+  const instancesThisMonth = state.bills.filter(b =>
+    b.is_recurring && !b.is_template && b.month === monthStr
+  );
+  // Index instances by bill_name_id (or name) for quick lookup
+  const instanceMap = {};
+  instancesThisMonth.forEach(b => {
+    const key = b.bill_name_id || b.name.toLowerCase().trim();
+    instanceMap[key] = b;
   });
-  const allTemplates = Object.values(seen);
 
-  if (!thisMonthBills.length) {
+  if (!templates.length) {
     listEl.innerHTML = '';
     emptyEl.style.display = 'block';
-    emptyEl.textContent = allTemplates.length
-      ? `No recurring bills due in ${label?.textContent || monthStr}. Use "Add to Month" to generate them.`
-      : 'No recurring bills yet. Mark a bill as "Recurring" when adding or editing it.';
+    emptyEl.textContent = 'No recurring bills yet. Mark a bill as "Recurring" when adding or editing it.';
     return;
   }
   emptyEl.style.display = 'none';
 
-  const totalAmt = thisMonthBills.reduce((s, b) => s + b.amount, 0);
-  const paidCount = thisMonthBills.filter(b => b.is_paid).length;
+  const totalAmt  = templates.reduce((s, b) => s + b.amount, 0);
+  const paidCount = instancesThisMonth.filter(b => b.is_paid).length;
 
   listEl.innerHTML = `
     <div class="debt-section">
@@ -2733,33 +2733,43 @@ function renderRecurringInline() {
           <tr>
             <th>Bill Name</th>
             <th>Amount</th>
-            <th>Due Date</th>
-            <th>Status</th>
+            <th>Due Day</th>
+            <th>Frequency</th>
+            <th>This Month</th>
             <th>AutoPay</th>
             <th class="dt-actions"></th>
           </tr>
         </thead>
         <tbody>
-          ${thisMonthBills.map(b => `
-          <tr id="rec-inline-row-${b.id}" class="${b.is_paid ? 'dt-row-no-bal' : ''}">
+          ${templates.map(b => {
+            const inst = instanceMap[b.bill_name_id || b.name.toLowerCase().trim()];
+            const statusHtml = inst
+              ? (inst.is_paid
+                  ? '<span class="bucket-pill pill-paid" style="font-size:0.72rem;">✓ Paid</span>'
+                  : '<span class="bucket-pill pill-pending" style="font-size:0.72rem;">Generated</span>')
+              : '<span class="dt-empty">Not generated</span>';
+            const dueDay = b.due_date ? b.due_date.slice(8) : '—';
+            const freq = (b.frequency || 'monthly').charAt(0).toUpperCase() + (b.frequency || 'monthly').slice(1);
+            return `
+          <tr id="rec-inline-row-${b.id}">
             <td><strong>${escHtml(b.name)}</strong></td>
-            <td style="color:${b.is_paid ? 'var(--text-lt)' : 'var(--danger)'};font-weight:700;">$${fmt(b.amount)}</td>
-            <td>${b.due_date ? fmtDate(b.due_date) : '<span class="dt-empty">—</span>'}</td>
-            <td>${b.is_paid
-              ? '<span class="bucket-pill pill-paid" style="font-size:0.72rem;">✓ Paid</span>'
-              : '<span class="bucket-pill pill-pending" style="font-size:0.72rem;">Unpaid</span>'}</td>
+            <td style="color:var(--danger);font-weight:700;">$${fmt(b.amount)}</td>
+            <td>${dueDay === '—' ? '<span class="dt-empty">—</span>' : `Day ${parseInt(dueDay, 10)}`}</td>
+            <td>${freq}</td>
+            <td>${statusHtml}</td>
             <td>${b.autopay ? '<span class="bucket-pill pill-paid" style="font-size:0.72rem;">AutoPay</span>' : '<span class="dt-empty">Manual</span>'}</td>
             <td class="dt-actions">
               <button class="bill-btn edit" onclick="openEditBillFromRecurring(${b.id})">Edit</button>
             </td>
-          </tr>`).join('')}
+          </tr>`;
+          }).join('')}
         </tbody>
       </table>
     </div>
     <div style="margin-top:0.75rem;display:flex;gap:1.5rem;font-size:0.82rem;color:var(--text-lt);">
-      <span>${thisMonthBills.length} bill${thisMonthBills.length !== 1 ? 's' : ''} this month</span>
-      <span>Total: <strong style="color:var(--danger);">$${fmt(totalAmt)}</strong></span>
-      <span>Paid: <strong style="color:var(--sage-dk);">${paidCount} of ${thisMonthBills.length}</strong></span>
+      <span>${templates.length} recurring bill${templates.length !== 1 ? 's' : ''}</span>
+      <span>Monthly total: <strong style="color:var(--danger);">$${fmt(totalAmt)}</strong></span>
+      <span>Paid this month: <strong style="color:var(--sage-dk);">${paidCount} of ${instancesThisMonth.length}</strong></span>
     </div>`;
 }
 

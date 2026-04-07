@@ -472,10 +472,14 @@ def add_bill():
             'SELECT id FROM bill_names WHERE user_id=? AND name=?', (uid, name)
         ).fetchone()['id']
 
+    is_recurring = 1 if data.get('is_recurring') else 0
+    # A new recurring bill is always the canonical template
+    is_template  = 1 if is_recurring else 0
+
     db.execute('''INSERT INTO bills
         (user_id, paycheck_id, bill_name_id, name, amount, due_date,
-         planned_pay_date, is_recurring, autopay, category, savings_goal_id, month, notes, frequency)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+         planned_pay_date, is_recurring, autopay, category, savings_goal_id, month, notes, frequency, is_template)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
         (uid,
          data.get('paycheck_id'),
          bill_name_id,
@@ -483,13 +487,14 @@ def add_bill():
          data['amount'],
          data.get('due_date'),
          data.get('planned_pay_date'),
-         1 if data.get('is_recurring') else 0,
+         is_recurring,
          1 if data.get('autopay') else 0,
          category,
          data.get('savings_goal_id'),
          data.get('month', date.today().strftime('%Y-%m')),
          data.get('notes', ''),
-         data.get('frequency', 'monthly'))
+         data.get('frequency', 'monthly'),
+         is_template)
     )
     db.commit()
 
@@ -508,22 +513,23 @@ def add_bill():
 @app.route('/api/bills/<int:bid>/stop-recurring', methods=['POST'])
 @login_required
 def stop_recurring_bill(bid):
-    """Delete this bill instance AND mark all matching recurring instances as non-recurring."""
+    """Stop a recurring bill: marks the template as non-recurring and deletes this instance."""
     uid = session['user_id']
     db  = get_db()
     row = db.execute('SELECT * FROM bills WHERE id=? AND user_id=?', (bid, uid)).fetchone()
     if not row:
         db.close()
         return jsonify({'error': 'Not found'}), 404
-    # Mark all bills sharing the same bill_name_id (or name) as non-recurring
+    # Mark the template(s) for this bill as non-recurring — this stops future generation
     if row['bill_name_id']:
-        db.execute('UPDATE bills SET is_recurring=0 WHERE user_id=? AND bill_name_id=?',
+        db.execute('UPDATE bills SET is_recurring=0 WHERE user_id=? AND bill_name_id=? AND is_template=1',
                    (uid, row['bill_name_id']))
     else:
-        db.execute('UPDATE bills SET is_recurring=0 WHERE user_id=? AND name=?',
+        db.execute('UPDATE bills SET is_recurring=0 WHERE user_id=? AND name=? AND is_template=1',
                    (uid, row['name']))
-    # Delete the specific instance
-    db.execute('DELETE FROM bills WHERE id=?', (bid,))
+    # Delete only the instance (not the template itself, so history is preserved)
+    if not row['is_template']:
+        db.execute('DELETE FROM bills WHERE id=?', (bid,))
     db.commit()
     db.close()
     return jsonify({'success': True})
@@ -540,6 +546,10 @@ def manage_bill(bid):
         return jsonify({'error': 'Not found'}), 404
 
     if request.method == 'DELETE':
+        # Protect recurring templates — use stop-recurring endpoint to change them
+        if row['is_template'] and row['is_recurring']:
+            db.close()
+            return jsonify({'error': 'Cannot delete a recurring template directly. Use stop-recurring instead.'}), 400
         # If savings bill, subtract from goal
         if row['savings_goal_id'] and row['category'] in ('savings', 'trip'):
             db.execute('UPDATE savings_goals SET current_amount = MAX(0, current_amount - ?) WHERE id=?',
@@ -660,11 +670,42 @@ def generate_recurring():
     month = data.get('month', date.today().strftime('%Y-%m'))
 
     db = get_db()
+    # Only read canonical templates — never monthly instances
     recurring = db.execute(
-        "SELECT * FROM bills WHERE user_id=? AND is_recurring=1 "
-        "ORDER BY planned_pay_date DESC",
+        "SELECT * FROM bills WHERE user_id=? AND is_recurring=1 AND is_template=1 "
+        "ORDER BY name ASC",
         (uid,)
     ).fetchall()
+
+    # Load all paychecks for auto-assignment (sorted oldest → newest)
+    paychecks = db.execute(
+        "SELECT id, date FROM paychecks WHERE user_id=? ORDER BY date ASC",
+        (uid,)
+    ).fetchall()
+
+    def auto_assign_paycheck(due_date_str):
+        """Mirror of JS autoAssignPaycheck: most recent paycheck on or before due date."""
+        if not due_date_str or not paychecks:
+            return None
+        best = None
+        for p in paychecks:
+            if p['date'] <= due_date_str:
+                best = p['id']
+        if best is None:
+            best = paychecks[0]['id']  # all paychecks are after due date → use earliest
+        return best
+
+    def due_date_for_month(template_date_str, target_month):
+        """Shift a template date into the target month, preserving the day-of-month."""
+        if not template_date_str:
+            return None
+        try:
+            day = int(template_date_str[8:10])
+            ty, tm = int(target_month[:4]), int(target_month[5:7])
+            day = min(day, monthrange(ty, tm)[1])  # clamp to valid days (e.g. Feb 28/29)
+            return f"{ty:04d}-{tm:02d}-{day:02d}"
+        except Exception:
+            return None
 
     # Group by bill_name_id, keep latest
     seen = {}
@@ -700,17 +741,24 @@ def generate_recurring():
             (uid, template['bill_name_id'], month)
         ).fetchone()
         if not existing:
+            # Calculate due/planned date in target month and auto-assign paycheck
+            template_anchor = template['due_date'] or template['planned_pay_date']
+            due   = due_date_for_month(template_anchor, month)
+            paycheck_id = auto_assign_paycheck(due)
+
             db.execute('''INSERT INTO bills
                 (user_id, paycheck_id, bill_name_id, name, amount, due_date,
-                 planned_pay_date, is_recurring, category, savings_goal_id, month, notes, frequency)
-                VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?)''',
+                 planned_pay_date, is_recurring, autopay, category, savings_goal_id,
+                 month, notes, frequency, is_template)
+                VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,0)''',
                 (uid,
-                 None,
+                 paycheck_id,
                  template['bill_name_id'],
                  template['name'],
                  template['amount'],
-                 None,
-                 None,
+                 due,
+                 due,
+                 template['autopay'] or 0,
                  template['category'],
                  template['savings_goal_id'],
                  month,
