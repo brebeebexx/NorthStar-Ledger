@@ -409,11 +409,15 @@ function _saveMonth() {
 }
 async function autoGenerateForMonth(monthStr) {
   try {
-    const result = await api('POST', '/api/bills/generate-recurring', { month: monthStr });
-    if (!result || result.error) return;
-    if (result.bills) {
-      const existingIds = new Set(state.bills.map(b => b.id));
-      result.bills.forEach(b => { if (!existingIds.has(b.id)) state.bills.push(b); });
+    const [r1, r2] = await Promise.all([
+      api('POST', '/api/bills/generate-recurring',     { month: monthStr }),
+      api('POST', '/api/bills/generate-subscriptions', { month: monthStr }),
+    ]);
+    const existingIds = new Set(state.bills.map(b => b.id));
+    for (const result of [r1, r2]) {
+      if (result && !result.error && result.bills) {
+        result.bills.forEach(b => { if (!existingIds.has(b.id)) state.bills.push(b); });
+      }
     }
   } catch(e) { /* silent — don't disrupt navigation */ }
 }
@@ -622,31 +626,13 @@ function renderPlanner() {
     </div>`;
   }
 
-  // ── Map subscriptions to paycheck buckets for this month ─────────────────
-  const subDueDateMap = {}; // sub.id -> due date string in this month
-  const subBucketMap  = {}; // sub.id -> paycheck id
-  for (const sub of state.subscriptions) {
-    const dueDate = subDueInMonth(sub, plannerYear, plannerMonth);
-    if (!dueDate) continue;
-    subDueDateMap[sub.id] = dueDate;
-    // Assign to the latest paycheck whose date is <= dueDate; fallback to first
-    let best = null;
-    for (const p of sorted) {
-      if (p.date <= dueDate) best = p;
-    }
-    if (!best && sorted.length) best = sorted[0];
-    if (best) subBucketMap[sub.id] = best.id;
-  }
-
   // Build buckets with a running balance that carries across all paychecks
   let runningBalance = carryover;
   const bucketHtmlParts = sorted.map((p, idx) => {
     const bills      = state.bills.filter(b => b.paycheck_id === p.id);
-    const bucketSubs = state.subscriptions.filter(s => subBucketMap[s.id] === p.id);
     const income     = p.amount;
     const paidOut    = bills.filter(b => b.is_paid    && !b.is_postponed).reduce((s, b) => s + b.amount, 0);
-    const pendingOut = bills.filter(b => !b.is_paid   && !b.is_postponed).reduce((s, b) => s + b.amount, 0)
-                     + bucketSubs.reduce((s, sub) => s + sub.amount, 0);
+    const pendingOut = bills.filter(b => !b.is_paid   && !b.is_postponed).reduce((s, b) => s + b.amount, 0);
     const adjs       = state.balanceAdjustments.filter(a => a.paycheck_id === p.id);
     const prevRunningBalance = runningBalance;   // balance carried in from prior buckets
 
@@ -667,12 +653,6 @@ function renderPlanner() {
         sortDate:  a.adjustment_date || '9999-12-31',
         sortGroup: 1,
       })),
-      ...bucketSubs.map(s => ({
-        type:      'subscription',
-        data:      s,
-        sortDate:  subDueDateMap[s.id] || '9999-12-31',
-        sortGroup: 1,
-      })),
     ];
     entries.sort((a, b) => {
       if (a.sortGroup !== b.sortGroup) return a.sortGroup - b.sortGroup;
@@ -686,8 +666,6 @@ function renderPlanner() {
     let dynAdjTotal = 0;
     for (const entry of entries) {
       if (entry.type === 'bill' && !entry.data.is_postponed) {
-        simBal -= entry.data.amount;
-      } else if (entry.type === 'subscription') {
         simBal -= entry.data.amount;
       } else if (entry.type === 'adj') {
         const snap   = entry.data.bank_balance;
@@ -709,10 +687,6 @@ function renderPlanner() {
         const b = entry.data;
         if (!b.is_postponed) rowBalance -= b.amount;
         return billRowHtml(b, rowBalance);
-      } else if (entry.type === 'subscription') {
-        const s = entry.data;
-        rowBalance -= s.amount;
-        return subRowHtml(s, subDueDateMap[s.id], rowBalance);
       } else {
         const a        = entry.data;
         const snapAdj  = a.bank_balance - rowBalance;   // dynamic adjustment
@@ -924,7 +898,11 @@ function billRowHtml(b, runningBal) {
     ? '<span class="bucket-pill pill-auto">AUTO</span>'
     : '';
 
-  const recurringIcon = b.is_recurring ? ' <span title="Recurring" style="font-size:0.7rem;color:var(--text-lt);">🔁</span>' : '';
+  const recurringIcon = b.subscription_id
+    ? ' <span title="Subscription" style="font-size:0.7rem;color:var(--text-lt);">🔁 sub</span>'
+    : b.is_recurring
+    ? ' <span title="Recurring" style="font-size:0.7rem;color:var(--text-lt);">🔁</span>'
+    : '';
 
   const notesHtml = b.notes
     ? `<div class="bill-note">📝 ${escHtml(b.notes)}</div>` : '';
@@ -984,29 +962,6 @@ function adjRowHtml(a, runningBal, snapAdj) {
     </div>
     <div class="bill-actions">
       <button class="bill-btn" style="border-color:var(--danger);color:var(--danger);" onclick="deleteAdjustment(${a.id})" title="Delete adjustment">✕ Delete</button>
-    </div>
-  </div>`;
-}
-
-// Renders a subscription as a read-only planner row
-function subRowHtml(s, dueDate, runningBal) {
-  const balHtml = runningBal !== undefined
-    ? `<div class="bill-running-bal ${runningBal >= 0 ? 'pos' : 'neg'}" title="Balance after this subscription">$${fmt(runningBal)}</div>`
-    : '';
-  return `
-  <div class="bill-row" style="opacity:0.88;border-left:3px solid var(--accent,#7c9cbf);">
-    <div class="bill-name-col">
-      <div class="bill-name">${escHtml(s.name)} <span title="Subscription" style="font-size:0.7rem;color:var(--text-lt);">🔁</span></div>
-      ${dueDate ? `<div class="bill-due">due ${fmtDate(dueDate)}</div>` : ''}
-    </div>
-    <div class="bill-col-status"><span class="bucket-pill" style="background:var(--accent-lt,#e8f0f7);color:var(--navy);">Subscription</span></div>
-    <div class="bill-col-auto"></div>
-    <div class="bill-amount-col">
-      <div class="bill-amount">$${fmt(s.amount)}</div>
-      ${balHtml}
-    </div>
-    <div class="bill-actions">
-      <button class="bill-btn edit" onclick="switchTab('subscriptions')" title="Manage in Subscriptions tab">Manage</button>
     </div>
   </div>`;
 }
