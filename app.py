@@ -737,9 +737,10 @@ def generate_recurring():
                     best = p['id']
             if best is not None:
                 return best
-            # All paychecks this month are after the due date — use the last paycheck before it (prior month)
+            # Month has paychecks but all are after the due date — use last prior-month paycheck
             return auto_assign_paycheck(due_date_str)
-        return auto_assign_paycheck(due_date_str)
+        # No paychecks at all in this month — leave unassigned until user adds one
+        return None
 
     def due_date_for_template(template, target_month):
         """Compute YYYY-MM-DD due date for a template in the target month."""
@@ -830,8 +831,7 @@ def generate_recurring():
             )
             created += 1
 
-    # Fix existing instances that landed in a paycheck after their due date
-    # (e.g. early-month bill with no prior paycheck in month — should go to last prior-month paycheck)
+    # Fix instances that landed in a paycheck after their due date
     misassigned = db.execute(
         'SELECT b.id, b.due_date FROM bills b '
         'JOIN paychecks p ON b.paycheck_id=p.id '
@@ -841,6 +841,18 @@ def generate_recurring():
     ).fetchall()
     for inst in misassigned:
         better = auto_assign_paycheck(inst['due_date'])
+        if better:
+            db.execute('UPDATE bills SET paycheck_id=? WHERE id=?', (better, inst['id']))
+
+    # Assign any unassigned bills now that paychecks may have been added to this month
+    unassigned = db.execute(
+        'SELECT id, due_date FROM bills '
+        'WHERE user_id=? AND month=? AND is_template=0 AND is_recurring=1 '
+        'AND is_paid=0 AND is_postponed=0 AND paycheck_id IS NULL',
+        (uid, month)
+    ).fetchall()
+    for inst in unassigned:
+        better = auto_assign_paycheck_in_month(inst['due_date'], month)
         if better:
             db.execute('UPDATE bills SET paycheck_id=? WHERE id=?', (better, inst['id']))
 
@@ -1302,6 +1314,61 @@ def manage_debt(did):
 # API – Subscriptions
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _sync_sub_to_template(db, uid, sub):
+    """Create or update a recurring_template that mirrors this subscription.
+    Frequency mapping: month intervals → monthly/bimonthly/quarterly/semiannual/annual.
+    Weekly subscriptions are skipped (not supported by recurring templates).
+    """
+    name           = sub['name']
+    amount         = sub['amount']
+    interval_count = sub['interval_count'] or 1
+    interval_unit  = sub['interval_unit']  or 'month'
+    next_due       = sub['next_due_date']
+
+    # Convert to months
+    if interval_unit == 'year':
+        months = interval_count * 12
+    elif interval_unit == 'month':
+        months = interval_count
+    else:
+        return  # weekly — not supported
+
+    freq_map = {1: 'monthly', 2: 'bimonthly', 3: 'quarterly', 6: 'semiannual', 12: 'annual'}
+    frequency = freq_map.get(months)
+    if not frequency:
+        return  # unsupported interval (e.g. every 4 months)
+
+    due_day    = None
+    start_date = None
+    if next_due:
+        try:
+            d          = date.fromisoformat(next_due)
+            due_day    = d.day
+            start_date = next_due[:7]
+        except Exception:
+            pass
+
+    existing = db.execute(
+        "SELECT id FROM recurring_templates WHERE user_id=? AND name=?", (uid, name)
+    ).fetchone()
+
+    if existing:
+        db.execute(
+            '''UPDATE recurring_templates
+               SET amount=?, due_day=?, frequency=?, start_date=?, category='subscription'
+               WHERE id=?''',
+            (amount, due_day, frequency, start_date, existing['id'])
+        )
+    else:
+        bill_name_id = _upsert_bill_name(db, uid, name, 'subscription')
+        db.execute(
+            '''INSERT INTO recurring_templates
+               (user_id, name, amount, due_day, frequency, autopay, category, bill_name_id, start_date)
+               VALUES (?,?,?,?,?,0,'subscription',?,?)''',
+            (uid, name, amount, due_day, frequency, bill_name_id, start_date)
+        )
+
+
 @app.route('/api/subscriptions', methods=['GET', 'POST'])
 @login_required
 def subscriptions():
@@ -1328,6 +1395,8 @@ def subscriptions():
     )
     db.commit()
     row = db.execute('SELECT * FROM subscriptions WHERE user_id=? ORDER BY id DESC LIMIT 1', (uid,)).fetchone()
+    _sync_sub_to_template(db, uid, dict(row))
+    db.commit()
     db.close()
     return jsonify(dict(row))
 
@@ -1343,12 +1412,18 @@ def manage_subscription(sid):
         return jsonify({'error': 'Not found'}), 404
 
     if request.method == 'DELETE':
+        # Remove the matching recurring template too
+        db.execute(
+            "DELETE FROM recurring_templates WHERE user_id=? AND name=? AND category='subscription'",
+            (uid, row['name'])
+        )
         db.execute('DELETE FROM subscriptions WHERE id=?', (sid,))
         db.commit()
         db.close()
         return jsonify({'success': True})
 
     data = request.get_json()
+    old_name = row['name']
     db.execute('''UPDATE subscriptions SET
         name=?, amount=?, interval_count=?, interval_unit=?, next_due_date=?
         WHERE id=?''',
@@ -1360,6 +1435,14 @@ def manage_subscription(sid):
          sid))
     db.commit()
     updated = db.execute('SELECT * FROM subscriptions WHERE id=?', (sid,)).fetchone()
+    # If name changed, remove old template (new one will be created by sync)
+    if old_name != updated['name']:
+        db.execute(
+            "DELETE FROM recurring_templates WHERE user_id=? AND name=? AND category='subscription'",
+            (uid, old_name)
+        )
+    _sync_sub_to_template(db, uid, dict(updated))
+    db.commit()
     db.close()
     return jsonify(dict(updated))
 

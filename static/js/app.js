@@ -409,15 +409,11 @@ function _saveMonth() {
 }
 async function autoGenerateForMonth(monthStr) {
   try {
-    // Run sequentially so generate-recurring commits first; generate-subscriptions
-    // can then see those bills and skip any that already exist by name.
-    const r1 = await api('POST', '/api/bills/generate-recurring',     { month: monthStr });
-    const r2 = await api('POST', '/api/bills/generate-subscriptions', { month: monthStr });
-    const existingIds = new Set(state.bills.map(b => b.id));
-    for (const result of [r1, r2]) {
-      if (result && !result.error && result.bills) {
-        result.bills.forEach(b => { if (!existingIds.has(b.id)) state.bills.push(b); });
-      }
+    const result = await api('POST', '/api/bills/generate-recurring', { month: monthStr });
+    if (!result || result.error) return;
+    if (result.bills) {
+      const existingIds = new Set(state.bills.map(b => b.id));
+      result.bills.forEach(b => { if (!existingIds.has(b.id)) state.bills.push(b); });
     }
   } catch(e) { /* silent — don't disrupt navigation */ }
 }
