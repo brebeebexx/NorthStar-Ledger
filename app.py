@@ -680,6 +680,23 @@ def unpostpone_bill(bid):
     return jsonify({'success': True})
 
 
+@app.route('/api/bills/<int:bid>/mark-paid', methods=['POST'])
+@login_required
+def mark_paid_bill(bid):
+    """Toggle the 'Paid' intermediate state (submitted but not yet cleared from bank)."""
+    uid = session['user_id']
+    db  = get_db()
+    row = db.execute('SELECT * FROM bills WHERE id=? AND user_id=?', (bid, uid)).fetchone()
+    if not row:
+        db.close()
+        return jsonify({'error': 'Not found'}), 404
+    new_val = 0 if row['is_marked_paid'] else 1
+    db.execute('UPDATE bills SET is_marked_paid=? WHERE id=? AND user_id=?', (new_val, bid, uid))
+    db.commit()
+    db.close()
+    return jsonify({'is_marked_paid': new_val})
+
+
 @app.route('/api/bills/generate-recurring', methods=['POST'])
 @login_required
 def generate_recurring():

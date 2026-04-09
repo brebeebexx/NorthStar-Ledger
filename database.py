@@ -232,6 +232,18 @@ def init_db():
     except Exception:
         pass
 
+    # Link subscription-generated bill instances back to their subscription
+    try:
+        c.execute('ALTER TABLE bills ADD COLUMN subscription_id INTEGER REFERENCES subscriptions(id) ON DELETE SET NULL')
+    except Exception:
+        pass
+
+    # Paid (submitted) but not yet cleared from bank — intermediate state before Deducted
+    try:
+        c.execute('ALTER TABLE bills ADD COLUMN is_marked_paid INTEGER DEFAULT 0')
+    except Exception:
+        pass
+
     # Start date for recurring templates — bills won't generate before this month
     try:
         c.execute('ALTER TABLE recurring_templates ADD COLUMN start_date TEXT')

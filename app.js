@@ -116,6 +116,7 @@ function switchTab(tab) {
   // Also render sticky notes on dashboard init
   if (tab === 'dashboard')     { renderDashboard(); renderStickyNotes(); }
   if (tab === 'planner')       renderPlanner();
+  if (tab === 'recurring')     renderRecurringManager();
   if (tab === 'savings')       renderSavings();
   if (tab === 'debt')          renderDebt();
   if (tab === 'subscriptions') renderSubscriptions();
@@ -394,14 +395,13 @@ function updateSharedNavVisibility(tab) {
 
 function _reRenderActiveTab() {
   const tab = document.querySelector('.tab-section.active')?.id?.replace('tab-', '');
-  if (tab === 'planner') {
-    renderPlanner();
-    if (document.getElementById('recurring-view')?.style.display !== 'none') renderRecurringInline();
-  } else if (tab === 'dashboard')     renderDashboard();
-  else if (tab === 'savings')         renderSavings();
-  else if (tab === 'debt')            renderDebt();
-  else if (tab === 'subscriptions')   renderSubscriptions();
-  else if (tab === 'calendar')        renderCalendar();
+  if      (tab === 'planner')       renderPlanner();
+  else if (tab === 'dashboard')     renderDashboard();
+  else if (tab === 'recurring')     renderRecurringManager();
+  else if (tab === 'savings')       renderSavings();
+  else if (tab === 'debt')          renderDebt();
+  else if (tab === 'subscriptions') renderSubscriptions();
+  else if (tab === 'calendar')      renderCalendar();
 }
 
 function _saveMonth() {
@@ -517,8 +517,21 @@ function renderPlanner() {
 
   // ── Past Due Widget ───────────────────────────────────────────
   const refDate = viewRefDate();
+  const today   = state.today; // actual current date — used for overdue check
+  // Show past-due bills whose paycheck bucket belongs to the viewed month.
+  // Use today (not refDate) so a bill due Apr 4 shows as overdue on the March
+  // view when its paycheck is in March and today is past Apr 4.
+  const viewMonthPaycheckIds = new Set(
+    (state.paychecks || [])
+      .filter(p => p.date && p.date.slice(0, 7) === monthStr)
+      .map(p => p.id)
+  );
   const pastDueBills = state.bills
-    .filter(b => !b.is_paid && !b.is_postponed && b.due_date && b.due_date < refDate)
+    .filter(b => {
+      if (b.is_paid || b.is_postponed || !b.due_date || b.due_date >= today) return false;
+      if (!b.paycheck_id) return true;
+      return viewMonthPaycheckIds.has(b.paycheck_id);
+    })
     .sort((a, b) => a.due_date.localeCompare(b.due_date));
 
   let pastDueHtml = '';
@@ -856,7 +869,7 @@ async function confirmImportRecurring(toAdd) {
     closeModal('modal-import-recurring');
     populatePaycheckDropdowns();
     renderPlanner();
-    renderRecurringInline();
+    renderRecurringManager();
     renderDashboard();
   } catch (err) {
     alert('Import failed: ' + (err.message || err));
@@ -867,12 +880,15 @@ async function confirmImportRecurring(toAdd) {
 
 // billRowHtml now accepts an optional runningBal to show per-row balance
 function billRowHtml(b, runningBal) {
-  const isPaid = b.is_paid;
-  const isPost = b.is_postponed;
-  const nameClass = isPaid ? 'paid' : isPost ? 'postponed' : '';
+  const isPaid      = b.is_paid;
+  const isPost      = b.is_postponed;
+  const isMarked    = !isPaid && !isPost && b.is_marked_paid;
+  const nameClass   = isPaid ? 'paid' : isPost ? 'postponed' : '';
 
   const pillHtml = isPaid
-    ? '<span class="bucket-pill pill-paid">✓ Paid</span>'
+    ? '<span class="bucket-pill pill-paid">✓ Deducted</span>'
+    : isMarked
+    ? '<span class="bucket-pill pill-marked-paid">✓ Paid</span>'
     : isPost
     ? '<span class="bucket-pill pill-post">Postponed</span>'
     : '<span class="bucket-pill pill-pending">Pending</span>';
@@ -881,7 +897,11 @@ function billRowHtml(b, runningBal) {
     ? '<span class="bucket-pill pill-auto">AUTO</span>'
     : '';
 
-  const recurringIcon = b.is_recurring ? ' <span title="Recurring" style="font-size:0.7rem;color:var(--text-lt);">🔁</span>' : '';
+  const recurringIcon = b.subscription_id
+    ? ' <span title="Subscription" style="font-size:0.7rem;color:var(--text-lt);">🔁 sub</span>'
+    : b.is_recurring
+    ? ' <span title="Recurring" style="font-size:0.7rem;color:var(--text-lt);">🔁</span>'
+    : '';
 
   const notesHtml = b.notes
     ? `<div class="bill-note">📝 ${escHtml(b.notes)}</div>` : '';
@@ -890,15 +910,22 @@ function billRowHtml(b, runningBal) {
     ? `<div class="bill-paid-date">Paid ${b.paid_date ? fmtDate(b.paid_date) : '—'} <button class="paid-date-edit-btn" onclick="openEditPaidDate(${b.id})" title="Edit paid date">✏️</button></div>`
     : '';
 
-  const payBtnLabel = isPaid ? 'Unpay' : 'Mark Paid';
+  const payBtnLabel = isPaid ? 'Undo' : 'Deducted';
   const payBtnClass = isPaid ? 'unpay' : 'pay';
 
   const balHtml = runningBal !== undefined
     ? `<div class="bill-running-bal ${runningBal >= 0 ? 'pos' : 'neg'}" title="Balance after this bill">$${fmt(runningBal)}</div>`
     : '';
 
+  // Paid button: shown when not yet deducted and not postponed
+  const paidBtnHtml = !isPaid && !isPost
+    ? `<button class="bill-btn ${isMarked ? 'marked-paid-active' : 'mark-paid'}" onclick="toggleMarkedPaid(${b.id})">${isMarked ? 'Undo Paid' : 'Paid'}</button>`
+    : '';
+
+  const rowClass = isPaid ? 'row-paid' : isMarked ? 'row-marked-paid' : isPost ? 'row-post' : '';
+
   return `
-  <div class="bill-row ${isPaid ? 'row-paid' : isPost ? 'row-post' : ''}" id="bill-${b.id}">
+  <div class="bill-row ${rowClass}" id="bill-${b.id}">
     <div class="bill-name-col">
       <div class="bill-name ${nameClass}">${escHtml(b.name)}${recurringIcon}</div>
       ${b.due_date ? `<div class="bill-due">due ${fmtDate(b.due_date)}</div>` : ''}
@@ -912,6 +939,7 @@ function billRowHtml(b, runningBal) {
       ${balHtml}
     </div>
     <div class="bill-actions">
+      ${paidBtnHtml}
       <button class="bill-btn ${payBtnClass}" onclick="togglePay(${b.id})">${payBtnLabel}</button>
       ${!isPaid && !isPost ? `<button class="bill-btn post" onclick="openPostpone(${b.id})">Postpone</button>` : ''}
       ${isPost ? `<button class="bill-btn unpost" onclick="unPostpone(${b.id})">Un-postpone</button>` : ''}
@@ -2554,7 +2582,7 @@ async function addBill() {
       });
       if (tmpl && !tmpl.error) {
         state.recurringTemplates.push(tmpl);
-        renderRecurringInline();
+        renderRecurringManager();
       }
     }
   }
@@ -2599,6 +2627,13 @@ async function togglePay(id) {
   }
   renderPlanner();
   renderDashboard();
+}
+
+async function toggleMarkedPaid(id) {
+  const data = await api('POST', `/api/bills/${id}/mark-paid`);
+  const bill = state.bills.find(b => b.id === id);
+  if (bill) bill.is_marked_paid = data.is_marked_paid;
+  renderPlanner();
 }
 
 function openEditPaidDate(id) {
@@ -2722,7 +2757,7 @@ async function saveEditBill() {
       });
       if (tmpl && !tmpl.error) {
         state.recurringTemplates.push(tmpl);
-        renderRecurringInline();
+        renderRecurringManager();
       }
     }
   } else if (!newRecurring && oldRecurring) {
@@ -2733,7 +2768,7 @@ async function saveEditBill() {
     if (existingTemplate) {
       await api('DELETE', `/api/recurring-templates/${existingTemplate.id}`, null);
       state.recurringTemplates = state.recurringTemplates.filter(t => t.id !== existingTemplate.id);
-      renderRecurringInline();
+      renderRecurringManager();
     }
   }
 
@@ -2798,65 +2833,54 @@ async function doDeleteBillStopRecurring() {
 
   closeModal('modal-delete-recurring-bill');
   renderPlanner();
-  renderRecurringInline();
+  renderRecurringManager();
   renderDashboard();
 }
 
 // ── Recurring Bills Manager ────────────────────────────────────
 
-function switchPlannerView(view) {
-  const isPlanner   = view === 'planner';
-  document.getElementById('planner-view').style.display    = isPlanner ? '' : 'none';
-  document.getElementById('recurring-view').style.display  = isPlanner ? 'none' : '';
-  document.getElementById('pvt-planner').classList.toggle('active', isPlanner);
-  document.getElementById('pvt-recurring').classList.toggle('active', !isPlanner);
-  if (!isPlanner) renderRecurringInline();
-}
 
-function renderRecurringInline() {
-  const listEl  = document.getElementById('recurring-inline-list');
-  const emptyEl = document.getElementById('recurring-inline-empty');
-  const monthEl = document.getElementById('recurring-month-inline');
-  const label   = document.getElementById('recurring-month-label');
+
+// ── Recurring Template CRUD ────────────────────────────────────────────────
+
+function renderRecurringManager() {
+  const listEl  = document.getElementById('recurring-manager-list');
+  const emptyEl = document.getElementById('recurring-manager-empty');
   if (!listEl) return;
 
-  // Sync month label and generate-month input with current planner month
-  const monthStr = `${plannerYear}-${String(plannerMonth + 1).padStart(2, '0')}`;
-  if (label) label.textContent = new Date(plannerYear, plannerMonth, 1)
-    .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  if (monthEl) monthEl.value = monthStr;
+  const templates = [...state.recurringTemplates].sort((a, b) => a.name.localeCompare(b.name));
 
-  // Templates come exclusively from recurring_templates table
-  let templates = [...state.recurringTemplates];
-  templates.sort((a, b) => a.name.localeCompare(b.name));
+  if (!templates.length) {
+    listEl.innerHTML = '';
+    emptyEl.style.display = 'block';
+    return;
+  }
+  emptyEl.style.display = 'none';
 
-  // Status is derived purely from what's in paycheck buckets this month — no stale instance tracking
+  const monthStr   = `${plannerYear}-${String(plannerMonth + 1).padStart(2, '0')}`;
+  const monthLabel = new Date(plannerYear, plannerMonth, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  const currentMonthPaycheckIds = new Set(
+    (state.paychecks || []).filter(p => p.date && p.date.slice(0, 7) === monthStr).map(p => p.id)
+  );
   const plannerBillMap = {};
   state.bills
     .filter(b => b.paycheck_id && currentMonthPaycheckIds.has(b.paycheck_id))
     .forEach(b => { plannerBillMap[b.name.toLowerCase().trim()] = b; });
 
-  // Build a set of paycheck IDs that actually belong to the current month
-  // so "In planner" only shows when the bill is in a paycheck bucket for THIS month
-  const currentMonthPaycheckIds = new Set(
-    (state.paychecks || [])
-      .filter(p => p.date && p.date.slice(0, 7) === monthStr)
-      .map(p => p.id)
-  );
-
-  if (!templates.length) {
-    listEl.innerHTML = '';
-    emptyEl.style.display = 'block';
-    emptyEl.textContent = 'No recurring bills yet. Mark a bill as "Recurring" when adding or editing it.';
-    return;
-  }
-  emptyEl.style.display = 'none';
-
-  const totalAmt  = templates.reduce((s, b) => s + b.amount, 0);
-  const paidCount = Object.values(plannerBillMap).filter(b => b.is_paid).length;
+  const paidCount      = Object.values(plannerBillMap).filter(b => b.is_paid).length;
+  const inPlannerCount = Object.values(plannerBillMap).length;
+  const totalMonthly   = templates.reduce((s, t) => {
+    const n = { monthly:1, bimonthly:2, quarterly:3, semiannual:6, annual:12 }[t.frequency || 'monthly'] || 1;
+    return s + t.amount / n;
+  }, 0);
 
   listEl.innerHTML = `
     <div class="debt-section">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;padding:0 0.25rem;flex-wrap:wrap;gap:0.5rem;">
+        <span style="font-size:0.85rem;color:var(--text-md);">${templates.length} recurring bill${templates.length !== 1 ? 's' : ''} &nbsp;·&nbsp; Est. monthly: <strong style="color:var(--danger);">$${fmt(totalMonthly)}</strong></span>
+        <span style="font-size:0.85rem;color:var(--text-md);"><strong>${monthLabel}:</strong> ${inPlannerCount} in planner &nbsp;·&nbsp; ${paidCount} paid</span>
+      </div>
       <table class="debt-table">
         <thead>
           <tr>
@@ -2864,93 +2888,37 @@ function renderRecurringInline() {
             <th>Amount</th>
             <th>Due Day</th>
             <th>Frequency</th>
-            <th>This Month</th>
             <th>AutoPay</th>
+            <th>${monthLabel}</th>
             <th class="dt-actions"></th>
           </tr>
         </thead>
         <tbody>
-          ${templates.map(b => {
-            const inst = plannerBillMap[b.name.toLowerCase().trim()];
+          ${templates.map(t => {
+            const freq = (t.frequency || 'monthly').charAt(0).toUpperCase() + (t.frequency || 'monthly').slice(1);
+            const inst = plannerBillMap[t.name.toLowerCase().trim()];
             let statusHtml;
-            if (!inst) {
-              statusHtml = '<span class="dt-empty">Not in planner</span>';
-            } else if (inst.is_paid) {
-              statusHtml = '<span class="bucket-pill pill-paid" style="font-size:0.72rem;">✓ Paid</span>';
-            } else {
-              statusHtml = '<span class="bucket-pill pill-pending" style="font-size:0.72rem;">In planner</span>';
-            }
-            // due_day is integer in new system; fall back to parsing due_date for legacy
-            const dueDayNum = b.due_day != null
-              ? b.due_day
-              : (b.due_date ? parseInt(b.due_date.slice(8), 10) : null);
-            const freq = (b.frequency || 'monthly').charAt(0).toUpperCase() + (b.frequency || 'monthly').slice(1);
+            if (!inst)           statusHtml = '<span class="dt-empty">Not in planner</span>';
+            else if (inst.is_paid) statusHtml = '<span class="bucket-pill pill-paid" style="font-size:0.72rem;">✓ Paid</span>';
+            else                   statusHtml = '<span class="bucket-pill pill-pending" style="font-size:0.72rem;">In planner</span>';
             return `
-          <tr id="rec-inline-row-${b.id}">
-            <td><strong>${escHtml(b.name)}</strong></td>
-            <td style="color:var(--danger);font-weight:700;">$${fmt(b.amount)}</td>
-            <td>${dueDayNum ? `Day ${dueDayNum}` : '<span class="dt-empty">—</span>'}</td>
+          <tr>
+            <td><strong>${escHtml(t.name)}</strong>${t.notes ? `<br><span style="font-size:0.75rem;color:var(--text-lt);">${escHtml(t.notes)}</span>` : ''}</td>
+            <td style="color:var(--danger);font-weight:700;">$${fmt(t.amount)}</td>
+            <td>${t.due_day ? `Day ${t.due_day}` : '<span class="dt-empty">—</span>'}</td>
             <td>${freq}</td>
+            <td>${t.autopay ? '<span class="bucket-pill pill-paid" style="font-size:0.72rem;">AutoPay</span>' : '<span class="dt-empty">Manual</span>'}</td>
             <td>${statusHtml}</td>
-            <td>${b.autopay ? '<span class="bucket-pill pill-paid" style="font-size:0.72rem;">AutoPay</span>' : '<span class="dt-empty">Manual</span>'}</td>
             <td class="dt-actions">
-              <button class="bill-btn edit" onclick="openEditTemplate(${b.id})">Edit</button>
+              <button class="bill-btn edit" onclick="openEditTemplate(${t.id})">Edit</button>
             </td>
           </tr>`;
           }).join('')}
         </tbody>
       </table>
-    </div>
-    <div style="margin-top:0.75rem;display:flex;gap:1.5rem;font-size:0.82rem;color:var(--text-lt);">
-      <span>${templates.length} recurring bill${templates.length !== 1 ? 's' : ''}</span>
-      <span>Monthly total: <strong style="color:var(--danger);">$${fmt(totalAmt)}</strong></span>
-      <span>Paid this month: <strong style="color:var(--sage-dk);">${paidCount} of ${instancesThisMonth.length}</strong></span>
     </div>`;
 }
 
-async function doGenerateRecurringInline() {
-  const month = document.getElementById('recurring-month-inline').value;
-  const msgEl = document.getElementById('recurring-gen-msg-inline');
-  if (!month) return alert('Please select a month.');
-  const result = await api('POST', '/api/bills/generate-recurring', { month });
-  msgEl.style.display = 'inline';
-  if (result.created > 0) {
-    window.location.href = `?tab=planner`;
-  } else {
-    msgEl.style.color = 'var(--text-lt)';
-    msgEl.textContent = `All recurring bills already exist for ${month}.`;
-    setTimeout(() => { msgEl.style.display = 'none'; }, 4000);
-  }
-}
-
-function openEditBillFromRecurring(templateId) {
-  // When editing from the Recurring Bills tab, prefer the current month's instance
-  // over the template — the template may have stale dates from the month it was created.
-  const monthStr = `${plannerYear}-${String(plannerMonth + 1).padStart(2, '0')}`;
-  const template = state.bills.find(b => b.id === templateId);
-  if (!template) return;
-
-  const nameKey = template.name.toLowerCase().trim();
-  const instance = state.bills.find(b =>
-    b.is_recurring &&
-    !b.is_template &&
-    b.month === monthStr &&
-    b.name.toLowerCase().trim() === nameKey
-  );
-
-  switchPlannerView('planner');
-  openEditBill(instance ? instance.id : templateId);
-}
-
-// ── Recurring Template CRUD ────────────────────────────────────────────────
-
-async function resetRecurringInstance(id) {
-  if (!confirm('Remove this instance? It will show as "Not generated" and can be re-generated.')) return;
-  await api('DELETE', `/api/bills/${id}`, null);
-  state.bills = state.bills.filter(b => b.id !== id);
-  renderRecurringInline();
-  renderPlanner();
-}
 
 function openEditTemplate(id) {
   const t = state.recurringTemplates.find(t => t.id === id);
@@ -2961,9 +2929,10 @@ function openEditTemplate(id) {
   document.getElementById('template-amount').value  = t.amount;
   document.getElementById('template-due-day').value = t.due_day != null ? t.due_day : '';
   document.getElementById('template-frequency').value = t.frequency || 'monthly';
-  document.getElementById('template-autopay').checked  = !!t.autopay;
-  document.getElementById('template-category').value   = t.category || 'bill';
-  document.getElementById('template-notes').value      = t.notes || '';
+  document.getElementById('template-autopay').checked    = !!t.autopay;
+  document.getElementById('template-category').value     = t.category || 'bill';
+  document.getElementById('template-start-date').value   = t.start_date || '';
+  document.getElementById('template-notes').value        = t.notes || '';
   document.getElementById('template-delete-btn').style.display = '';
   openModal('modal-edit-template');
 }
@@ -2975,9 +2944,10 @@ function openNewTemplate() {
   document.getElementById('template-amount').value  = '';
   document.getElementById('template-due-day').value = '';
   document.getElementById('template-frequency').value = 'monthly';
-  document.getElementById('template-autopay').checked  = false;
-  document.getElementById('template-category').value   = 'bill';
-  document.getElementById('template-notes').value      = '';
+  document.getElementById('template-autopay').checked    = false;
+  document.getElementById('template-category').value     = 'bill';
+  document.getElementById('template-start-date').value   = '';
+  document.getElementById('template-notes').value        = '';
   document.getElementById('template-delete-btn').style.display = 'none';
   openModal('modal-edit-template');
 }
@@ -2989,10 +2959,11 @@ async function saveTemplate() {
     name:      document.getElementById('template-name').value.trim(),
     amount:    parseFloat(document.getElementById('template-amount').value) || 0,
     due_day:   dueDayVal ? parseInt(dueDayVal, 10) : null,
-    frequency: document.getElementById('template-frequency').value,
-    autopay:   document.getElementById('template-autopay').checked ? 1 : 0,
-    category:  document.getElementById('template-category').value,
-    notes:     document.getElementById('template-notes').value.trim(),
+    frequency:   document.getElementById('template-frequency').value,
+    autopay:     document.getElementById('template-autopay').checked ? 1 : 0,
+    category:    document.getElementById('template-category').value,
+    start_date:  document.getElementById('template-start-date').value || null,
+    notes:       document.getElementById('template-notes').value.trim(),
   };
   if (!payload.name) { alert('Name is required.'); return; }
 
@@ -3011,7 +2982,7 @@ async function saveTemplate() {
   }
 
   closeModal('modal-edit-template');
-  renderRecurringInline();
+  renderRecurringManager();
 }
 
 async function deleteTemplate() {
@@ -3024,82 +2995,10 @@ async function deleteTemplate() {
 
   state.recurringTemplates = state.recurringTemplates.filter(t => t.id !== parseInt(id, 10));
   closeModal('modal-edit-template');
-  renderRecurringInline();
+  renderRecurringManager();
 }
 
-function openRecurringManager() {
-  // Default month to current planner month
-  const monthStr = `${plannerYear}-${String(plannerMonth + 1).padStart(2, '0')}`;
-  const el = document.getElementById('recurring-month');
-  if (el) el.value = monthStr;
-  const msg = document.getElementById('recurring-gen-msg');
-  if (msg) msg.style.display = 'none';
-  renderRecurringList();
-  openModal('modal-recurring');
-}
 
-function renderRecurringList() {
-  const listEl  = document.getElementById('recurring-list');
-  const emptyEl = document.getElementById('recurring-empty');
-  if (!listEl) return;
-
-  // Get unique recurring templates — most recent bill per name
-  const recurringBills = state.bills.filter(b => b.is_recurring);
-  const seen = {};
-  // Sort newest first so we pick the most recent per name
-  [...recurringBills].sort((a, b) => (b.id - a.id)).forEach(b => {
-    const key = b.name.toLowerCase().trim();
-    if (!seen[key]) seen[key] = b;
-  });
-  const templates = Object.values(seen).sort((a, b) => a.name.localeCompare(b.name));
-
-  if (!templates.length) {
-    listEl.innerHTML = '';
-    emptyEl.style.display = 'block';
-    return;
-  }
-  emptyEl.style.display = 'none';
-
-  const freqLabel = { monthly:'Monthly', bimonthly:'Every 2 mo', quarterly:'Quarterly', semiannual:'Semi-annual', annual:'Annual' };
-  listEl.innerHTML = `
-    <div class="rec-header-row">
-      <div>Bill Name</div>
-      <div>Amount</div>
-      <div>Due Day</div>
-      <div>Frequency</div>
-      <div>Notes</div>
-      <div></div>
-    </div>
-    ${templates.map(b => `
-    <div class="rec-row" id="rec-row-${b.id}">
-      <div class="rec-cell">
-        <input class="rec-input" id="rec-name-${b.id}" value="${escHtml(b.name)}" placeholder="Bill name"/>
-      </div>
-      <div class="rec-cell">
-        <input class="rec-input rec-amount" id="rec-amount-${b.id}" type="number" step="0.01" value="${b.amount}" placeholder="0.00"/>
-      </div>
-      <div class="rec-cell">
-        <input class="rec-input" id="rec-due-${b.id}" type="date" value="${b.due_date || ''}" title="Used as the anchor date for frequency calculations"/>
-      </div>
-      <div class="rec-cell">
-        <select class="rec-input rec-freq" id="rec-freq-${b.id}">
-          <option value="monthly"   ${(b.frequency||'monthly')==='monthly'   ? 'selected':''}>Monthly</option>
-          <option value="bimonthly" ${(b.frequency||'monthly')==='bimonthly' ? 'selected':''}>Every 2 months</option>
-          <option value="quarterly" ${(b.frequency||'monthly')==='quarterly' ? 'selected':''}>Quarterly</option>
-          <option value="semiannual"${(b.frequency||'monthly')==='semiannual'? 'selected':''}>Semi-annual</option>
-          <option value="annual"    ${(b.frequency||'monthly')==='annual'    ? 'selected':''}>Annual</option>
-        </select>
-      </div>
-      <div class="rec-cell rec-notes-cell">
-        <input class="rec-input" id="rec-notes-${b.id}" value="${escHtml(b.notes || '')}" placeholder="Notes…"/>
-      </div>
-      <div class="rec-cell rec-actions">
-        <button class="rec-save-btn" onclick="saveRecurringTemplate(${b.id})" title="Save changes">💾</button>
-        <button class="rec-del-btn"  onclick="removeRecurring(${b.id})"        title="Remove recurring flag">✕</button>
-      </div>
-    </div>`).join('')}
-  `;
-}
 
 async function saveRecurringTemplate(id) {
   const name      = document.getElementById(`rec-name-${id}`).value.trim();
@@ -3145,23 +3044,6 @@ function billDueInMonth(bill, targetMonth) {
   return diff >= 0 && diff % n === 0;
 }
 
-async function doGenerateRecurring() {
-  const month   = document.getElementById('recurring-month').value;
-  const msgEl   = document.getElementById('recurring-gen-msg');
-  if (!month) return alert('Please select a month.');
-
-  const result = await api('POST', '/api/bills/generate-recurring', { month });
-
-  msgEl.style.display = 'inline';
-  if (result.created > 0) {
-    // Reload bills from server so new ones appear
-    window.location.href = `?tab=planner`;
-  } else {
-    msgEl.style.color = 'var(--text-lt)';
-    msgEl.textContent = `All recurring bills already exist for ${month} (or none are due that month).`;
-    setTimeout(() => { msgEl.style.display = 'none'; }, 4000);
-  }
-}
 
 
 // ═══════════════════════════════════════════════════════════════

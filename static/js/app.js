@@ -880,12 +880,15 @@ async function confirmImportRecurring(toAdd) {
 
 // billRowHtml now accepts an optional runningBal to show per-row balance
 function billRowHtml(b, runningBal) {
-  const isPaid = b.is_paid;
-  const isPost = b.is_postponed;
-  const nameClass = isPaid ? 'paid' : isPost ? 'postponed' : '';
+  const isPaid      = b.is_paid;
+  const isPost      = b.is_postponed;
+  const isMarked    = !isPaid && !isPost && b.is_marked_paid;
+  const nameClass   = isPaid ? 'paid' : isPost ? 'postponed' : '';
 
   const pillHtml = isPaid
-    ? '<span class="bucket-pill pill-paid">✓ Paid</span>'
+    ? '<span class="bucket-pill pill-paid">✓ Deducted</span>'
+    : isMarked
+    ? '<span class="bucket-pill pill-marked-paid">✓ Paid</span>'
     : isPost
     ? '<span class="bucket-pill pill-post">Postponed</span>'
     : '<span class="bucket-pill pill-pending">Pending</span>';
@@ -907,15 +910,22 @@ function billRowHtml(b, runningBal) {
     ? `<div class="bill-paid-date">Paid ${b.paid_date ? fmtDate(b.paid_date) : '—'} <button class="paid-date-edit-btn" onclick="openEditPaidDate(${b.id})" title="Edit paid date">✏️</button></div>`
     : '';
 
-  const payBtnLabel = isPaid ? 'Unpay' : 'Mark Paid';
+  const payBtnLabel = isPaid ? 'Undo' : 'Deducted';
   const payBtnClass = isPaid ? 'unpay' : 'pay';
 
   const balHtml = runningBal !== undefined
     ? `<div class="bill-running-bal ${runningBal >= 0 ? 'pos' : 'neg'}" title="Balance after this bill">$${fmt(runningBal)}</div>`
     : '';
 
+  // Paid button: shown when not yet deducted and not postponed
+  const paidBtnHtml = !isPaid && !isPost
+    ? `<button class="bill-btn ${isMarked ? 'marked-paid-active' : 'mark-paid'}" onclick="toggleMarkedPaid(${b.id})">${isMarked ? 'Undo Paid' : 'Paid'}</button>`
+    : '';
+
+  const rowClass = isPaid ? 'row-paid' : isMarked ? 'row-marked-paid' : isPost ? 'row-post' : '';
+
   return `
-  <div class="bill-row ${isPaid ? 'row-paid' : isPost ? 'row-post' : ''}" id="bill-${b.id}">
+  <div class="bill-row ${rowClass}" id="bill-${b.id}">
     <div class="bill-name-col">
       <div class="bill-name ${nameClass}">${escHtml(b.name)}${recurringIcon}</div>
       ${b.due_date ? `<div class="bill-due">due ${fmtDate(b.due_date)}</div>` : ''}
@@ -929,6 +939,7 @@ function billRowHtml(b, runningBal) {
       ${balHtml}
     </div>
     <div class="bill-actions">
+      ${paidBtnHtml}
       <button class="bill-btn ${payBtnClass}" onclick="togglePay(${b.id})">${payBtnLabel}</button>
       ${!isPaid && !isPost ? `<button class="bill-btn post" onclick="openPostpone(${b.id})">Postpone</button>` : ''}
       ${isPost ? `<button class="bill-btn unpost" onclick="unPostpone(${b.id})">Un-postpone</button>` : ''}
@@ -2616,6 +2627,13 @@ async function togglePay(id) {
   }
   renderPlanner();
   renderDashboard();
+}
+
+async function toggleMarkedPaid(id) {
+  const data = await api('POST', `/api/bills/${id}/mark-paid`);
+  const bill = state.bills.find(b => b.id === id);
+  if (bill) bill.is_marked_paid = data.is_marked_paid;
+  renderPlanner();
 }
 
 function openEditPaidDate(id) {
