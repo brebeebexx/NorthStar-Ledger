@@ -288,10 +288,13 @@ def app_main():
         'SELECT * FROM paychecks WHERE user_id=? ORDER BY date DESC', (uid,)
     ).fetchall()]
 
+    # Only bill instances — not legacy is_template=1 rows. Templates live in
+    # the recurring_templates table (passed separately below); they leaked into
+    # the planner before, appearing as un-deletable duplicate rows.
     bills = [dict(r) for r in db.execute(
         'SELECT b.*, p.date as paycheck_date FROM bills b '
         'LEFT JOIN paychecks p ON b.paycheck_id=p.id '
-        'WHERE b.user_id=? ORDER BY b.planned_pay_date ASC', (uid,)
+        'WHERE b.user_id=? AND b.is_template=0 ORDER BY b.planned_pay_date ASC', (uid,)
     ).fetchall()]
 
     savings_goals = [dict(r) for r in db.execute(
@@ -565,6 +568,56 @@ def manage_bill(bid):
         return jsonify({'error': 'Not found'}), 404
 
     if request.method == 'DELETE':
+        # "Remove from this month only" — caller passes ?skip_month=1. We record
+        # a skip row so generate_recurring won't regenerate this bill for this
+        # month, then clear any generated instances for that (name, month). The
+        # recurring template itself is preserved so future months still generate.
+        # This branch must run BEFORE the is_template guard below, otherwise
+        # clicking "skip this month" on a template row returns 400.
+        skip_month = (
+            request.args.get('skip_month') in ('1', 'true')
+            or (request.get_json(silent=True) or {}).get('skip_month') in (1, True, '1', 'true')
+        )
+        if skip_month and row['is_recurring']:
+            skip_month_str = row['month'] or ((row['due_date'] or row['planned_pay_date'] or '')[:7])
+            if skip_month_str:
+                # Record the skip (idempotent — don't duplicate an existing one).
+                if row['bill_name_id']:
+                    existing_skip = db.execute(
+                        'SELECT id FROM recurring_skips '
+                        'WHERE user_id=? AND bill_name_id=? AND month=?',
+                        (uid, row['bill_name_id'], skip_month_str)
+                    ).fetchone()
+                else:
+                    existing_skip = db.execute(
+                        'SELECT id FROM recurring_skips '
+                        'WHERE user_id=? AND bill_name_id IS NULL AND name=? AND month=?',
+                        (uid, row['name'], skip_month_str)
+                    ).fetchone()
+                if not existing_skip:
+                    db.execute(
+                        'INSERT INTO recurring_skips (user_id, bill_name_id, name, month) '
+                        'VALUES (?,?,?,?)',
+                        (uid, row['bill_name_id'], row['name'], skip_month_str)
+                    )
+                # Clear any NON-TEMPLATE instances for this (name, month) so the
+                # planner visibly updates. Template rows are preserved.
+                if row['bill_name_id']:
+                    db.execute(
+                        'DELETE FROM bills WHERE user_id=? AND bill_name_id=? '
+                        'AND month=? AND is_template=0',
+                        (uid, row['bill_name_id'], skip_month_str)
+                    )
+                else:
+                    db.execute(
+                        'DELETE FROM bills WHERE user_id=? AND name=? AND month=? '
+                        'AND bill_name_id IS NULL AND is_template=0',
+                        (uid, row['name'], skip_month_str)
+                    )
+                db.commit()
+            db.close()
+            return jsonify({'success': True, 'skipped': True})
+
         # Protect recurring templates — use stop-recurring endpoint to change them
         if row['is_template'] and row['is_recurring']:
             db.close()
@@ -800,6 +853,14 @@ def generate_recurring():
         diff = (ty2 - ay) * 12 + (tm2 - am)
         return diff >= 0 and diff % n == 0
 
+    # Load all skips for this user+month once, so we don't re-query per template
+    skip_rows = db.execute(
+        'SELECT bill_name_id, name FROM recurring_skips WHERE user_id=? AND month=?',
+        (uid, month)
+    ).fetchall()
+    skipped_ids   = {r['bill_name_id'] for r in skip_rows if r['bill_name_id'] is not None}
+    skipped_names = {r['name'] for r in skip_rows if r['bill_name_id'] is None and r['name']}
+
     created = 0
     for template in templates:
         if not is_due_this_month(template, month):
@@ -807,6 +868,12 @@ def generate_recurring():
 
         bill_name_id = template['bill_name_id']
         name         = template['name']
+
+        # Respect an explicit "Remove from this month only" — don't regenerate.
+        if bill_name_id is not None and bill_name_id in skipped_ids:
+            continue
+        if bill_name_id is None and name in skipped_names:
+            continue
 
         # Check if instance already exists for this month
         if bill_name_id is not None:

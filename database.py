@@ -197,6 +197,23 @@ def init_db():
         UNIQUE(user_id, month)
     )''')
 
+    # ── Recurring skips (months the user explicitly removed a recurring bill) ─
+    #    Blocks generate_recurring from re-creating an instance the user deleted
+    #    via "Remove from this month only". bill_name_id OR name must be set
+    #    depending on whether the recurring bill is template-backed or legacy.
+    c.execute('''CREATE TABLE IF NOT EXISTS recurring_skips (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id      INTEGER NOT NULL,
+        bill_name_id INTEGER,
+        name         TEXT,
+        month        TEXT NOT NULL,  -- 'YYYY-MM'
+        created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id)      REFERENCES users(id)      ON DELETE CASCADE,
+        FOREIGN KEY (bill_name_id) REFERENCES bill_names(id) ON DELETE CASCADE
+    )''')
+    c.execute('''CREATE INDEX IF NOT EXISTS idx_recurring_skips_lookup
+                 ON recurring_skips(user_id, month, bill_name_id, name)''')
+
     # ── Recurring templates (canonical definitions, separate from instances) ──
     c.execute('''CREATE TABLE IF NOT EXISTS recurring_templates (
         id           INTEGER PRIMARY KEY AUTOINCREMENT,

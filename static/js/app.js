@@ -2799,9 +2799,11 @@ async function deleteBill() {
 }
 
 async function doDeleteBillThisMonth() {
-  // Remove only this month's instance — future months still generate from older templates
+  // Remove only this month's instance. Pass skip_month=1 so the backend records
+  // a recurring_skips row — otherwise generate_recurring would re-create this
+  // bill on the next page load.
   const id = parseInt(document.getElementById('edit-bill-id').value);
-  await api('DELETE', `/api/bills/${id}`, null);
+  await api('DELETE', `/api/bills/${id}?skip_month=1`, null);
   state.bills = state.bills.filter(b => b.id !== id);
   closeModal('modal-delete-recurring-bill');
   renderPlanner();
