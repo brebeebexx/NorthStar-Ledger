@@ -695,7 +695,7 @@ function renderPlanner() {
     const runLabel = isLast ? 'Month-End Balance' : 'Running Balance';
 
     return `
-    <div class="bucket ${isCurrent ? 'current' : ''} ${isNeg ? 'negative' : ''}" id="bucket-${p.id}">
+    <div class="bucket ${isCurrent ? 'current' : ''}" id="bucket-${p.id}">
       <div class="bucket-header" onclick="toggleBucket(${p.id})">
         <div class="bucket-title">
           ${p.income_type === 'bonus' ? '🎁' : '💵'} ${fmtDate(p.date)}
@@ -922,7 +922,10 @@ function billRowHtml(b, runningBal) {
     ? `<button class="bill-btn ${isMarked ? 'marked-paid-active' : 'mark-paid'}" onclick="toggleMarkedPaid(${b.id})">${isMarked ? 'Undo Paid' : 'Paid'}</button>`
     : '';
 
-  const rowClass = isPaid ? 'row-paid' : isMarked ? 'row-marked-paid' : isPost ? 'row-post' : '';
+  let rowClass = isPaid ? 'row-paid' : isMarked ? 'row-marked-paid' : isPost ? 'row-post' : '';
+  // Mark the row red only if running balance dips below zero at this point.
+  // Applies on top of any paid/postponed class so the row's state is still readable.
+  if (runningBal !== undefined && runningBal < 0) rowClass += ' row-negative';
 
   return `
   <div class="bill-row ${rowClass}" id="bill-${b.id}">
@@ -955,8 +958,9 @@ function adjRowHtml(a, runningBal, snapAdj) {
   const sign     = adj >= 0 ? '+' : '';
   const balClass = runningBal >= 0 ? 'pos' : 'neg';
   const amtClass = adj >= 0 ? 'pos' : 'neg';
+  const negClass = (runningBal !== undefined && runningBal < 0) ? ' row-negative' : '';
   return `
-  <div class="bill-row adj-row">
+  <div class="bill-row adj-row${negClass}">
     <div class="bill-name-col">
       <div class="bill-name" style="color:var(--navy);font-style:italic;">⚖️ Reconcile to Bank</div>
       <div class="bill-due">${fmtDate(a.adjustment_date)} · Bank balance: $${fmt(a.bank_balance)}</div>
@@ -2814,29 +2818,39 @@ async function doDeleteBillStopRecurring() {
   // Delete this instance AND stop future generation (marks non-recurring + deletes template)
   const id   = parseInt(document.getElementById('edit-bill-id').value);
   const bill = state.bills.find(b => b.id === id);
+  const billName = bill ? bill.name : 'this bill';
 
-  await api('POST', `/api/bills/${id}/stop-recurring`, null);
-
-  // Refresh bills state — stop-recurring may have updated other bill records too
-  const fresh = await api('GET', '/api/bills', null);
-  if (fresh) state.bills = fresh;
-
-  // Also remove the matching recurring_template from in-memory state and DB.
-  // The backend now deletes it, but we sync the frontend state here too.
-  if (bill) {
-    const normalizedName = (bill.name || '').toLowerCase().trim();
-    const tmpl = state.recurringTemplates.find(
-      t => (t.name || '').toLowerCase().trim() === normalizedName
-    );
-    if (tmpl) {
-      state.recurringTemplates = state.recurringTemplates.filter(t => t.id !== tmpl.id);
-    }
+  if (!confirm(`Stop recurring "${billName}" entirely?\n\nThis removes the recurring rule so no future months will generate. Existing past-month entries are kept.`)) {
+    return;
   }
 
-  closeModal('modal-delete-recurring-bill');
-  renderPlanner();
-  renderRecurringManager();
-  renderDashboard();
+  try {
+    const result = await api('POST', `/api/bills/${id}/stop-recurring`, null);
+    if (result && result.error) {
+      alert(`Couldn't stop recurring: ${result.error}`);
+      return;
+    }
+
+    // Sync local state (the backend deleted the instance + the template).
+    // We do NOT re-fetch via GET /api/bills — that route doesn't exist and
+    // would silently break the rest of this function.
+    state.bills = state.bills.filter(b => b.id !== id);
+    if (bill) {
+      const normalizedName = (bill.name || '').toLowerCase().trim();
+      state.recurringTemplates = state.recurringTemplates.filter(
+        t => (t.name || '').toLowerCase().trim() !== normalizedName
+      );
+    }
+
+    closeModal('modal-delete-recurring-bill');
+    renderPlanner();
+    renderRecurringManager();
+    renderDashboard();
+
+    alert(`✓ "${billName}" removed from recurring bills.`);
+  } catch (err) {
+    alert(`Something went wrong stopping this recurring bill. Please try again.\n\n${err.message || err}`);
+  }
 }
 
 // ── Recurring Bills Manager ────────────────────────────────────

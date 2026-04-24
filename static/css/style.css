@@ -107,6 +107,8 @@ body.dark-mode .pill-marked-paid  { background: #2A0E18; color: #F472B6; }
 body.dark-mode .pill-post         { background: #1A1A2A; color: #9AA0B4; }
 body.dark-mode .bill-row.row-marked-paid { background: #2A0E18; }
 body.dark-mode .bill-row.row-marked-paid:hover { background: #3A1224; }
+body.dark-mode .bill-row.row-negative       { background: #2A0E0E; }
+body.dark-mode .bill-row.row-negative:hover { background: #3A1414; }
 /* Savings progress bar track */
 body.dark-mode .savings-bar-track { background: #2E3444; }
 /* Projection card status */
@@ -493,7 +495,10 @@ body.dark-mode .carryover-banner.carry-negative { background: #2e1a1a; border-co
 /* ─── PLANNER / BUCKETS ─── */
 .bucket { background: var(--white); border-radius: var(--r); border: 1px solid var(--border); box-shadow: var(--shadow); margin-bottom: 1.2rem; overflow: hidden; }
 .bucket.current { border-color: var(--sage); box-shadow: 0 0 0 2px rgba(61,107,84,.15), var(--shadow); }
-.bucket.negative { border-color: var(--danger); background: #fff8f8; }
+/* Per-row negative highlight — replaces the old bucket-wide red wash so only
+   the row where running balance dips below zero gets visually flagged. */
+.bill-row.row-negative        { background: #fff5f5; border-left: 3px solid var(--danger); }
+.bill-row.row-negative:hover  { background: #ffe8e8; }
 .bucket-header {
   padding: 1rem 1.2rem; display: flex; align-items: center;
   justify-content: space-between; cursor: pointer;

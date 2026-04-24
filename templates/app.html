@@ -73,7 +73,6 @@
     </div>
     <div class="sidebar-extra-actions">
       <button class="btn-sidebar-extra" onclick="toggleDarkMode()" id="dark-mode-btn" title="Toggle dark mode">🌙 Dark Mode</button>
-      <button class="btn-sidebar-extra" onclick="openModal('modal-export')" title="Export data">📤 Export</button>
     </div>
     {% if user.is_admin %}
       <a href="/admin" class="btn-admin">⚙️ Admin</a>
@@ -1016,6 +1015,17 @@
       </div>
 
       <div class="settings-section">
+        <div class="settings-section-label">Data</div>
+        <div class="settings-danger-row">
+          <div>
+            <div style="font-weight:600;font-size:0.875rem;">Export Data</div>
+            <div style="font-size:0.78rem;color:var(--text-lt);margin-top:0.15rem;">Download all your data to a multi-sheet Excel file.</div>
+          </div>
+          <button class="btn-outline" onclick="closeModal('modal-settings'); openModal('modal-export');">📤 Export</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
         <div class="settings-section-label">Danger Zone</div>
         <div class="settings-danger-row">
           <div>
@@ -1187,7 +1197,7 @@
 ════════════════════════════════════════════════════════════════════════════ -->
 <div class="fab-group">
   <button class="fab-btn fab-calc"   onclick="openModal('modal-calculator')" title="Calculator">🧮</button>
-  <button class="fab-btn fab-export" onclick="openModal('modal-export')"     title="Export data">📤</button>
+  <!-- Export moved into Settings → Data -->
 </div>
 
 
