@@ -12,6 +12,7 @@ let state = {
   billNames:           [...APP_DATA.billNames],
   stickyNotes:         [...APP_DATA.stickyNotes],
   balanceAdjustments:  [...(APP_DATA.balanceAdjustments || [])],
+  deposits:            [...(APP_DATA.deposits || [])],
   snapshots:           [...(APP_DATA.snapshots || [])],
   recurringTemplates:  [...(APP_DATA.recurringTemplates || [])],
   today:               APP_DATA.today,
@@ -630,10 +631,12 @@ function renderPlanner() {
     const paidOut    = bills.filter(b => b.is_paid    && !b.is_postponed).reduce((s, b) => s + b.amount, 0);
     const pendingOut = bills.filter(b => !b.is_paid   && !b.is_postponed).reduce((s, b) => s + b.amount, 0);
     const adjs       = state.balanceAdjustments.filter(a => a.paycheck_id === p.id);
+    const deposits   = state.deposits.filter(d => d.paycheck_id === p.id);
+    const depositsTotal = deposits.reduce((s, d) => s + d.amount, 0);
     const prevRunningBalance = runningBalance;   // balance carried in from prior buckets
 
     // ── Build + sort entries first so we can simulate the real running balance ──
-    // Sort groups: 0 = paid (top), 1 = pending/reconcile (middle), 2 = postponed (bottom)
+    // Sort groups: 0 = paid (top), 1 = pending/reconcile/deposit (middle), 2 = postponed (bottom)
     const entries = [
       ...bills.map(b => ({
         type:      'bill',
@@ -649,6 +652,12 @@ function renderPlanner() {
         sortDate:  a.adjustment_date || '9999-12-31',
         sortGroup: 1,
       })),
+      ...deposits.map(d => ({
+        type:      'deposit',
+        data:      d,
+        sortDate:  d.deposit_date || '9999-12-31',
+        sortGroup: 1,
+      })),
     ];
     entries.sort((a, b) => {
       if (a.sortGroup !== b.sortGroup) return a.sortGroup - b.sortGroup;
@@ -656,13 +665,14 @@ function renderPlanner() {
     });
 
     // ── Simulate the row walk to get the real running balance ──
-    // Reconcile entries SNAP to bank_balance (dynamic) instead of using stale adjustment_amount.
-    // This ensures the balance is always correct regardless of carryover or prior-bucket changes.
+    // Bills subtract, deposits add, reconcile entries SNAP to bank_balance.
     let simBal     = prevRunningBalance + income;
     let dynAdjTotal = 0;
     for (const entry of entries) {
       if (entry.type === 'bill' && !entry.data.is_postponed) {
         simBal -= entry.data.amount;
+      } else if (entry.type === 'deposit') {
+        simBal += entry.data.amount;
       } else if (entry.type === 'adj') {
         const snap   = entry.data.bank_balance;
         dynAdjTotal += (snap - simBal);
@@ -683,6 +693,10 @@ function renderPlanner() {
         const b = entry.data;
         if (!b.is_postponed) rowBalance -= b.amount;
         return billRowHtml(b, rowBalance);
+      } else if (entry.type === 'deposit') {
+        const d = entry.data;
+        rowBalance += d.amount;
+        return depositRowHtml(d, rowBalance);
       } else {
         const a        = entry.data;
         const snapAdj  = a.bank_balance - rowBalance;   // dynamic adjustment
@@ -690,7 +704,7 @@ function renderPlanner() {
         return adjRowHtml(a, rowBalance, snapAdj);
       }
     }).join('') :
-      `<div style="padding:1rem 1.2rem;font-size:0.82rem;color:var(--text-lt);">No bills assigned to this paycheck.</div>`;
+      `<div style="padding:1rem 1.2rem;font-size:0.82rem;color:var(--text-lt);">No bills or deposits assigned to this paycheck.</div>`;
 
     const runLabel = isLast ? 'Month-End Balance' : 'Running Balance';
 
@@ -698,10 +712,13 @@ function renderPlanner() {
     <div class="bucket ${isCurrent ? 'current' : ''}" id="bucket-${p.id}">
       <div class="bucket-header" onclick="toggleBucket(${p.id})">
         <div class="bucket-title">
-          ${p.income_type === 'bonus' ? '🎁' : '💵'} ${fmtDate(p.date)}
-          ${p.income_type === 'bonus' ? '<span class="badge-bonus">BONUS</span>' : ''}
-          ${isCurrent ? '<span class="badge-current">CURRENT</span>' : ''}
-          ${isNeg ? '<span class="badge-warning">⚠️ Negative</span>' : ''}
+          <div>
+            ${p.income_type === 'bonus' ? '🎁' : '💵'} ${fmtDate(p.date)}
+            ${p.income_type === 'bonus' ? '<span class="badge-bonus">BONUS</span>' : ''}
+            ${isCurrent ? '<span class="badge-current">CURRENT</span>' : ''}
+            ${isNeg ? '<span class="badge-warning">⚠️ Negative</span>' : ''}
+          </div>
+          ${p.notes ? `<div class="bucket-notes">📝 ${escHtml(p.notes)}</div>` : ''}
         </div>
         <div class="bucket-meta">
           <span class="bucket-income">+$${fmt(income)}</span>
@@ -715,6 +732,7 @@ function renderPlanner() {
         <div class="bucket-recon-row">
           <span class="bucket-running-balance">
             ${isFirst && carryover !== 0 ? `Carried in: <strong style="color:${carryover >= 0 ? 'var(--sage-dk)' : 'var(--danger)'};">${carryover >= 0 ? '+' : ''}$${fmt(carryover)}</strong> — ` : ''}This check: <strong>+$${fmt(income)}</strong> — Paid: <strong>$${fmt(paidOut)}</strong> — Pending: <strong>$${fmt(pendingOut)}</strong>
+            ${depositsTotal > 0 ? `— Deposits: <strong style="color:var(--sage-dk);">+$${fmt(depositsTotal)}</strong>` : ''}
             ${dynAdjTotal !== 0 ? `— Reconcile adj: <strong>${dynAdjTotal >= 0 ? '+' : ''}$${fmt(dynAdjTotal)}</strong>` : ''}
             &nbsp;·&nbsp; <span style="font-weight:700;color:${runningBalance >= 0 ? 'var(--sage-dk)' : 'var(--danger)'};">${runLabel}: $${fmt(runningBalance)}</span>
           </span>
@@ -973,6 +991,33 @@ function adjRowHtml(a, runningBal, snapAdj) {
     </div>
     <div class="bill-actions">
       <button class="bill-btn" style="border-color:var(--danger);color:var(--danger);" onclick="deleteAdjustment(${a.id})" title="Delete adjustment">✕ Delete</button>
+    </div>
+  </div>`;
+}
+
+// Renders a deposit (positive entry, e.g. transfer from savings) as a green row.
+function depositRowHtml(d, runningBal) {
+  const balClass = runningBal >= 0 ? 'pos' : 'neg';
+  const negClass = (runningBal !== undefined && runningBal < 0) ? ' row-negative' : '';
+  const noteHtml = d.notes ? `<div class="bill-note">📝 ${escHtml(d.notes)}</div>` : '';
+  return `
+  <div class="bill-row deposit-row${negClass}" id="deposit-${d.id}">
+    <div class="bill-name-col">
+      <div class="bill-name" style="color:var(--sage-dk);">💰 Deposit</div>
+      <div class="bill-due">${d.deposit_date ? fmtDate(d.deposit_date) : ''}</div>
+      ${noteHtml}
+    </div>
+    <div class="bill-col-status">
+      <span class="bucket-pill" style="background:rgba(46,125,50,0.12);color:var(--sage-dk);">+ Added</span>
+    </div>
+    <div class="bill-col-auto"></div>
+    <div class="bill-amount-col">
+      <div class="bill-amount pos" style="color:var(--sage-dk);">+$${fmt(d.amount)}</div>
+      <div class="bill-running-bal ${balClass}">$${fmt(runningBal)}</div>
+    </div>
+    <div class="bill-actions">
+      <button class="bill-btn edit" onclick="openEditDeposit(${d.id})">Edit</button>
+      <button class="bill-btn" style="border-color:var(--danger);color:var(--danger);" onclick="deleteDeposit(${d.id})" title="Delete deposit">✕</button>
     </div>
   </div>`;
 }
@@ -2919,7 +2964,10 @@ function renderRecurringManager() {
             else                   statusHtml = '<span class="bucket-pill pill-pending" style="font-size:0.72rem;">In planner</span>';
             return `
           <tr>
-            <td><strong>${escHtml(t.name)}</strong>${t.notes ? `<br><span style="font-size:0.75rem;color:var(--text-lt);">${escHtml(t.notes)}</span>` : ''}</td>
+            <td>
+              <strong>${escHtml(t.name)}</strong>
+              ${t.notes ? `<div style="font-size:0.78rem;color:var(--text-md);font-style:italic;margin-top:0.2rem;line-height:1.3;">📝 ${escHtml(t.notes)}</div>` : ''}
+            </td>
             <td style="color:var(--danger);font-weight:700;">$${fmt(t.amount)}</td>
             <td>${t.due_day ? `Day ${t.due_day}` : '<span class="dt-empty">—</span>'}</td>
             <td>${freq}</td>
@@ -3112,6 +3160,109 @@ async function deleteAdjustment(id) {
   await api('DELETE', `/api/reconcile/${id}`, null);
   state.balanceAdjustments = state.balanceAdjustments.filter(a => a.id !== id);
   renderPlanner();
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// ACTIONS — Deposits (positive entries inside a paycheck bucket)
+// ═══════════════════════════════════════════════════════════════
+// Populate the paycheck dropdown with all paychecks (most recent first within
+// the currently-viewed month, then everything else).
+function populateDepositPaycheckDropdown(selectId) {
+  const sel = document.getElementById('deposit-paycheck-id');
+  sel.innerHTML = '';
+  if (!state.paychecks.length) {
+    const opt = document.createElement('option');
+    opt.value = '';
+    opt.textContent = 'No paychecks yet — add one first';
+    sel.appendChild(opt);
+    return;
+  }
+  const monthStr = `${plannerYear}-${String(plannerMonth + 1).padStart(2, '0')}`;
+  // Sort: same-month first (newest first), then everything else newest first.
+  const sorted = [...state.paychecks].sort((a, b) => {
+    const aMonth = (a.date || '').slice(0, 7) === monthStr;
+    const bMonth = (b.date || '').slice(0, 7) === monthStr;
+    if (aMonth !== bMonth) return aMonth ? -1 : 1;
+    return (b.date || '').localeCompare(a.date || '');
+  });
+  for (const p of sorted) {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = `${fmtDate(p.date)} — $${fmt(p.amount)}`;
+    sel.appendChild(opt);
+  }
+  if (selectId) sel.value = selectId;
+}
+
+function openAddDepositGlobal() {
+  if (!state.paychecks.length) {
+    alert('Add a paycheck first — deposits attach to a paycheck bucket.');
+    return;
+  }
+  document.getElementById('deposit-modal-title').textContent = '💰 Add Deposit';
+  document.getElementById('deposit-id').value     = '';
+  populateDepositPaycheckDropdown();   // defaults to the most recent paycheck in this month
+  document.getElementById('deposit-amount').value = '';
+  document.getElementById('deposit-notes').value  = '';
+  document.getElementById('deposit-date').value   = (state.today || new Date().toISOString().slice(0,10));
+  document.getElementById('deposit-save-btn').textContent = 'Save Deposit';
+  openModal('modal-deposit');
+}
+
+function openEditDeposit(id) {
+  const d = state.deposits.find(x => x.id === id);
+  if (!d) return;
+  document.getElementById('deposit-modal-title').textContent = '💰 Edit Deposit';
+  document.getElementById('deposit-id').value = d.id;
+  populateDepositPaycheckDropdown(d.paycheck_id);
+  document.getElementById('deposit-amount').value = d.amount;
+  document.getElementById('deposit-notes').value  = d.notes || '';
+  document.getElementById('deposit-date').value   = d.deposit_date || '';
+  document.getElementById('deposit-save-btn').textContent = 'Update Deposit';
+  openModal('modal-deposit');
+}
+
+async function saveDeposit() {
+  const id          = document.getElementById('deposit-id').value;
+  const paycheck_id = parseInt(document.getElementById('deposit-paycheck-id').value);
+  const amount      = parseFloat(document.getElementById('deposit-amount').value);
+  const deposit_date = document.getElementById('deposit-date').value || null;
+  const notes        = document.getElementById('deposit-notes').value.trim() || null;
+
+  if (!amount || amount <= 0) { alert('Enter a positive amount.'); return; }
+  if (!paycheck_id)           { alert('Missing paycheck reference.'); return; }
+
+  try {
+    if (id) {
+      const updated = await api('PUT', `/api/deposits/${id}`, { paycheck_id, amount, deposit_date, notes });
+      if (updated && updated.error) { alert(updated.error); return; }
+      const idx = state.deposits.findIndex(x => x.id === parseInt(id));
+      if (idx >= 0) state.deposits[idx] = updated;
+      else          state.deposits.push(updated);
+    } else {
+      const created = await api('POST', `/api/deposits`, { paycheck_id, amount, deposit_date, notes });
+      if (created && created.error) { alert(created.error); return; }
+      state.deposits.push(created);
+    }
+    closeModal('modal-deposit');
+    renderPlanner();
+    renderDashboard();
+  } catch (err) {
+    alert(`Couldn't save deposit. ${err.message || err}`);
+  }
+}
+
+async function deleteDeposit(id) {
+  if (!confirm('Delete this deposit?')) return;
+  try {
+    await api('DELETE', `/api/deposits/${id}`, null);
+    state.deposits = state.deposits.filter(d => d.id !== id);
+    renderPlanner();
+    renderDashboard();
+  } catch (err) {
+    alert(`Couldn't delete deposit. ${err.message || err}`);
+  }
 }
 
 

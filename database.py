@@ -132,6 +132,22 @@ def init_db():
         FOREIGN KEY (paycheck_id) REFERENCES paychecks(id) ON DELETE CASCADE
     )''')
 
+    # ── Deposits (positive entries inside a paycheck bucket) ─────────────────
+    #    Used for "I transferred $X from savings to the bills account" — money
+    #    going IN that isn't a paycheck. Adds to running balance, but does NOT
+    #    count as income in any income totals.
+    c.execute('''CREATE TABLE IF NOT EXISTS deposits (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id      INTEGER NOT NULL,
+        paycheck_id  INTEGER NOT NULL,
+        amount       REAL    NOT NULL,
+        deposit_date TEXT,
+        notes        TEXT,
+        created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id)     REFERENCES users(id)     ON DELETE CASCADE,
+        FOREIGN KEY (paycheck_id) REFERENCES paychecks(id) ON DELETE CASCADE
+    )''')
+
     # ── Help messages ─────────────────────────────────────────────────────────
     c.execute('''CREATE TABLE IF NOT EXISTS help_messages (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -299,42 +315,20 @@ def init_db():
         )
     ''')
 
-    # ── Data migration: populate recurring_templates from is_recurring=1 bills ──
-    # Deduplicate by (user_id, name) — use most recent bill per name as the source.
-    deduped = c.execute('''
-        SELECT * FROM bills WHERE is_recurring=1
-        AND id IN (
-            SELECT MAX(id) FROM bills WHERE is_recurring=1 GROUP BY user_id, name
-        )
-    ''').fetchall()
-    for b in deduped:
-        existing = c.execute(
-            "SELECT id FROM recurring_templates WHERE user_id=? AND name=?",
-            (b['user_id'], b['name'])
-        ).fetchone()
-        if existing:
-            if not b['template_id']:
-                c.execute('UPDATE bills SET template_id=? WHERE id=?', (existing['id'], b['id']))
-            continue
-        due_day = None
-        if b['due_date']:
-            try:
-                due_day = int(b['due_date'][8:10])
-            except Exception:
-                pass
-        c.execute('''INSERT INTO recurring_templates
-            (user_id, name, amount, due_day, frequency, autopay, category, bill_name_id, notes)
-            VALUES (?,?,?,?,?,?,?,?,?)''',
-            (b['user_id'], b['name'], b['amount'], due_day,
-             b['frequency'] or 'monthly', b['autopay'] or 0,
-             b['category'] or 'bill', b['bill_name_id'], b['notes'])
-        )
-        tmpl_id = c.execute('SELECT last_insert_rowid()').fetchone()[0]
-        c.execute('UPDATE bills SET template_id=? WHERE id=?', (tmpl_id, b['id']))
-        c.execute(
-            'UPDATE bills SET template_id=? WHERE user_id=? AND name=? AND is_template=0 AND template_id IS NULL',
-            (tmpl_id, b['user_id'], b['name'])
-        )
+    # ── (DISABLED) Auto-migration: populate recurring_templates from is_recurring=1 bills
+    #
+    # This used to run on every Flask startup and re-create a template for any
+    # bill (including paid history rows) that still had is_recurring=1. That
+    # silently undid "Stop recurring entirely" — the user would stop a bill,
+    # restart Flask, and the template would come right back because old paid
+    # history still had is_recurring=1 set.
+    #
+    # The migration was a one-time onboarding step. It's no longer needed:
+    # templates are created explicitly by user actions (Add Bill with the
+    # recurring toggle, or via /api/recurring-templates POST). Leaving the
+    # block disabled preserves history bills' is_recurring flag without
+    # using it as a regeneration source.
+    pass  # auto-template-from-bills migration intentionally removed
 
     # ── Cleanup: fix bills where month doesn't match due_date's year-month ──────
     # Idempotent — safe to run on every startup.

@@ -150,6 +150,7 @@
       <h2 style="margin:0;">Bills / Planner</h2>
       <div class="planner-actions">
         <button class="btn-secondary btn-sm" onclick="openModal('modal-add-paycheck')">+ Add Income</button>
+        <button class="btn-secondary btn-sm" onclick="openAddDepositGlobal()">+ Add Deposit</button>
         <button class="btn-primary btn-sm" onclick="openModal('modal-add-bill')">+ Add Bill</button>
       </div>
     </div>
@@ -577,6 +578,33 @@
     <div class="modal-footer">
       <button class="btn-outline" onclick="closeModal('modal-reconcile')">Cancel</button>
       <button class="btn-primary" onclick="doReconcile()">Reconcile</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add / Edit Deposit -->
+<div class="modal-overlay" id="modal-deposit">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="deposit-modal-title">💰 Add Deposit</h3>
+      <button class="modal-close" onclick="closeModal('modal-deposit')">×</button>
+    </div>
+    <div class="modal-body">
+      <p class="modal-desc">A positive entry that lands inside a paycheck bucket — for transfers from another account, refunds, gifts, etc. <strong>Does not count as income.</strong></p>
+      <input type="hidden" id="deposit-id"/>
+      <div class="form-group">
+        <label>Apply to paycheck</label>
+        <select id="deposit-paycheck-id"></select>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Amount ($)</label><input type="number" id="deposit-amount" step="0.01" min="0.01" placeholder="100.00"/></div>
+        <div class="form-group"><label>Date</label><input type="date" id="deposit-date"/></div>
+      </div>
+      <div class="form-group"><label>Notes (optional)</label><input type="text" id="deposit-notes" placeholder="e.g. Transfer from Savings"/></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-outline" onclick="closeModal('modal-deposit')">Cancel</button>
+      <button class="btn-primary" id="deposit-save-btn" onclick="saveDeposit()">Save Deposit</button>
     </div>
   </div>
 </div>
@@ -1214,6 +1242,7 @@
     billNames:          {{ bill_names          | tojson }},
     stickyNotes:        {{ sticky_notes        | tojson }},
     balanceAdjustments: {{ balance_adjustments | tojson }},
+    deposits:           {{ deposits            | tojson }},
     snapshots:          {{ snapshots           | tojson }},
     recurringTemplates: {{ recurring_templates | tojson }},
     today:       '{{ today }}',

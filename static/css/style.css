@@ -505,7 +505,9 @@ body.dark-mode .carryover-banner.carry-negative { background: #2e1a1a; border-co
   border-bottom: 1px solid var(--border);
   gap: 0.8rem; flex-wrap: wrap;
 }
-.bucket-title   { font-weight: 700; font-size: 0.95rem; display: flex; align-items: center; gap: 0.6rem; }
+.bucket-title   { font-weight: 700; font-size: 0.95rem; display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+.bucket-title > div:first-child { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.bucket-notes   { font-size: 0.78rem; font-weight: 500; color: var(--text-md); font-style: italic; }
 .bucket-meta    { display: flex; align-items: center; gap: 1rem; font-size: 0.85rem; }
 .bucket-income  { color: var(--sage-dk); font-weight: 600; }
 .bucket-balance { font-weight: 700; font-size: 1rem; }
@@ -563,7 +565,7 @@ body.dark-mode .carryover-banner.carry-negative { background: #2e1a1a; border-co
 .bill-name.paid       { text-decoration: line-through; color: var(--text-lt); font-weight: 400; }
 .bill-name.postponed  { color: var(--warning); }
 .bill-due      { font-size: 0.72rem; color: var(--text-lt); }
-.bill-note     { font-size: 0.72rem; color: var(--text-md); font-style: italic; }
+.bill-note     { font-size: 0.78rem; color: var(--text-md); font-style: italic; margin-top: 0.15rem; line-height: 1.3; }
 .bill-paid-date{ font-size: 0.7rem; color: var(--success); display:flex; align-items:center; gap:0.3rem; }
 .paid-date-edit-btn { background:none; border:none; cursor:pointer; font-size:0.7rem; padding:0; line-height:1; opacity:0.6; }
 .paid-date-edit-btn:hover { opacity:1; }
