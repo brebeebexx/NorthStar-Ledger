@@ -27,6 +27,16 @@ let plannerMonth = _savedMonth ? parseInt(_savedMonth.slice(5, 7)) - 1 : new Dat
 Object.defineProperty(window, 'calYear',  { get: () => plannerYear,  set: v => { plannerYear  = v; } });
 Object.defineProperty(window, 'calMonth', { get: () => plannerMonth, set: v => { plannerMonth = v; } });
 
+// Bucket open/closed state lives in JS (not just the DOM) so it survives
+// re-renders cleanly. Without this, querying DOM at the start of renderPlanner
+// can race against in-flight DOM updates from edit/save flows.
+const _openBucketIds = new Set();
+function _isBucketOpen(id) { return _openBucketIds.has(String(id)); }
+function _setBucketOpen(id, open) {
+  const k = String(id);
+  if (open) _openBucketIds.add(k); else _openBucketIds.delete(k);
+}
+
 // ─── Init ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   const tab = APP_DATA.activeTab || 'dashboard';
@@ -496,15 +506,18 @@ function renderPlanner() {
   const label = document.getElementById('planner-month-label');
   if (!container) return;
 
-  // Preserve scroll position across full DOM rebuilds
+  // ── Preserve scroll position across DOM rebuild ──
+  // We capture before rebuilding, then restore via double-rAF AFTER all DOM
+  // mutations (buckets + unassigned section) are complete so the saved scrollY
+  // is reachable in the new layout.
   const _savedScrollY = window.scrollY;
-  requestAnimationFrame(() => window.scrollTo({ top: _savedScrollY, behavior: 'instant' }));
 
-  // ── Preserve which buckets the user has open before rebuilding DOM ──
-  const openBuckets = new Set(
-    [...document.querySelectorAll('.bucket-body:not(.collapsed)')]
-      .map(el => el.id.replace('bucket-body-', ''))
-  );
+  // Sync the JS Set with current DOM state (defensive — toggleBucket already
+  // keeps it in sync, but this catches anything that bypassed the toggle).
+  document.querySelectorAll('.bucket-body').forEach(el => {
+    const id = el.id.replace('bucket-body-', '');
+    if (id) _setBucketOpen(id, !el.classList.contains('collapsed'));
+  });
 
   // Update month label
   const monthStr = `${plannerYear}-${String(plannerMonth + 1).padStart(2, '0')}`;
@@ -682,6 +695,7 @@ function renderPlanner() {
     runningBalance = simBal;
 
     const isCurrent = p.id === currentId;
+    if (isCurrent) _setBucketOpen(p.id, true);  // current bucket is always remembered as open
     const isNeg     = runningBalance < 0;
     const isFirst   = idx === 0;
     const isLast    = idx === sorted.length - 1;
@@ -733,7 +747,7 @@ function renderPlanner() {
           <span style="color:var(--text-lt);font-size:0.8rem;">${isCurrent ? '▾' : '▸'}</span>
         </div>
       </div>
-      <div class="bucket-body ${isCurrent ? '' : 'collapsed'}" id="bucket-body-${p.id}">
+      <div class="bucket-body ${(isCurrent || _isBucketOpen(p.id)) ? '' : 'collapsed'}" id="bucket-body-${p.id}">
         ${entriesHtml}
         <div class="bucket-recon-row">
           <span class="bucket-running-balance">
@@ -749,14 +763,8 @@ function renderPlanner() {
   });
 
   container.innerHTML += bucketHtmlParts.join('');
-
-  // ── Restore open/closed state the user had before re-render ──
-  // (Start: every bucket is collapsed except current; openBuckets overrides that)
-  openBuckets.forEach(id => {
-    const el = document.getElementById('bucket-body-' + id);
-    if (el) el.classList.remove('collapsed');
-  });
-  // If a bucket was previously open but is no longer in the DOM (month changed), that's fine
+  // Bucket open/closed state is already correct in the rendered HTML thanks to
+  // _isBucketOpen() being inlined into the template above. No DOM patch needed.
 
   // Unassigned bills section — only show bills belonging to the current month
   // (prevents stale bills from other months bleeding into every planner view)
@@ -774,6 +782,14 @@ function renderPlanner() {
     </div>`;
   }
 
+  // ── Restore scroll position now that the document is at its final height ──
+  // Double rAF: first frame lets the browser reconcile the new DOM, second
+  // frame fires after layout/paint so the saved scrollY is reachable.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: _savedScrollY, behavior: 'instant' });
+    });
+  });
 }
 
 // ── Import Recurring Bills for current planner month ─────────────────────────
@@ -1030,7 +1046,9 @@ function depositRowHtml(d, runningBal) {
 
 function toggleBucket(id) {
   const body = document.getElementById('bucket-body-' + id);
-  if (body) body.classList.toggle('collapsed');
+  if (!body) return;
+  body.classList.toggle('collapsed');
+  _setBucketOpen(id, !body.classList.contains('collapsed'));
 }
 
 
