@@ -1925,7 +1925,9 @@ def mobile_login():
             'id':       user['id'],
             'name':     user['name'],
             'email':    user['email'],
-            'is_admin': bool(user['is_admin'])
+            # Keep as raw int (0/1) to match /api/mobile/me and /api/mobile/data.
+            # The iOS client decodes this as Int?; a JSON bool here breaks decoding.
+            'is_admin': int(user['is_admin'] or 0)
         }
     })
 
@@ -1963,7 +1965,7 @@ def mobile_register():
     token = _make_jwt(user['id'])
     return jsonify({
         'token': token,
-        'user': {'id': user['id'], 'name': user['name'], 'email': user['email'], 'is_admin': False}
+        'user': {'id': user['id'], 'name': user['name'], 'email': user['email'], 'is_admin': 0}
     }), 201
 
 

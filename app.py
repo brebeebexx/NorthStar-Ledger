@@ -528,7 +528,12 @@ def add_bill():
 @login_required
 def stop_recurring_bill(bid):
     """Stop a recurring bill: marks the legacy template non-recurring, deletes the
-    recurring_template entry, and removes this instance."""
+    recurring_template entry, and removes this instance.
+
+    Matches templates by bill_name_id OR name to handle data drift where the
+    bill instance and the template were created with different bill_name_id
+    values (legacy migrations, manual fixes, etc.). Without this, stop-recurring
+    silently misses the template and the bill regenerates on next page load."""
     uid = session['user_id']
     db  = get_db()
     row = db.execute('SELECT * FROM bills WHERE id=? AND user_id=?', (bid, uid)).fetchone()
@@ -536,22 +541,63 @@ def stop_recurring_bill(bid):
         db.close()
         return jsonify({'error': 'Not found'}), 404
 
-    # Mark legacy bills-table template(s) as non-recurring (stops old-system generation)
-    if row['bill_name_id']:
-        db.execute('UPDATE bills SET is_recurring=0 WHERE user_id=? AND bill_name_id=? AND is_template=1',
-                   (uid, row['bill_name_id']))
-        # Delete the matching recurring_template (new system) so the Recurring tab clears it
-        db.execute('DELETE FROM recurring_templates WHERE user_id=? AND bill_name_id=?',
-                   (uid, row['bill_name_id']))
-    else:
-        db.execute('UPDATE bills SET is_recurring=0 WHERE user_id=? AND name=? AND is_template=1',
-                   (uid, row['name']))
-        db.execute('DELETE FROM recurring_templates WHERE user_id=? AND name=?',
-                   (uid, row['name']))
+    bill_name_id = row['bill_name_id']
+    name         = row['name']
 
-    # Delete only the instance (not the legacy template itself, so history is preserved)
+    # 1. Mark legacy bills-table templates non-recurring (stops old-system generation).
+    #    Match by bill_name_id OR name so we catch templates whose bill_name_id
+    #    drifted from the instance's.
+    if bill_name_id is not None:
+        db.execute('UPDATE bills SET is_recurring=0 '
+                   'WHERE user_id=? AND is_template=1 AND (bill_name_id=? OR name=?)',
+                   (uid, bill_name_id, name))
+    else:
+        db.execute('UPDATE bills SET is_recurring=0 '
+                   'WHERE user_id=? AND is_template=1 AND name=?',
+                   (uid, name))
+
+    # 2. Delete the recurring_template (new system). Use the same OR-match.
+    if bill_name_id is not None:
+        db.execute('DELETE FROM recurring_templates '
+                   'WHERE user_id=? AND (bill_name_id=? OR name=?)',
+                   (uid, bill_name_id, name))
+    else:
+        db.execute('DELETE FROM recurring_templates '
+                   'WHERE user_id=? AND name=?',
+                   (uid, name))
+
+    # 3. Clear any recurring_skips rows for this same bill — once recurring
+    #    is stopped, any "skip this month" entries are meaningless.
+    if bill_name_id is not None:
+        db.execute('DELETE FROM recurring_skips '
+                   'WHERE user_id=? AND (bill_name_id=? OR name=?)',
+                   (uid, bill_name_id, name))
+    else:
+        db.execute('DELETE FROM recurring_skips '
+                   'WHERE user_id=? AND name=?',
+                   (uid, name))
+
+    # 4. Delete the current instance (not the legacy template itself, so history
+    #    is preserved). Also delete any future, unpaid is_template=0 instances
+    #    of this same bill — otherwise May/June already-generated rows linger.
     if not row['is_template']:
         db.execute('DELETE FROM bills WHERE id=?', (bid,))
+    today = date.today().strftime('%Y-%m')
+    if bill_name_id is not None:
+        db.execute(
+            'DELETE FROM bills '
+            'WHERE user_id=? AND is_template=0 AND is_paid=0 AND is_marked_paid=0 '
+            'AND (bill_name_id=? OR name=?) AND month > ?',
+            (uid, bill_name_id, name, today)
+        )
+    else:
+        db.execute(
+            'DELETE FROM bills '
+            'WHERE user_id=? AND is_template=0 AND is_paid=0 AND is_marked_paid=0 '
+            'AND name=? AND month > ?',
+            (uid, name, today)
+        )
+
     db.commit()
     db.close()
     return jsonify({'success': True})
