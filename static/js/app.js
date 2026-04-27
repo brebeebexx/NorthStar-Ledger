@@ -28,13 +28,31 @@ Object.defineProperty(window, 'calYear',  { get: () => plannerYear,  set: v => {
 Object.defineProperty(window, 'calMonth', { get: () => plannerMonth, set: v => { plannerMonth = v; } });
 
 // Bucket open/closed state lives in JS (not just the DOM) so it survives
-// re-renders cleanly. Without this, querying DOM at the start of renderPlanner
-// can race against in-flight DOM updates from edit/save flows.
-const _openBucketIds = new Set();
+// re-renders cleanly. Persisted to localStorage so it also survives page
+// refreshes — without that, refreshing collapses every bucket except the
+// "current" one, which is jarring when the user is mid-task on another bucket.
+const _OPEN_BUCKETS_KEY = 'nsl_openBuckets';
+const _openBucketIds = (() => {
+  try {
+    const raw = localStorage.getItem(_OPEN_BUCKETS_KEY);
+    return new Set(raw ? JSON.parse(raw) : []);
+  } catch {
+    return new Set();
+  }
+})();
+function _persistOpenBuckets() {
+  try {
+    localStorage.setItem(_OPEN_BUCKETS_KEY, JSON.stringify([..._openBucketIds]));
+  } catch {
+    /* localStorage may be disabled — degrade silently */
+  }
+}
 function _isBucketOpen(id) { return _openBucketIds.has(String(id)); }
 function _setBucketOpen(id, open) {
   const k = String(id);
+  const before = _openBucketIds.has(k);
   if (open) _openBucketIds.add(k); else _openBucketIds.delete(k);
+  if (before !== open) _persistOpenBuckets();
 }
 
 // ─── Init ─────────────────────────────────────────────────────
