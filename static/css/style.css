@@ -509,6 +509,15 @@ body.dark-mode .carryover-banner.carry-negative { background: #2e1a1a; border-co
 .bucket-title > div:first-child { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .bucket-notes   { font-size: 0.78rem; font-weight: 500; color: var(--text-md); font-style: italic; }
 .bucket-meta    { display: flex; align-items: center; gap: 1rem; font-size: 0.85rem; }
+.bucket-stat    { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
+.bucket-stat-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-lt);
+  margin-bottom: 0.1rem;
+}
 .bucket-income  { color: var(--sage-dk); font-weight: 600; }
 .bucket-balance { font-weight: 700; font-size: 1rem; }
 .bucket-balance.pos { color: var(--sage-dk); }

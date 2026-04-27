@@ -721,8 +721,14 @@ function renderPlanner() {
           ${p.notes ? `<div class="bucket-notes">📝 ${escHtml(p.notes)}</div>` : ''}
         </div>
         <div class="bucket-meta">
-          <span class="bucket-income">+$${fmt(income)}</span>
-          <span class="bucket-balance ${(prevRunningBalance + income) >= 0 ? 'pos' : 'neg'}" title="Available when this check lands (previous balance + paycheck)">$${fmt(prevRunningBalance + income)}</span>
+          <div class="bucket-stat">
+            <span class="bucket-stat-label">Paycheck</span>
+            <span class="bucket-income">+$${fmt(income)}</span>
+          </div>
+          <div class="bucket-stat" title="Available when this check lands — previous balance plus this paycheck, before any bills come out">
+            <span class="bucket-stat-label">Available</span>
+            <span class="bucket-balance ${(prevRunningBalance + income) >= 0 ? 'pos' : 'neg'}">$${fmt(prevRunningBalance + income)}</span>
+          </div>
           <button class="bill-btn edit" style="font-size:0.72rem;" onclick="event.stopPropagation(); openEditPaycheck(${p.id})">✏️ Edit</button>
           <span style="color:var(--text-lt);font-size:0.8rem;">${isCurrent ? '▾' : '▸'}</span>
         </div>

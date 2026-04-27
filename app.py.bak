@@ -317,6 +317,10 @@ def app_main():
         'SELECT * FROM balance_adjustments WHERE user_id=? ORDER BY created_at DESC', (uid,)
     ).fetchall()]
 
+    deposits = [dict(r) for r in db.execute(
+        'SELECT * FROM deposits WHERE user_id=? ORDER BY deposit_date ASC, id ASC', (uid,)
+    ).fetchall()]
+
     _user_row = db.execute('SELECT * FROM users WHERE id=?', (uid,)).fetchone()
     if _user_row is None:
         db.close()
@@ -354,6 +358,7 @@ def app_main():
         subscriptions=subscriptions,
         bill_names=bill_names,
         balance_adjustments=balance_adjustments,
+        deposits=deposits,
         sticky_notes=sticky_notes,
         snapshots=snapshots,
         recurring_templates=recurring_templates_data,
@@ -544,16 +549,16 @@ def stop_recurring_bill(bid):
     bill_name_id = row['bill_name_id']
     name         = row['name']
 
-    # 1. Mark legacy bills-table templates non-recurring (stops old-system generation).
-    #    Match by bill_name_id OR name so we catch templates whose bill_name_id
-    #    drifted from the instance's.
+    # 1. Mark every related bill row (history + legacy templates) non-recurring.
+    #    Without this, an old paid instance with is_recurring=1 would let any
+    #    legacy migration rebuild the template after a Flask restart.
     if bill_name_id is not None:
         db.execute('UPDATE bills SET is_recurring=0 '
-                   'WHERE user_id=? AND is_template=1 AND (bill_name_id=? OR name=?)',
+                   'WHERE user_id=? AND (bill_name_id=? OR name=?)',
                    (uid, bill_name_id, name))
     else:
         db.execute('UPDATE bills SET is_recurring=0 '
-                   'WHERE user_id=? AND is_template=1 AND name=?',
+                   'WHERE user_id=? AND name=?',
                    (uid, name))
 
     # 2. Delete the recurring_template (new system). Use the same OR-match.
@@ -1295,6 +1300,92 @@ def delete_adjustment(adj_id):
     db.commit()
     db.close()
     return jsonify({'success': True})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# API – Deposits
+#
+# Deposits are positive entries inside a paycheck bucket — used for transfers
+# from another account, refunds, gifts, etc. They add to the running balance
+# but never count toward income totals.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@app.route('/api/deposits', methods=['POST'])
+@login_required
+def add_deposit():
+    uid  = session['user_id']
+    data = request.get_json() or {}
+    pid  = data.get('paycheck_id')
+    try:
+        amount = float(data.get('amount') or 0)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'Invalid amount'}), 400
+    if not pid:
+        return jsonify({'error': 'paycheck_id is required'}), 400
+    if amount <= 0:
+        return jsonify({'error': 'Amount must be greater than zero'}), 400
+
+    deposit_date = data.get('deposit_date') or date.today().isoformat()
+    notes        = (data.get('notes') or '').strip() or None
+
+    db = get_db()
+    # Verify the paycheck belongs to this user
+    pc = db.execute('SELECT id FROM paychecks WHERE id=? AND user_id=?', (pid, uid)).fetchone()
+    if not pc:
+        db.close()
+        return jsonify({'error': 'Paycheck not found'}), 404
+
+    db.execute(
+        'INSERT INTO deposits (user_id, paycheck_id, amount, deposit_date, notes) '
+        'VALUES (?,?,?,?,?)',
+        (uid, pid, amount, deposit_date, notes)
+    )
+    db.commit()
+    row = db.execute(
+        'SELECT * FROM deposits WHERE user_id=? ORDER BY id DESC LIMIT 1', (uid,)
+    ).fetchone()
+    db.close()
+    return jsonify(dict(row))
+
+
+@app.route('/api/deposits/<int:dep_id>', methods=['PUT', 'DELETE'])
+@login_required
+def manage_deposit(dep_id):
+    uid = session['user_id']
+    db  = get_db()
+    row = db.execute('SELECT * FROM deposits WHERE id=? AND user_id=?', (dep_id, uid)).fetchone()
+    if not row:
+        db.close()
+        return jsonify({'error': 'Not found'}), 404
+
+    if request.method == 'DELETE':
+        db.execute('DELETE FROM deposits WHERE id=?', (dep_id,))
+        db.commit()
+        db.close()
+        return jsonify({'success': True})
+
+    data = request.get_json() or {}
+    try:
+        amount = float(data.get('amount', row['amount']))
+    except (TypeError, ValueError):
+        db.close()
+        return jsonify({'error': 'Invalid amount'}), 400
+    if amount <= 0:
+        db.close()
+        return jsonify({'error': 'Amount must be greater than zero'}), 400
+
+    deposit_date = data.get('deposit_date', row['deposit_date'])
+    notes        = data.get('notes', row['notes'])
+    paycheck_id  = data.get('paycheck_id', row['paycheck_id'])
+
+    db.execute(
+        'UPDATE deposits SET paycheck_id=?, amount=?, deposit_date=?, notes=? WHERE id=?',
+        (paycheck_id, amount, deposit_date, notes, dep_id)
+    )
+    db.commit()
+    updated = db.execute('SELECT * FROM deposits WHERE id=?', (dep_id,)).fetchone()
+    db.close()
+    return jsonify(dict(updated))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
