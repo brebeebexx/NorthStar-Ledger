@@ -419,6 +419,55 @@ def delete_snapshot(sid):
 # API – Paychecks
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _resort_bills_for_month(db, uid, month):
+    """Re-assign every unpaid, un-postponed bill in `month` to the latest
+    paycheck whose date is on or before that bill's due date. Called whenever
+    a paycheck is added/edited so the planner buckets stay sorted automatically.
+
+    Skips paid, marked-paid, and postponed bills — those have intentional
+    manual paycheck assignments that shouldn't be moved.
+    """
+    if not month:
+        return 0
+
+    paychecks = db.execute(
+        'SELECT id, date FROM paychecks WHERE user_id=? ORDER BY date ASC', (uid,)
+    ).fetchall()
+
+    def best_paycheck_for(due_date_str):
+        if not due_date_str or not paychecks:
+            return None
+        # Prefer paychecks in the same month, picking the latest one whose
+        # date <= the bill's due date.
+        same_month = [p for p in paychecks if p['date'] and p['date'][:7] == month]
+        same_month.sort(key=lambda p: p['date'])
+        best = None
+        for p in same_month:
+            if p['date'] <= due_date_str:
+                best = p['id']
+        if best is not None:
+            return best
+        # No same-month paycheck on or before the due date — fall back to the
+        # latest prior-month paycheck (so the bill still lands somewhere).
+        prior = [p for p in paychecks if p['date'] and p['date'] <= due_date_str]
+        return prior[-1]['id'] if prior else None
+
+    bills = db.execute(
+        'SELECT id, due_date, paycheck_id FROM bills '
+        'WHERE user_id=? AND month=? AND is_template=0 '
+        'AND is_paid=0 AND is_marked_paid=0 AND is_postponed=0',
+        (uid, month)
+    ).fetchall()
+
+    moved = 0
+    for b in bills:
+        target = best_paycheck_for(b['due_date'])
+        if target is not None and target != b['paycheck_id']:
+            db.execute('UPDATE bills SET paycheck_id=? WHERE id=?', (target, b['id']))
+            moved += 1
+    return moved
+
+
 @app.route('/api/paychecks', methods=['POST'])
 @login_required
 def add_paycheck():
@@ -429,6 +478,13 @@ def add_paycheck():
                (uid, data['date'], data['amount'], data.get('notes', ''), data.get('income_type', 'paycheck')))
     db.commit()
     row = db.execute('SELECT * FROM paychecks WHERE user_id=? ORDER BY id DESC LIMIT 1', (uid,)).fetchone()
+
+    # Re-sort bills in this paycheck's month so existing bills land in the
+    # right buckets without the user needing to drag them manually.
+    if row and row['date']:
+        _resort_bills_for_month(db, uid, row['date'][:7])
+        db.commit()
+
     db.close()
     return jsonify(dict(row))
 
@@ -445,15 +501,33 @@ def manage_paycheck(pid):
         return jsonify({'error': 'Not found'}), 404
 
     if request.method == 'DELETE':
+        deleted_month = (row['date'] or '')[:7]
         db.execute('DELETE FROM paychecks WHERE id=?', (pid,))
         db.commit()
+        # After deletion, re-sort the affected month so orphaned bills move to
+        # the next-best paycheck (or unassigned if none remain).
+        if deleted_month:
+            _resort_bills_for_month(db, uid, deleted_month)
+            db.commit()
         db.close()
         return jsonify({'success': True})
 
     data = request.get_json()
+    old_month = (row['date'] or '')[:7]
+    new_month = (data.get('date') or '')[:7]
+
     db.execute('UPDATE paychecks SET date=?, amount=?, notes=?, income_type=? WHERE id=?',
                (data['date'], data['amount'], data.get('notes', ''), data.get('income_type', row['income_type'] or 'paycheck'), pid))
     db.commit()
+
+    # Re-sort the month(s) the paycheck touched. If the date changed across
+    # months, both old and new months may need re-sorting.
+    months_to_resort = {old_month, new_month}
+    months_to_resort.discard('')
+    for m in months_to_resort:
+        _resort_bills_for_month(db, uid, m)
+    db.commit()
+
     row = db.execute('SELECT * FROM paychecks WHERE id=?', (pid,)).fetchone()
     db.close()
     return jsonify(dict(row))
