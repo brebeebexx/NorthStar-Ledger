@@ -555,14 +555,17 @@ body.dark-mode .carryover-banner.carry-negative { background: #2e1a1a; border-co
 .bill-row {
   display: grid;
   /* 5 explicit columns: name | status pill | auto badge | amount | buttons */
-  /* actions column uses minmax so all rows reserve the same space, keeping amount column aligned */
-  grid-template-columns: 1fr 95px 52px 110px minmax(175px, auto);
+  /* Actions column is FIXED width so the amount column lines up across rows
+     with different action sets (e.g. bill = 4 buttons, deposit = 2 buttons,
+     adj = 1 button). Amount column always lands at the same X position. */
+  grid-template-columns: 1fr 95px 52px 110px 290px;
   align-items: center;
   gap: 0.6rem;
   padding: 0.65rem 1.2rem;
   border-bottom: 1px solid var(--border);
   transition: background .15s;
 }
+.bill-actions { justify-content: flex-end; }
 .bill-row.row-paid        { background: #f0fdf4; }
 .bill-row.row-marked-paid { background: #fff0f4; }
 .bill-row.row-post        { background: #fffde7; }
