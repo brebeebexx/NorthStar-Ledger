@@ -148,6 +148,24 @@ def init_db():
         FOREIGN KEY (paycheck_id) REFERENCES paychecks(id) ON DELETE CASCADE
     )''')
 
+    # ── Transactions (discretionary spending log) ────────────────────────────
+    #    Tracks one-off purchases that aren't scheduled bills — Target runs,
+    #    gas, dining out, etc. Lets you answer "where did this money go" for
+    #    the spending the bills planner doesn't cover.
+    c.execute('''CREATE TABLE IF NOT EXISTS transactions (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id    INTEGER NOT NULL,
+        date       TEXT    NOT NULL,
+        amount     REAL    NOT NULL,
+        merchant   TEXT,
+        category   TEXT,
+        notes      TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )''')
+    c.execute('''CREATE INDEX IF NOT EXISTS idx_transactions_user_date
+                 ON transactions(user_id, date)''')
+
     # ── Help messages ─────────────────────────────────────────────────────────
     c.execute('''CREATE TABLE IF NOT EXISTS help_messages (
         id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -274,6 +292,18 @@ def init_db():
     # Paid (submitted) but not yet cleared from bank — intermediate state before Deducted
     try:
         c.execute('ALTER TABLE bills ADD COLUMN is_marked_paid INTEGER DEFAULT 0')
+    except Exception:
+        pass
+
+    # Reminder mode: bill exists for visual check-in only (e.g. paid-off credit
+    # card you still want to monitor monthly). When set, the bill doesn't
+    # subtract from running balance; UI shows it as a "Review" task.
+    try:
+        c.execute('ALTER TABLE bills ADD COLUMN is_reminder INTEGER DEFAULT 0')
+    except Exception:
+        pass
+    try:
+        c.execute('ALTER TABLE recurring_templates ADD COLUMN is_reminder INTEGER DEFAULT 0')
     except Exception:
         pass
 

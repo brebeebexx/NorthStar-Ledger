@@ -128,6 +128,9 @@
       <!-- Populated by JS -->
     </div>
 
+    <!-- Forecast snapshot — quick 30/60/90 day balance preview -->
+    <div id="dashboard-forecast"></div>
+
     <div class="dashboard-grid">
       <div class="card">
         <div class="card-header"><h3>Upcoming Bills</h3></div>
@@ -151,7 +154,7 @@
       <div class="planner-actions">
         <button class="btn-secondary btn-sm" onclick="openModal('modal-add-paycheck')">+ Add Income</button>
         <button class="btn-secondary btn-sm" onclick="openAddDepositGlobal()">+ Add Deposit</button>
-        <button class="btn-primary btn-sm" onclick="openModal('modal-add-bill')">+ Add Bill</button>
+        <button class="btn-primary btn-sm" onclick="openAddWithdrawal()">+ Add Withdrawal</button>
       </div>
     </div>
     <div id="planner-buckets">
@@ -485,14 +488,24 @@
   </div>
 </div>
 
-<!-- Add Bill -->
+<!-- Add Withdrawal (Bill / Spending / Savings) -->
 <div class="modal-overlay" id="modal-add-bill">
   <div class="modal">
-    <div class="modal-header"><h3>Add Bill</h3><button class="modal-close" onclick="closeModal('modal-add-bill')">×</button></div>
+    <div class="modal-header"><h3 id="modal-add-bill-title">+ Add Withdrawal</h3><button class="modal-close" onclick="closeModal('modal-add-bill')">×</button></div>
     <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group" style="flex:1;">
+          <label>Type</label>
+          <select id="bill-category" onchange="handleCategoryChange()">
+            <option value="bill">📄 Bill (scheduled)</option>
+            <option value="spending">🛒 Spending (one-off)</option>
+            <option value="savings">⭐ Savings / Trip</option>
+          </select>
+        </div>
+      </div>
       <div class="form-group">
-        <label>Bill Name</label>
-        <input type="text" id="bill-name" list="bill-names-list" placeholder="e.g. Rent, Electric Bill"/>
+        <label id="bill-name-label">Name</label>
+        <input type="text" id="bill-name" list="bill-names-list" placeholder="e.g. Rent, Target, Electric"/>
         <datalist id="bill-names-list">
           {% for bn in bill_names %}
             <option value="{{ bn.name }}">{{ bn.name }}</option>
@@ -504,13 +517,6 @@
           <label>Amount ($)</label>
           <input type="number" id="bill-amount" step="0.01" placeholder="0.00"/>
         </div>
-        <div class="form-group">
-          <label>Category</label>
-          <select id="bill-category" onchange="handleCategoryChange()">
-            <option value="bill">Bill</option>
-            <option value="savings">Savings / Trip</option>
-          </select>
-        </div>
       </div>
       <div id="savings-goal-picker" style="display:none;" class="form-group">
         <label>Link to Savings Goal</label>
@@ -518,23 +524,23 @@
           <option value="">— Select a goal —</option>
         </select>
       </div>
-      <div class="form-row">
+      <div class="form-row" id="bill-dates-row">
         <div class="form-group">
-          <label>Due Date</label>
+          <label id="bill-due-date-label">Due Date</label>
           <input type="date" id="bill-due-date" oninput="syncPlannedDate()"/>
         </div>
-        <div class="form-group">
+        <div class="form-group" id="bill-planned-date-group">
           <label>Planned Pay Date</label>
           <input type="date" id="bill-planned-date" oninput="_plannedDateTouched=true"/>
         </div>
       </div>
-      <div class="form-group">
+      <div class="form-group" id="bill-paycheck-group">
         <label>Assign to Paycheck</label>
         <select id="bill-paycheck">
           <option value="">— Unassigned —</option>
         </select>
       </div>
-      <div style="display:flex; align-items:center; gap:1.5rem; margin-bottom:1rem;">
+      <div id="bill-bill-options" style="display:flex; align-items:center; gap:1.5rem; margin-bottom:0.6rem;">
         <label class="checkbox-label">
           <input type="checkbox" id="bill-autopay"/> AutoPay
         </label>
@@ -542,6 +548,13 @@
           <input type="checkbox" id="bill-recurring" onchange="toggleFrequencyField('bill-frequency-row', this.checked)"/> Recurring
         </label>
       </div>
+      <label class="checkbox-label" id="bill-reminder-row" style="display:flex;align-items:flex-start;gap:0.5rem;margin-bottom:1rem;">
+        <input type="checkbox" id="bill-is-reminder" style="margin-top:0.2rem;"/>
+        <span>
+          👁 Reminder only — no payment, just a check-in
+          <div style="font-size:0.74rem;color:var(--text-lt);font-weight:400;margin-top:0.1rem;">For paid-off cards or accounts you want to verify. Won't subtract from your running balance.</div>
+        </span>
+      </label>
       <div id="bill-frequency-row" class="form-group" style="display:none;">
         <label>Frequency</label>
         <select id="bill-frequency">
@@ -559,7 +572,7 @@
     </div>
     <div class="modal-footer">
       <button class="btn-outline" onclick="closeModal('modal-add-bill')">Cancel</button>
-      <button class="btn-primary" onclick="addBill()">Add Bill</button>
+      <button class="btn-primary" id="bill-save-btn" onclick="addBill()">Add Withdrawal</button>
     </div>
   </div>
 </div>
@@ -851,6 +864,13 @@
           <input type="checkbox" id="edit-bill-recurring" onchange="toggleFrequencyField('edit-bill-frequency-row', this.checked)"/> Recurring
         </label>
       </div>
+      <label class="checkbox-label" style="display:flex;align-items:flex-start;gap:0.5rem;margin-top:0.5rem;">
+        <input type="checkbox" id="edit-bill-is-reminder" style="margin-top:0.2rem;"/>
+        <span>
+          👁 Reminder only — no payment, just a check-in
+          <div style="font-size:0.74rem;color:var(--text-lt);font-weight:400;margin-top:0.1rem;">For paid-off cards or accounts you want to verify. Won't subtract from your running balance.</div>
+        </span>
+      </label>
       <div id="edit-bill-frequency-row" class="form-group" style="display:none;margin-top:0.75rem;">
         <label>Frequency</label>
         <select id="edit-bill-frequency">
@@ -963,6 +983,13 @@
         <input type="month" id="template-start-date" style="width:100%;"/>
       </div>
       <label class="checkbox-label" style="margin-top:0.5rem;"><input type="checkbox" id="template-autopay"/> Autopay</label>
+      <label class="checkbox-label" style="margin-top:0.4rem;display:flex;align-items:flex-start;gap:0.5rem;">
+        <input type="checkbox" id="template-is-reminder" style="margin-top:0.2rem;"/>
+        <span>
+          👁 Reminder only — no payment, just a monthly check-in
+          <div style="font-size:0.74rem;color:var(--text-lt);font-weight:400;margin-top:0.1rem;">For paid-off cards, accounts you want to verify monthly, etc. Won't subtract from your running balance.</div>
+        </span>
+      </label>
       <div class="form-group">
         <label>Notes</label>
         <textarea id="template-notes" rows="2" placeholder="Optional notes…" style="width:100%;resize:vertical;"></textarea>

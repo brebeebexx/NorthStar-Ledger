@@ -398,6 +398,70 @@ function renderDashboard() {
       savEl.innerHTML = `<p class="empty-state">No savings goals yet. <button class="link-btn" onclick="switchTab('savings')">Add one →</button></p>`;
     }
   }
+
+  // Snapshot of the longer-term forecast: 30/60/90 day projected balance.
+  renderDashboardForecast();
+}
+
+// Compact forecast snapshot card for the dashboard. Uses the same income /
+// expenses / start-balance heuristics as the full Forecast tab but shows just
+// the three key horizons, with a "View Full Forecast" link to the deep dive.
+function renderDashboardForecast() {
+  const el = document.getElementById('dashboard-forecast');
+  if (!el) return;
+
+  const income   = fcDetectMonthlyIncome();
+  const expenses = fcDetectMonthlyExpenses();
+  const start    = fcDetectStartBalance();
+  const monthlyNet = income - expenses;
+
+  // Empty state — no income or no bills means no useful forecast yet
+  if (income === 0 && expenses === 0) {
+    el.innerHTML = '';
+    return;
+  }
+
+  // Quick projection: linear from today's projected month-end balance forward
+  // by monthlyNet for each subsequent month. Approximation; the full Forecast
+  // tab does the more careful version with planned purchases.
+  const at30  = start + monthlyNet * 1;
+  const at60  = start + monthlyNet * 2;
+  const at90  = start + monthlyNet * 3;
+
+  const trendIcon = monthlyNet >= 0 ? '📈' : '📉';
+  const trendColor = monthlyNet >= 0 ? 'var(--sage-dk)' : 'var(--danger)';
+
+  const tile = (label, val, days) => {
+    const color = val >= 0 ? 'var(--sage-dk)' : 'var(--danger)';
+    return `
+      <div style="flex:1;min-width:140px;padding:0.85rem 1rem;border:1px solid var(--border);border-radius:12px;background:var(--white);">
+        <div style="font-size:0.66rem;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:var(--text-lt);">${label}</div>
+        <div style="font-size:1.4rem;font-weight:800;color:${color};margin-top:0.15rem;">${val >= 0 ? '' : '−'}$${fmt(Math.abs(val))}</div>
+        <div style="font-size:0.7rem;color:var(--text-md);margin-top:0.1rem;">in ${days} days</div>
+      </div>`;
+  };
+
+  el.innerHTML = `
+    <div style="margin:0 1.2rem 1.5rem;background:var(--cream);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.2rem;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.8rem;flex-wrap:wrap;gap:0.5rem;">
+        <div style="font-size:0.95rem;font-weight:700;display:flex;align-items:center;gap:0.4rem;">
+          ${trendIcon} <span>Cash Flow Forecast</span>
+          <span style="font-size:0.72rem;color:${trendColor};font-weight:700;background:${monthlyNet >= 0 ? 'rgba(46,125,50,0.1)' : 'rgba(220,38,38,0.1)'};padding:0.15rem 0.5rem;border-radius:50px;">
+            ${monthlyNet >= 0 ? '+' : '−'}$${fmt(Math.abs(monthlyNet))}/mo net
+          </span>
+        </div>
+        <button class="link-btn" style="font-size:0.78rem;" onclick="switchTab('forecast')">View Full Forecast →</button>
+      </div>
+      <div style="display:flex;gap:0.7rem;flex-wrap:wrap;">
+        ${tile('30 days', at30, 30)}
+        ${tile('60 days', at60, 60)}
+        ${tile('90 days', at90, 90)}
+      </div>
+      <div style="font-size:0.72rem;color:var(--text-lt);margin-top:0.7rem;">
+        Based on ${fmt(income)}/mo avg income and ${fmt(expenses)}/mo avg expenses (last 3 months). Open the Forecast tab to refine.
+      </div>
+    </div>
+  `;
 }
 
 
@@ -659,8 +723,9 @@ function renderPlanner() {
   const bucketHtmlParts = sorted.map((p, idx) => {
     const bills      = state.bills.filter(b => b.paycheck_id === p.id);
     const income     = p.amount;
-    const paidOut    = bills.filter(b => b.is_paid    && !b.is_postponed).reduce((s, b) => s + b.amount, 0);
-    const pendingOut = bills.filter(b => !b.is_paid   && !b.is_postponed).reduce((s, b) => s + b.amount, 0);
+    // Reminder bills don't count toward Paid / Pending totals — they aren't payments.
+    const paidOut    = bills.filter(b => b.is_paid    && !b.is_postponed && !b.is_reminder).reduce((s, b) => s + b.amount, 0);
+    const pendingOut = bills.filter(b => !b.is_paid   && !b.is_postponed && !b.is_reminder).reduce((s, b) => s + b.amount, 0);
     const adjs       = state.balanceAdjustments.filter(a => a.paycheck_id === p.id);
     const deposits   = state.deposits.filter(d => d.paycheck_id === p.id);
     const depositsTotal = deposits.reduce((s, d) => s + d.amount, 0);
@@ -700,7 +765,8 @@ function renderPlanner() {
     let simBal     = prevRunningBalance + income;
     let dynAdjTotal = 0;
     for (const entry of entries) {
-      if (entry.type === 'bill' && !entry.data.is_postponed) {
+      if (entry.type === 'bill' && !entry.data.is_postponed && !entry.data.is_reminder) {
+        // Reminders never subtract from balance — they're check-in tasks, not payments.
         simBal -= entry.data.amount;
       } else if (entry.type === 'deposit') {
         simBal += entry.data.amount;
@@ -723,7 +789,7 @@ function renderPlanner() {
     const entriesHtml = entries.length ? entries.map(entry => {
       if (entry.type === 'bill') {
         const b = entry.data;
-        if (!b.is_postponed) rowBalance -= b.amount;
+        if (!b.is_postponed && !b.is_reminder) rowBalance -= b.amount;
         return billRowHtml(b, rowBalance);
       } else if (entry.type === 'deposit') {
         const d = entry.data;
@@ -938,6 +1004,11 @@ async function confirmImportRecurring(toAdd) {
 
 // billRowHtml now accepts an optional runningBal to show per-row balance
 function billRowHtml(b, runningBal) {
+  // Reminders are rendered with a different look + a single "Mark Reviewed"
+  // button. They never affect the running balance (handled by the simulation
+  // walk above; balHtml below still shows the unchanged carried balance).
+  if (b.is_reminder) return reminderRowHtml(b, runningBal);
+
   const isPaid      = b.is_paid;
   const isPost      = b.is_postponed;
   const isMarked    = !isPaid && !isPost && b.is_marked_paid;
@@ -985,11 +1056,15 @@ function billRowHtml(b, runningBal) {
   // Applies on top of any paid/postponed class so the row's state is still readable.
   if (runningBal !== undefined && runningBal < 0) rowClass += ' row-negative';
 
+  // Fall back to template-derived date if the bill itself is missing one,
+  // so the planner never shows an empty due-date line on a recurring bill.
+  const displayDue = getBillDueDateForDisplay(b);
+
   return `
   <div class="bill-row ${rowClass}" id="bill-${b.id}">
     <div class="bill-name-col">
       <div class="bill-name ${nameClass}">${escHtml(b.name)}${recurringIcon}</div>
-      ${b.due_date ? `<div class="bill-due">due ${fmtDate(b.due_date)}</div>` : ''}
+      ${displayDue ? `<div class="bill-due">due ${fmtDate(displayDue)}</div>` : ''}
       ${notesHtml}
       ${paidDateHtml}
     </div>
@@ -1036,6 +1111,64 @@ function adjRowHtml(a, runningBal, snapAdj) {
 }
 
 // Renders a deposit (positive entry, e.g. transfer from savings) as a green row.
+// Returns a displayable due date string for a bill, falling back to a date
+// computed from the linked template (template.due_day + bill.month) if the
+// bill's own due_date got cleared somehow. Never returns empty when we can
+// figure out a sensible date to show.
+function getBillDueDateForDisplay(b) {
+  if (b.due_date) return b.due_date;
+  if (b.month && b.template_id) {
+    const tmpl = state.recurringTemplates.find(t => t.id === b.template_id);
+    if (tmpl && tmpl.due_day) {
+      const [yr, mo] = b.month.split('-').map(Number);
+      const lastDay = new Date(yr, mo, 0).getDate();
+      const day = Math.min(parseInt(tmpl.due_day, 10), lastDay);
+      return `${b.month}-${String(day).padStart(2, '0')}`;
+    }
+  }
+  return '';
+}
+
+// Reminder bill row — for "check-in" entries (e.g. paid-off credit card you
+// still want to monitor). Displays in lavender with a single "Mark Reviewed"
+// toggle. Reuses is_paid as the "reviewed" state since reminders only have
+// two states (open vs done) — keeps the data model simple.
+function reminderRowHtml(b, runningBal) {
+  const isReviewed = !!b.is_paid;
+  const balClass   = runningBal >= 0 ? 'pos' : 'neg';
+  const balHtml    = runningBal !== undefined
+    ? `<div class="bill-running-bal ${balClass}" title="Balance unchanged — reminders don't deduct">$${fmt(runningBal)}</div>`
+    : '';
+  const noteHtml   = b.notes ? `<div class="bill-note">📝 ${escHtml(b.notes)}</div>` : '';
+  const displayDue = getBillDueDateForDisplay(b);
+  const dueHtml    = displayDue ? `<div class="bill-due">due ${fmtDate(displayDue)}</div>` : '';
+
+  return `
+  <div class="bill-row reminder-row ${isReviewed ? 'reminder-reviewed' : ''}" id="bill-${b.id}">
+    <div class="bill-name-col">
+      <div class="bill-name" style="color:#5b21b6;">👁 ${escHtml(b.name)}</div>
+      ${dueHtml}
+      ${noteHtml}
+    </div>
+    <div class="bill-col-status">
+      <span class="bucket-pill" style="background:${isReviewed ? '#e9d5ff' : '#f3e8ff'};color:#5b21b6;">
+        ${isReviewed ? '✓ Reviewed' : 'Review'}
+      </span>
+    </div>
+    <div class="bill-col-auto"></div>
+    <div class="bill-amount-col">
+      <div class="bill-amount" style="color:var(--text-lt);font-weight:500;">—</div>
+      ${balHtml}
+    </div>
+    <div class="bill-actions">
+      <button class="bill-btn ${isReviewed ? 'unpay' : 'pay'}" onclick="togglePay(${b.id})">
+        ${isReviewed ? 'Undo' : 'Mark Reviewed'}
+      </button>
+      <button class="bill-btn edit" onclick="openEditBill(${b.id})">Edit</button>
+    </div>
+  </div>`;
+}
+
 function depositRowHtml(d, runningBal) {
   const balClass = runningBal >= 0 ? 'pos' : 'neg';
   const negClass = (runningBal !== undefined && runningBal < 0) ? ' row-negative' : '';
@@ -2613,8 +2746,73 @@ async function deletePaycheck() {
 // ═══════════════════════════════════════════════════════════════
 function handleCategoryChange() {
   const cat = document.getElementById('bill-category').value;
-  document.getElementById('savings-goal-picker').style.display =
-    (cat === 'savings' || cat === 'trip') ? 'block' : 'none';
+  const isSpending = cat === 'spending';
+  const isSavings  = cat === 'savings' || cat === 'trip';
+
+  // Savings goal picker only shows for savings/trip
+  document.getElementById('savings-goal-picker').style.display = isSavings ? 'block' : 'none';
+
+  // Spending entries are one-off charges that already happened — they don't
+  // need a planned pay date, paycheck assignment, recurring/autopay toggle, or
+  // a reminder option. Form simplifies to: type, name, amount, date, notes.
+  // Saving creates an already-paid bill so it lands in the planner running
+  // balance (paid_date = the date you entered).
+  const showBillFields = !isSpending;
+  const set = (id, show) => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = show ? '' : 'none';
+  };
+  set('bill-planned-date-group', showBillFields);
+  set('bill-paycheck-group',     showBillFields);
+  set('bill-bill-options',       showBillFields);
+  set('bill-reminder-row',       showBillFields);
+
+  // Re-label fields so the form reads naturally for each type
+  const dueLabel  = document.getElementById('bill-due-date-label');
+  const nameLabel = document.getElementById('bill-name-label');
+  if (dueLabel)  dueLabel.textContent  = isSpending ? 'Date'     : 'Due Date';
+  if (nameLabel) nameLabel.textContent = isSpending ? 'Merchant' : 'Name';
+
+  const nameInput = document.getElementById('bill-name');
+  if (nameInput) {
+    nameInput.placeholder = isSpending
+      ? 'e.g. Target, Shell, Starbucks'
+      : 'e.g. Rent, Electric Bill';
+  }
+  const saveBtn = document.getElementById('bill-save-btn');
+  if (saveBtn) saveBtn.textContent = isSpending ? 'Add Spending' : 'Add Withdrawal';
+
+  // Switching INTO spending forces recurring/reminder OFF (one-off by definition)
+  if (isSpending) {
+    const recur = document.getElementById('bill-recurring');
+    if (recur && recur.checked) {
+      recur.checked = false;
+      toggleFrequencyField('bill-frequency-row', false);
+    }
+    const reminder = document.getElementById('bill-is-reminder');
+    if (reminder) reminder.checked = false;
+  }
+}
+
+// Open the withdrawal modal with sensible defaults — replaces the old direct
+// openModal('modal-add-bill') call from the "+ Add Withdrawal" button.
+function openAddWithdrawal() {
+  const today = state.today || new Date().toISOString().slice(0, 10);
+  document.getElementById('bill-name').value      = '';
+  document.getElementById('bill-amount').value    = '';
+  document.getElementById('bill-due-date').value  = today;
+  document.getElementById('bill-planned-date').value = today;
+  document.getElementById('bill-notes').value     = '';
+  document.getElementById('bill-category').value  = 'bill';
+  if (document.getElementById('bill-paycheck')) document.getElementById('bill-paycheck').value = 'auto';
+  document.getElementById('bill-recurring').checked = false;
+  document.getElementById('bill-autopay').checked   = false;
+  if (document.getElementById('bill-is-reminder')) document.getElementById('bill-is-reminder').checked = false;
+  document.getElementById('bill-frequency').value = 'monthly';
+  toggleFrequencyField('bill-frequency-row', false);
+  handleCategoryChange();   // reset visibility for default 'bill' type
+  _plannedDateTouched = false;
+  openModal('modal-add-bill');
 }
 
 function toggleFrequencyField(rowId, show) {
@@ -2652,12 +2850,34 @@ async function addBill() {
 
   if (!name || !amount) return alert('Name and amount are required.');
 
-  const data = await api('POST', '/api/bills', {
-    name, amount, category, savings_goal_id: goalId ? parseInt(goalId) : null,
-    due_date: dueDate, planned_pay_date: plannedDate,
-    paycheck_id: paycheckId ? parseInt(paycheckId) : null,
-    month, is_recurring: recurring, autopay, notes, frequency
-  });
+  // Spending entries are one-off purchases that already happened. Save them
+  // as already-paid so the planner running balance reflects the money's gone.
+  // The "due_date" field becomes the transaction date; paycheck assignment
+  // auto-resolves to whichever paycheck covers that date.
+  const isSpending = category === 'spending';
+  const isReminder = !isSpending && (document.getElementById('bill-is-reminder')?.checked || false);
+
+  const payload = {
+    name, amount, category,
+    savings_goal_id: goalId ? parseInt(goalId) : null,
+    due_date: dueDate,
+    planned_pay_date: isSpending ? dueDate : plannedDate,
+    paycheck_id: isSpending
+      ? (autoAssignPaycheck(dueDate) || null)
+      : (paycheckId ? parseInt(paycheckId) : null),
+    month,
+    is_recurring: isSpending ? false : recurring,
+    autopay: isSpending ? false : autopay,
+    notes,
+    frequency,
+    is_reminder: isReminder,
+  };
+  if (isSpending) {
+    payload.is_paid   = 1;          // already happened
+    payload.paid_date = dueDate;
+  }
+
+  const data = await api('POST', '/api/bills', payload);
   state.bills.push(data);
 
   // Sync recurring template when bill is marked recurring
@@ -2669,7 +2889,8 @@ async function addBill() {
     if (!existingTemplate) {
       const dueDay = dueDate ? parseInt(dueDate.split('-')[2], 10) : null;
       const tmpl = await api('POST', '/api/recurring-templates', {
-        name, amount, category, due_day: dueDay, frequency, autopay, notes: notes || ''
+        name, amount, category, due_day: dueDay, frequency, autopay,
+        notes: notes || '', is_reminder: isReminder
       });
       if (tmpl && !tmpl.error) {
         state.recurringTemplates.push(tmpl);
@@ -2688,6 +2909,7 @@ async function addBill() {
   clearFields(['bill-name','bill-amount','bill-due-date','bill-planned-date','bill-notes']);
   document.getElementById('bill-recurring').checked = false;
   document.getElementById('bill-autopay').checked   = false;
+  if (document.getElementById('bill-is-reminder')) document.getElementById('bill-is-reminder').checked = false;
   document.getElementById('bill-frequency').value   = 'monthly';
   toggleFrequencyField('bill-frequency-row', false);
   document.getElementById('bill-paycheck').value = 'auto';
@@ -2775,10 +2997,25 @@ async function unPostpone(id) {
 function openEditBill(id) {
   const bill = state.bills.find(b => b.id === id);
   if (!bill) return;
+
+  // If the bill has no due_date but came from a recurring template, derive
+  // a sensible default from template.due_day + bill.month so the form never
+  // shows blank by accident. Without this, saving the bill would persist null.
+  let defaultDue = bill.due_date || '';
+  if (!defaultDue && bill.month && bill.template_id) {
+    const tmpl = state.recurringTemplates.find(t => t.id === bill.template_id);
+    if (tmpl && tmpl.due_day) {
+      const [yr, mo] = bill.month.split('-').map(Number);
+      const lastDay = new Date(yr, mo, 0).getDate();           // days in that month
+      const day = Math.min(parseInt(tmpl.due_day, 10), lastDay);
+      defaultDue = `${bill.month}-${String(day).padStart(2, '0')}`;
+    }
+  }
+
   document.getElementById('edit-bill-id').value      = id;
   document.getElementById('edit-bill-name').value    = bill.name;
   document.getElementById('edit-bill-amount').value  = bill.amount;
-  document.getElementById('edit-bill-due').value     = bill.due_date || '';
+  document.getElementById('edit-bill-due').value     = defaultDue;
   // If the bill is already paid, show the paid_date in the "Planned Pay Date" field
   // and relabel it so it's clear — saving will update both paid_date and planned_pay_date
   const plannedLabel = document.querySelector('label[for="edit-bill-planned"], #modal-edit-bill label[for="edit-bill-planned"]')
@@ -2790,6 +3027,9 @@ function openEditBill(id) {
   document.getElementById('edit-bill-notes').value   = bill.notes || '';
   document.getElementById('edit-bill-autopay').checked   = !!bill.autopay;
   document.getElementById('edit-bill-recurring').checked = !!bill.is_recurring;
+  if (document.getElementById('edit-bill-is-reminder')) {
+    document.getElementById('edit-bill-is-reminder').checked = !!bill.is_reminder;
+  }
   const freqSel = document.getElementById('edit-bill-frequency');
   if (freqSel) freqSel.value = bill.frequency || 'monthly';
   toggleFrequencyField('edit-bill-frequency-row', !!bill.is_recurring);
@@ -2825,6 +3065,7 @@ async function saveEditBill() {
     is_paid:          bill ? bill.is_paid : 0,
     is_postponed:     bill ? bill.is_postponed : 0,
     is_recurring:     document.getElementById('edit-bill-recurring').checked ? 1 : 0,
+    is_reminder:      document.getElementById('edit-bill-is-reminder')?.checked ? 1 : 0,
     frequency:        document.getElementById('edit-bill-frequency').value || 'monthly',
     category:         bill ? bill.category : 'bill',
   };
@@ -2834,6 +3075,7 @@ async function saveEditBill() {
 
   // Sync recurring template when is_recurring changes
   const newRecurring = !!payload.is_recurring;
+  const isReminder   = !!payload.is_reminder;
   if (newRecurring && !oldRecurring) {
     const normalizedName = payload.name.toLowerCase().trim();
     const existingTemplate = state.recurringTemplates.find(
@@ -2844,7 +3086,7 @@ async function saveEditBill() {
       const tmpl = await api('POST', '/api/recurring-templates', {
         name: payload.name, amount: payload.amount, category: payload.category,
         due_day: dueDay, frequency: payload.frequency, autopay: payload.autopay,
-        notes: ''
+        notes: '', is_reminder: isReminder
       });
       if (tmpl && !tmpl.error) {
         state.recurringTemplates.push(tmpl);
@@ -2860,6 +3102,22 @@ async function saveEditBill() {
       await api('DELETE', `/api/recurring-templates/${existingTemplate.id}`, null);
       state.recurringTemplates = state.recurringTemplates.filter(t => t.id !== existingTemplate.id);
       renderRecurringManager();
+    }
+  } else if (newRecurring && oldRecurring) {
+    // Stays recurring — but the reminder flag may have flipped. Sync it to
+    // the matching template so future months generate with the right flag.
+    const normalizedName = payload.name.toLowerCase().trim();
+    const existingTemplate = state.recurringTemplates.find(
+      t => (t.name || '').toLowerCase().trim() === normalizedName
+    );
+    if (existingTemplate && !!existingTemplate.is_reminder !== isReminder) {
+      const updated = await api('PUT', `/api/recurring-templates/${existingTemplate.id}`,
+                                { is_reminder: isReminder });
+      if (updated && !updated.error) {
+        const tIdx = state.recurringTemplates.findIndex(t => t.id === existingTemplate.id);
+        if (tIdx > -1) state.recurringTemplates[tIdx] = updated;
+        renderRecurringManager();
+      }
     }
   }
 
@@ -3008,6 +3266,7 @@ function renderRecurringManager() {
           <tr>
             <td>
               <strong>${escHtml(t.name)}</strong>
+              ${t.is_reminder ? '<span class="bucket-pill" style="background:#f3e8ff;color:#5b21b6;font-size:0.66rem;margin-left:0.4rem;">👁 REMINDER</span>' : ''}
               ${t.notes ? `<div style="font-size:0.78rem;color:var(--text-md);font-style:italic;margin-top:0.2rem;line-height:1.3;">📝 ${escHtml(t.notes)}</div>` : ''}
             </td>
             <td style="color:var(--danger);font-weight:700;">$${fmt(t.amount)}</td>
@@ -3036,6 +3295,9 @@ function openEditTemplate(id) {
   document.getElementById('template-due-day').value = t.due_day != null ? t.due_day : '';
   document.getElementById('template-frequency').value = t.frequency || 'monthly';
   document.getElementById('template-autopay').checked    = !!t.autopay;
+  if (document.getElementById('template-is-reminder')) {
+    document.getElementById('template-is-reminder').checked = !!t.is_reminder;
+  }
   document.getElementById('template-category').value     = t.category || 'bill';
   document.getElementById('template-start-date').value   = t.start_date || '';
   document.getElementById('template-notes').value        = t.notes || '';
@@ -3051,6 +3313,9 @@ function openNewTemplate() {
   document.getElementById('template-due-day').value = '';
   document.getElementById('template-frequency').value = 'monthly';
   document.getElementById('template-autopay').checked    = false;
+  if (document.getElementById('template-is-reminder')) {
+    document.getElementById('template-is-reminder').checked = false;
+  }
   document.getElementById('template-category').value     = 'bill';
   document.getElementById('template-start-date').value   = '';
   document.getElementById('template-notes').value        = '';
@@ -3067,6 +3332,7 @@ async function saveTemplate() {
     due_day:   dueDayVal ? parseInt(dueDayVal, 10) : null,
     frequency:   document.getElementById('template-frequency').value,
     autopay:     document.getElementById('template-autopay').checked ? 1 : 0,
+    is_reminder: document.getElementById('template-is-reminder')?.checked ? 1 : 0,
     category:    document.getElementById('template-category').value,
     start_date:  document.getElementById('template-start-date').value || null,
     notes:       document.getElementById('template-notes').value.trim(),
@@ -3306,6 +3572,11 @@ async function deleteDeposit(id) {
     alert(`Couldn't delete deposit. ${err.message || err}`);
   }
 }
+
+
+// (Spending now lives as a category inside the regular Bills/Withdrawal flow —
+//  see addBill/saveEditBill. The Spending tab and its handlers were removed.)
+
 
 
 // ═══════════════════════════════════════════════════════════════

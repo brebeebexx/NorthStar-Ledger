@@ -616,6 +616,12 @@ body.dark-mode .carryover-banner.carry-negative { background: #2e1a1a; border-co
 .bill-row.adj-row { background: #f0f7ff; border-left: 3px solid #bae6fd; }
 .bill-row.adj-row:hover { background: #e0f0ff; }
 
+/* Reminder rows — lavender treatment so they don't blend into payment bills */
+.bill-row.reminder-row          { background: #faf5ff; border-left: 3px solid #c4b5fd; }
+.bill-row.reminder-row:hover    { background: #f3e8ff; }
+.bill-row.reminder-row.reminder-reviewed { background: #f5f3ff; opacity: 0.85; }
+.bill-row.reminder-row.reminder-reviewed:hover { background: #ede9fe; opacity: 1; }
+
 /* ─── SAVINGS ─── */
 .savings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.2rem; }
 .goal-card { background: var(--white); border-radius: var(--r); border: 1px solid var(--border); padding: 1.4rem; box-shadow: var(--shadow); }
