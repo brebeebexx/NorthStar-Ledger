@@ -307,6 +307,18 @@ def init_db():
     except Exception:
         pass
 
+    # Deposit completion: a deposit can be planned (pending) or actually done
+    # (complete). When complete, the row is shaded differently and sorted by
+    # the day it was actually executed instead of the originally-planned date.
+    try:
+        c.execute('ALTER TABLE deposits ADD COLUMN is_complete INTEGER DEFAULT 0')
+    except Exception:
+        pass
+    try:
+        c.execute('ALTER TABLE deposits ADD COLUMN completed_date TEXT')
+    except Exception:
+        pass
+
     # Start date for recurring templates — bills won't generate before this month
     try:
         c.execute('ALTER TABLE recurring_templates ADD COLUMN start_date TEXT')

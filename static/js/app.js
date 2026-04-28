@@ -751,7 +751,10 @@ function renderPlanner() {
       ...deposits.map(d => ({
         type:      'deposit',
         data:      d,
-        sortDate:  d.deposit_date || '9999-12-31',
+        // Completed deposits sort by the day they were actually executed,
+        // so they sit chronologically next to bills paid that same day.
+        sortDate:  (d.is_complete && d.completed_date) ? d.completed_date
+                                                       : (d.deposit_date || '9999-12-31'),
         sortGroup: 1,
       })),
     ];
@@ -1170,25 +1173,51 @@ function reminderRowHtml(b, runningBal) {
 }
 
 function depositRowHtml(d, runningBal) {
-  const balClass = runningBal >= 0 ? 'pos' : 'neg';
-  const negClass = (runningBal !== undefined && runningBal < 0) ? ' row-negative' : '';
-  const noteHtml = d.notes ? `<div class="bill-note">📝 ${escHtml(d.notes)}</div>` : '';
+  const balClass    = runningBal >= 0 ? 'pos' : 'neg';
+  const negClass    = (runningBal !== undefined && runningBal < 0) ? ' row-negative' : '';
+  const noteHtml    = d.notes ? `<div class="bill-note">📝 ${escHtml(d.notes)}</div>` : '';
+  const isComplete  = !!d.is_complete;
+  const completeCls = isComplete ? ' deposit-complete' : ' deposit-pending';
+
+  // Date line: pending shows the planned date; complete shows the actual
+  // completion date (with the planned date as a smaller secondary line if
+  // they differ — useful when you back-fill a transfer that landed earlier
+  // or later than expected).
+  const dateLine = (() => {
+    if (isComplete && d.completed_date) {
+      const same = d.completed_date === d.deposit_date;
+      const main = `Completed ${fmtDate(d.completed_date)}`;
+      return same || !d.deposit_date
+        ? `<div class="bill-due">${main}</div>`
+        : `<div class="bill-due">${main} <span style="color:var(--text-lt);">· planned ${fmtDate(d.deposit_date)}</span></div>`;
+    }
+    return d.deposit_date ? `<div class="bill-due">Planned ${fmtDate(d.deposit_date)}</div>` : '';
+  })();
+
+  const pillHtml = isComplete
+    ? '<span class="bucket-pill pill-deposit-complete">✓ Complete</span>'
+    : '<span class="bucket-pill pill-deposit-pending">Pending</span>';
+
+  // Toggle action: pending → "Complete"; complete → "Undo"
+  const toggleBtn = isComplete
+    ? `<button class="bill-btn unpay" onclick="toggleDepositComplete(${d.id})">Undo</button>`
+    : `<button class="bill-btn pay"  onclick="toggleDepositComplete(${d.id})">Complete</button>`;
+
   return `
-  <div class="bill-row deposit-row${negClass}" id="deposit-${d.id}">
+  <div class="bill-row deposit-row${completeCls}${negClass}" id="deposit-${d.id}">
     <div class="bill-name-col">
       <div class="bill-name" style="color:var(--sage-dk);">💰 Deposit</div>
-      <div class="bill-due">${d.deposit_date ? fmtDate(d.deposit_date) : ''}</div>
+      ${dateLine}
       ${noteHtml}
     </div>
-    <div class="bill-col-status">
-      <span class="bucket-pill" style="background:rgba(46,125,50,0.12);color:var(--sage-dk);">+ Added</span>
-    </div>
+    <div class="bill-col-status">${pillHtml}</div>
     <div class="bill-col-auto"></div>
     <div class="bill-amount-col">
       <div class="bill-amount pos" style="color:var(--sage-dk);">+$${fmt(d.amount)}</div>
       <div class="bill-running-bal ${balClass}">$${fmt(runningBal)}</div>
     </div>
     <div class="bill-actions">
+      ${toggleBtn}
       <button class="bill-btn edit" onclick="openEditDeposit(${d.id})">Edit</button>
       <button class="bill-btn" style="border-color:var(--danger);color:var(--danger);" onclick="deleteDeposit(${d.id})" title="Delete deposit">✕</button>
     </div>
@@ -3503,6 +3532,31 @@ function populateDepositPaycheckDropdown(selectId) {
   if (selectId) sel.value = selectId;
 }
 
+// Picks the best paycheck for a given date — same rule as the bills auto-sort:
+// latest paycheck whose date is <= the chosen date.
+function _bestPaycheckForDate(dateStr) {
+  if (!dateStr || !state.paychecks?.length) return null;
+  const sorted = [...state.paychecks].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  let best = null;
+  for (const p of sorted) {
+    if (p.date && p.date <= dateStr) best = p.id;
+  }
+  return best ?? sorted[0]?.id ?? null;
+}
+
+// Re-point the paycheck dropdown to whichever paycheck covers the currently-
+// entered date (completed date if filled, else planned date). Lets the user
+// edit just the date and have the bucket move automatically.
+function syncDepositPaycheck() {
+  const completed = document.getElementById('deposit-completed-date')?.value;
+  const planned   = document.getElementById('deposit-date')?.value;
+  const target    = _bestPaycheckForDate(completed || planned);
+  if (target != null) {
+    const sel = document.getElementById('deposit-paycheck-id');
+    if (sel) sel.value = target;
+  }
+}
+
 function openAddDepositGlobal() {
   if (!state.paychecks.length) {
     alert('Add a paycheck first — deposits attach to a paycheck bucket.');
@@ -3514,6 +3568,8 @@ function openAddDepositGlobal() {
   document.getElementById('deposit-amount').value = '';
   document.getElementById('deposit-notes').value  = '';
   document.getElementById('deposit-date').value   = (state.today || new Date().toISOString().slice(0,10));
+  document.getElementById('deposit-completed-date').value = '';
+  document.getElementById('deposit-completed-row').style.display = 'none';   // pending by default for new deposits
   document.getElementById('deposit-save-btn').textContent = 'Save Deposit';
   openModal('modal-deposit');
 }
@@ -3527,23 +3583,45 @@ function openEditDeposit(id) {
   document.getElementById('deposit-amount').value = d.amount;
   document.getElementById('deposit-notes').value  = d.notes || '';
   document.getElementById('deposit-date').value   = d.deposit_date || '';
+  // Show the completed-date row only when the deposit's already complete.
+  // Editing it (and saving) will re-anchor the deposit to whichever paycheck
+  // covers the new completion date.
+  const isComplete = !!d.is_complete;
+  const compRow    = document.getElementById('deposit-completed-row');
+  const compInput  = document.getElementById('deposit-completed-date');
+  if (compRow)   compRow.style.display = isComplete ? '' : 'none';
+  if (compInput) compInput.value = d.completed_date || '';
   document.getElementById('deposit-save-btn').textContent = 'Update Deposit';
   openModal('modal-deposit');
 }
 
 async function saveDeposit() {
   const id          = document.getElementById('deposit-id').value;
-  const paycheck_id = parseInt(document.getElementById('deposit-paycheck-id').value);
   const amount      = parseFloat(document.getElementById('deposit-amount').value);
-  const deposit_date = document.getElementById('deposit-date').value || null;
+  const deposit_date    = document.getElementById('deposit-date').value || null;
+  const completed_input = document.getElementById('deposit-completed-date')?.value || null;
   const notes        = document.getElementById('deposit-notes').value.trim() || null;
 
   if (!amount || amount <= 0) { alert('Enter a positive amount.'); return; }
-  if (!paycheck_id)           { alert('Missing paycheck reference.'); return; }
+
+  // Auto-resolve paycheck from the date the user typed. If they chose a
+  // different paycheck explicitly via the dropdown, honor that instead.
+  const dropdownPC  = parseInt(document.getElementById('deposit-paycheck-id').value);
+  const datePC      = _bestPaycheckForDate(completed_input || deposit_date);
+  const paycheck_id = dropdownPC || datePC;
+  if (!paycheck_id) { alert('Missing paycheck reference.'); return; }
 
   try {
     if (id) {
-      const updated = await api('PUT', `/api/deposits/${id}`, { paycheck_id, amount, deposit_date, notes });
+      // For an edit, also pass through is_complete + the (possibly edited)
+      // completed_date so the backend reflects them.
+      const original = state.deposits.find(d => d.id === parseInt(id));
+      const payload = {
+        paycheck_id, amount, deposit_date, notes,
+        is_complete:    original ? !!original.is_complete : false,
+        completed_date: completed_input,
+      };
+      const updated = await api('PUT', `/api/deposits/${id}`, payload);
       if (updated && updated.error) { alert(updated.error); return; }
       const idx = state.deposits.findIndex(x => x.id === parseInt(id));
       if (idx >= 0) state.deposits[idx] = updated;
@@ -3570,6 +3648,24 @@ async function deleteDeposit(id) {
     renderDashboard();
   } catch (err) {
     alert(`Couldn't delete deposit. ${err.message || err}`);
+  }
+}
+
+// Toggle a deposit between pending and complete. Backend defaults the
+// completion date to today; user can edit it later via the Edit modal.
+async function toggleDepositComplete(id) {
+  try {
+    const updated = await api('POST', `/api/deposits/${id}/complete`, null);
+    if (!updated || updated.error) {
+      alert(updated?.error || "Couldn't update deposit.");
+      return;
+    }
+    const idx = state.deposits.findIndex(d => d.id === id);
+    if (idx > -1) state.deposits[idx] = updated;
+    renderPlanner();
+    renderDashboard();
+  } catch (err) {
+    alert(`Couldn't update deposit. ${err.message || err}`);
   }
 }
 

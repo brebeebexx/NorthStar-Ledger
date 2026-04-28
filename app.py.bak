@@ -568,10 +568,16 @@ def add_bill():
     else:
         is_template = 1 if is_recurring else 0
 
+    is_reminder = 1 if data.get('is_reminder') else 0
+    # is_paid + paid_date supported on POST so "Spending" entries (one-off
+    # purchases logged after the fact) can be created already-paid.
+    is_paid   = 1 if data.get('is_paid') else 0
+    paid_date = data.get('paid_date') if is_paid else None
+
     db.execute('''INSERT INTO bills
         (user_id, paycheck_id, bill_name_id, name, amount, due_date,
-         planned_pay_date, is_recurring, autopay, category, savings_goal_id, month, notes, frequency, is_template, template_id)
-        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
+         planned_pay_date, is_paid, paid_date, is_recurring, autopay, category, savings_goal_id, month, notes, frequency, is_template, template_id, is_reminder)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)''',
         (uid,
          data.get('paycheck_id'),
          bill_name_id,
@@ -579,6 +585,8 @@ def add_bill():
          data['amount'],
          data.get('due_date'),
          data.get('planned_pay_date'),
+         is_paid,
+         paid_date,
          is_recurring,
          1 if data.get('autopay') else 0,
          category,
@@ -587,7 +595,8 @@ def add_bill():
          data.get('notes', ''),
          data.get('frequency', 'monthly'),
          is_template,
-         data.get('template_id'))
+         data.get('template_id'),
+         is_reminder)
     )
     db.commit()
 
@@ -757,16 +766,39 @@ def manage_bill(bid):
         return jsonify({'success': True})
 
     data = request.get_json()
+    # Pull current is_reminder from the row if not in payload (defensive — some
+    # frontend paths PUT a partial bill without explicitly forwarding the flag).
+    is_reminder = 1 if data.get('is_reminder', row['is_reminder']) else 0
+
+    # ── Due date: never silently null-out a recurring bill's due date ──
+    # If the payload would clear due_date but the bill is recurring with a
+    # known template + month, recompute the date from the template's due_day
+    # instead of dropping it. This protects against form-roundtrip glitches
+    # where the date input arrived empty for any reason.
+    new_due = data.get('due_date', row['due_date'])
+    if not new_due and row['is_recurring'] and row['month'] and row['template_id']:
+        tmpl = db.execute(
+            'SELECT due_day FROM recurring_templates WHERE id=? AND user_id=?',
+            (row['template_id'], uid)
+        ).fetchone()
+        if tmpl and tmpl['due_day']:
+            try:
+                ty, tm = int(row['month'][:4]), int(row['month'][5:7])
+                day = min(int(tmpl['due_day']), monthrange(ty, tm)[1])
+                new_due = f"{ty:04d}-{tm:02d}-{day:02d}"
+            except Exception:
+                new_due = row['due_date']  # last-resort fallback to current value
+
     db.execute('''UPDATE bills SET
         paycheck_id=?, name=?, amount=?, due_date=?, planned_pay_date=?,
         is_paid=?, is_postponed=?, is_recurring=?, autopay=?, category=?,
-        savings_goal_id=?, notes=?, frequency=?, paid_date=?
+        savings_goal_id=?, notes=?, frequency=?, paid_date=?, is_reminder=?
         WHERE id=?''',
         (data.get('paycheck_id', row['paycheck_id']),
          data.get('name', row['name']),
          data.get('amount', row['amount']),
-         data.get('due_date', row['due_date']),
-         data.get('planned_pay_date', row['planned_pay_date']),
+         new_due,
+         data.get('planned_pay_date', row['planned_pay_date']) or new_due,
          1 if data.get('is_paid') else 0,
          1 if data.get('is_postponed') else 0,
          1 if data.get('is_recurring') else 0,
@@ -776,6 +808,7 @@ def manage_bill(bid):
          data.get('notes', row['notes']),
          data.get('frequency', row['frequency'] or 'monthly'),
          data.get('paid_date', row['paid_date']),
+         is_reminder,
          bid)
     )
     db.commit()
@@ -1018,11 +1051,18 @@ def generate_recurring():
             template_id = template['id'] if use_templates_table else None
             savings_goal_id = None if use_templates_table else template.get('savings_goal_id')
 
+            # Carry the reminder flag from template to instance (templates table
+            # may not have the column yet on legacy DBs — fall back gracefully).
+            try:
+                tmpl_is_reminder = 1 if template['is_reminder'] else 0
+            except (IndexError, KeyError):
+                tmpl_is_reminder = 0
+
             db.execute('''INSERT INTO bills
                 (user_id, paycheck_id, bill_name_id, name, amount, due_date,
                  planned_pay_date, is_recurring, autopay, category, savings_goal_id,
-                 month, notes, frequency, is_template, template_id)
-                VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,0,?)''',
+                 month, notes, frequency, is_template, template_id, is_reminder)
+                VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?,?,0,?,?)''',
                 (uid,
                  paycheck_id,
                  bill_name_id,
@@ -1036,7 +1076,8 @@ def generate_recurring():
                  month,
                  template['notes'],
                  template['frequency'] or 'monthly',
-                 template_id)
+                 template_id,
+                 tmpl_is_reminder)
             )
             created += 1
 
@@ -1239,8 +1280,8 @@ def recurring_templates():
     bill_name_id = _upsert_bill_name(db, uid, name, category)
 
     db.execute('''INSERT INTO recurring_templates
-        (user_id, name, amount, due_day, frequency, autopay, category, bill_name_id, notes, start_date)
-        VALUES (?,?,?,?,?,?,?,?,?,?)''',
+        (user_id, name, amount, due_day, frequency, autopay, category, bill_name_id, notes, start_date, is_reminder)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?)''',
         (uid, name,
          float(data.get('amount') or 0),
          int(data['due_day']) if data.get('due_day') else None,
@@ -1249,7 +1290,8 @@ def recurring_templates():
          category,
          bill_name_id,
          data.get('notes', '') or '',
-         data.get('start_date') or None)
+         data.get('start_date') or None,
+         1 if data.get('is_reminder') else 0)
     )
     db.commit()
     row = db.execute(
@@ -1286,8 +1328,12 @@ def manage_recurring_template(tid):
     if name != tmpl['name']:
         bill_name_id = _upsert_bill_name(db, uid, name, category)
 
+    # Preserve existing is_reminder if not in payload.
+    is_reminder = 1 if data.get('is_reminder', tmpl['is_reminder']) else 0
+    old_is_reminder = 1 if tmpl['is_reminder'] else 0
+
     db.execute('''UPDATE recurring_templates SET
-        name=?, amount=?, due_day=?, frequency=?, autopay=?, category=?, bill_name_id=?, notes=?, start_date=?
+        name=?, amount=?, due_day=?, frequency=?, autopay=?, category=?, bill_name_id=?, notes=?, start_date=?, is_reminder=?
         WHERE id=? AND user_id=?''',
         (name,
          float(data.get('amount', tmpl['amount']) or 0),
@@ -1298,8 +1344,30 @@ def manage_recurring_template(tid):
          bill_name_id,
          data.get('notes', tmpl['notes']) or '',
          data.get('start_date') or tmpl['start_date'] or None,
+         is_reminder,
          tid, uid)
     )
+
+    # If the reminder flag flipped, cascade to existing UNPAID bill instances
+    # so the change shows up on the planner immediately. Paid/marked-paid/
+    # postponed history is left alone — those are settled records.
+    if old_is_reminder != is_reminder:
+        if bill_name_id is not None:
+            db.execute(
+                'UPDATE bills SET is_reminder=? '
+                'WHERE user_id=? AND is_template=0 '
+                'AND is_paid=0 AND is_marked_paid=0 AND is_postponed=0 '
+                'AND (bill_name_id=? OR template_id=? OR name=?)',
+                (is_reminder, uid, bill_name_id, tid, tmpl['name'])
+            )
+        else:
+            db.execute(
+                'UPDATE bills SET is_reminder=? '
+                'WHERE user_id=? AND is_template=0 '
+                'AND is_paid=0 AND is_marked_paid=0 AND is_postponed=0 '
+                'AND (template_id=? OR name=?)',
+                (is_reminder, uid, tid, tmpl['name'])
+            )
     db.commit()
     updated = db.execute('SELECT * FROM recurring_templates WHERE id=?', (tid,)).fetchone()
     db.close()

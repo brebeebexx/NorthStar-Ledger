@@ -1516,13 +1516,48 @@ def manage_deposit(dep_id):
         db.close()
         return jsonify({'error': 'Amount must be greater than zero'}), 400
 
-    deposit_date = data.get('deposit_date', row['deposit_date'])
-    notes        = data.get('notes', row['notes'])
-    paycheck_id  = data.get('paycheck_id', row['paycheck_id'])
+    deposit_date   = data.get('deposit_date', row['deposit_date'])
+    notes          = data.get('notes', row['notes'])
+    paycheck_id    = data.get('paycheck_id', row['paycheck_id'])
+    is_complete    = 1 if data.get('is_complete', row['is_complete']) else 0
+    completed_date = data.get('completed_date', row['completed_date'])
+    # If completing without a date, default to today. If un-completing, clear it.
+    if is_complete and not completed_date:
+        completed_date = date.today().isoformat()
+    if not is_complete:
+        completed_date = None
 
     db.execute(
-        'UPDATE deposits SET paycheck_id=?, amount=?, deposit_date=?, notes=? WHERE id=?',
-        (paycheck_id, amount, deposit_date, notes, dep_id)
+        'UPDATE deposits SET paycheck_id=?, amount=?, deposit_date=?, notes=?, '
+        'is_complete=?, completed_date=? WHERE id=?',
+        (paycheck_id, amount, deposit_date, notes, is_complete, completed_date, dep_id)
+    )
+    db.commit()
+    updated = db.execute('SELECT * FROM deposits WHERE id=?', (dep_id,)).fetchone()
+    db.close()
+    return jsonify(dict(updated))
+
+
+@app.route('/api/deposits/<int:dep_id>/complete', methods=['POST'])
+@login_required
+def toggle_deposit_complete(dep_id):
+    """Toggle a deposit between pending and complete. Body may include
+    `completed_date` (YYYY-MM-DD); defaults to today when marking complete."""
+    uid  = session['user_id']
+    db   = get_db()
+    row  = db.execute(
+        'SELECT * FROM deposits WHERE id=? AND user_id=?', (dep_id, uid)
+    ).fetchone()
+    if not row:
+        db.close()
+        return jsonify({'error': 'Not found'}), 404
+
+    data = request.get_json(silent=True) or {}
+    new_state = 0 if row['is_complete'] else 1
+    completed = data.get('completed_date') or date.today().isoformat() if new_state else None
+    db.execute(
+        'UPDATE deposits SET is_complete=?, completed_date=? WHERE id=?',
+        (new_state, completed, dep_id)
     )
     db.commit()
     updated = db.execute('SELECT * FROM deposits WHERE id=?', (dep_id,)).fetchone()

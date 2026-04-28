@@ -622,6 +622,16 @@ body.dark-mode .carryover-banner.carry-negative { background: #2e1a1a; border-co
 .bill-row.reminder-row.reminder-reviewed { background: #f5f3ff; opacity: 0.85; }
 .bill-row.reminder-row.reminder-reviewed:hover { background: #ede9fe; opacity: 1; }
 
+/* Deposit rows — pending = soft sage tint, complete = saturated mint with
+   stronger left bar so the eye reads "this one's actually done." */
+.bill-row.deposit-row.deposit-pending        { background: #f0fdf4; border-left: 3px solid #86efac; }
+.bill-row.deposit-row.deposit-pending:hover  { background: #e6fbef; }
+.bill-row.deposit-row.deposit-complete       { background: #dcfce7; border-left: 4px solid #16a34a; }
+.bill-row.deposit-row.deposit-complete:hover { background: #c4f7d2; }
+
+.bucket-pill.pill-deposit-pending  { background: rgba(46,125,50,0.10); color: var(--sage-dk); }
+.bucket-pill.pill-deposit-complete { background: #16a34a;              color: #fff; }
+
 /* ─── SAVINGS ─── */
 .savings-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.2rem; }
 .goal-card { background: var(--white); border-radius: var(--r); border: 1px solid var(--border); padding: 1.4rem; box-shadow: var(--shadow); }
