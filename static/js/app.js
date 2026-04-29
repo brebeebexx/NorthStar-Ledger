@@ -2788,18 +2788,18 @@ function handleCategoryChange() {
   const isSpending = cat === 'spending';
   const isTransfer = cat === 'transfer';
   const isSavings  = cat === 'savings' || cat === 'trip';
-  // Spending and Transfer are both one-off, dated, already-occurred entries —
-  // they share the same simplified form treatment.
-  const isOneOff   = isSpending || isTransfer;
 
   // Savings goal picker only shows for savings/trip
   document.getElementById('savings-goal-picker').style.display = isSavings ? 'block' : 'none';
 
-  // One-off entries (Spending / Transfer) don't need a planned pay date,
-  // paycheck assignment, recurring/autopay toggle, or reminder. Form simplifies
-  // to: type, name, amount, date, notes. Saving creates an already-paid bill
-  // so it lands in the planner running balance (paid_date = the date entered).
-  const showBillFields = !isOneOff;
+  // Spending entries are already-happened one-off charges → simplified form
+  // (no planned date, no paycheck, no recurring/reminder). Saved as already-paid.
+  // Transfer entries are PLANNED events — same fields as a Bill, but the
+  // reminder option doesn't apply (transfers aren't check-ins). Reminder row
+  // is hidden for transfers; everything else stays available so the user can
+  // optionally make a transfer recurring (e.g. monthly savings transfer).
+  const showBillFields = !isSpending;
+  const showReminder   = !isSpending && !isTransfer;
   const set = (id, show) => {
     const el = document.getElementById(id);
     if (el) el.style.display = show ? '' : 'none';
@@ -2807,12 +2807,16 @@ function handleCategoryChange() {
   set('bill-planned-date-group', showBillFields);
   set('bill-paycheck-group',     showBillFields);
   set('bill-bill-options',       showBillFields);
-  set('bill-reminder-row',       showBillFields);
+  set('bill-reminder-row',       showReminder);
 
   // Re-label fields so the form reads naturally for each type
   const dueLabel  = document.getElementById('bill-due-date-label');
   const nameLabel = document.getElementById('bill-name-label');
-  if (dueLabel)  dueLabel.textContent  = isOneOff ? 'Date' : 'Due Date';
+  if (dueLabel) {
+    dueLabel.textContent = isSpending ? 'Date'
+                         : isTransfer ? 'Transfer Date'
+                         : 'Due Date';
+  }
   if (nameLabel) {
     nameLabel.textContent = isSpending ? 'Merchant'
                           : isTransfer ? 'Transfer Description'
@@ -2832,13 +2836,17 @@ function handleCategoryChange() {
                         : 'Add Withdrawal';
   }
 
-  // Switching INTO a one-off type forces recurring/reminder OFF (by definition)
-  if (isOneOff) {
+  // Switching INTO Spending forces recurring/reminder OFF (one-off by definition).
+  // Switching INTO Transfer forces reminder OFF only (a transfer can still recur).
+  if (isSpending) {
     const recur = document.getElementById('bill-recurring');
     if (recur && recur.checked) {
       recur.checked = false;
       toggleFrequencyField('bill-frequency-row', false);
     }
+    const reminder = document.getElementById('bill-is-reminder');
+    if (reminder) reminder.checked = false;
+  } else if (isTransfer) {
     const reminder = document.getElementById('bill-is-reminder');
     if (reminder) reminder.checked = false;
   }
@@ -2900,31 +2908,31 @@ async function addBill() {
 
   if (!name || !amount) return alert('Name and amount are required.');
 
-  // Spending and Transfer entries are one-off events that already happened.
-  // Save them as already-paid so the planner running balance reflects the
-  // money's gone. The "due_date" field becomes the transaction date; paycheck
-  // assignment auto-resolves to whichever paycheck covers that date.
+  // Spending entries are one-off purchases that already happened. Save them
+  // as already-paid so the planner running balance reflects the money's gone.
+  // Transfer entries are PLANNED events — saved as Pending so the user can
+  // mark them Deducted manually once the transfer actually goes through.
   const isSpending = category === 'spending';
   const isTransfer = category === 'transfer';
-  const isOneOff   = isSpending || isTransfer;
-  const isReminder = !isOneOff && (document.getElementById('bill-is-reminder')?.checked || false);
+  const isReminder = !isSpending && !isTransfer
+                     && (document.getElementById('bill-is-reminder')?.checked || false);
 
   const payload = {
     name, amount, category,
     savings_goal_id: goalId ? parseInt(goalId) : null,
     due_date: dueDate,
-    planned_pay_date: isOneOff ? dueDate : plannedDate,
-    paycheck_id: isOneOff
+    planned_pay_date: isSpending ? dueDate : plannedDate,
+    paycheck_id: isSpending
       ? (autoAssignPaycheck(dueDate) || null)
       : (paycheckId ? parseInt(paycheckId) : null),
     month,
-    is_recurring: isOneOff ? false : recurring,
-    autopay: isOneOff ? false : autopay,
+    is_recurring: isSpending ? false : recurring,
+    autopay: isSpending ? false : autopay,
     notes,
     frequency,
     is_reminder: isReminder,
   };
-  if (isOneOff) {
+  if (isSpending) {
     payload.is_paid   = 1;          // already happened
     payload.paid_date = dueDate;
   }
