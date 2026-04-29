@@ -3258,7 +3258,14 @@ function renderRecurringManager() {
   const emptyEl = document.getElementById('recurring-manager-empty');
   if (!listEl) return;
 
-  const templates = [...state.recurringTemplates].sort((a, b) => a.name.localeCompare(b.name));
+  // Sort by due day (1 → 31), then by name for any same-day tiebreakers.
+  // Templates with no due_day go to the bottom.
+  const templates = [...state.recurringTemplates].sort((a, b) => {
+    const aDay = a.due_day != null ? Number(a.due_day) : 999;
+    const bDay = b.due_day != null ? Number(b.due_day) : 999;
+    if (aDay !== bDay) return aDay - bDay;
+    return (a.name || '').localeCompare(b.name || '');
+  });
 
   if (!templates.length) {
     listEl.innerHTML = '';
@@ -3270,13 +3277,21 @@ function renderRecurringManager() {
   const monthStr   = `${plannerYear}-${String(plannerMonth + 1).padStart(2, '0')}`;
   const monthLabel = new Date(plannerYear, plannerMonth, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
-  const currentMonthPaycheckIds = new Set(
-    (state.paychecks || []).filter(p => p.date && p.date.slice(0, 7) === monthStr).map(p => p.id)
-  );
+  // Match the bill's billing month (b.month), not the paycheck's month.
+  // A May bill can legitimately be assigned to an April paycheck (e.g. paid
+  // early because the April-end paycheck covers the May 1 due date). The
+  // template should still show as "in planner" / "paid" for May in that case.
   const plannerBillMap = {};
   state.bills
-    .filter(b => b.paycheck_id && currentMonthPaycheckIds.has(b.paycheck_id))
-    .forEach(b => { plannerBillMap[b.name.toLowerCase().trim()] = b; });
+    .filter(b => !b.is_template && b.month === monthStr)
+    .forEach(b => {
+      // If multiple instances share a name (rare — e.g. you manually added a
+      // duplicate), prefer the paid one so the status reflects reality.
+      const key = (b.name || '').toLowerCase().trim();
+      if (!plannerBillMap[key] || (b.is_paid && !plannerBillMap[key].is_paid)) {
+        plannerBillMap[key] = b;
+      }
+    });
 
   const paidCount      = Object.values(plannerBillMap).filter(b => b.is_paid).length;
   const inPlannerCount = Object.values(plannerBillMap).length;
