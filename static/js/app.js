@@ -3133,52 +3133,61 @@ async function saveEditBill() {
   const idx = state.bills.findIndex(b => b.id === id);
   if (idx > -1) state.bills[idx] = { ...state.bills[idx], ...data };
 
-  // Sync recurring template when is_recurring changes
-  const newRecurring = !!payload.is_recurring;
-  const isReminder   = !!payload.is_reminder;
-  if (newRecurring && !oldRecurring) {
-    const normalizedName = payload.name.toLowerCase().trim();
-    const existingTemplate = state.recurringTemplates.find(
-      t => (t.name || '').toLowerCase().trim() === normalizedName
-    );
-    if (!existingTemplate) {
-      const dueDay = payload.due_date ? parseInt(payload.due_date.split('-')[2], 10) : null;
-      const tmpl = await api('POST', '/api/recurring-templates', {
-        name: payload.name, amount: payload.amount, category: payload.category,
-        due_day: dueDay, frequency: payload.frequency, autopay: payload.autopay,
-        notes: '', is_reminder: isReminder
-      });
-      if (tmpl && !tmpl.error) {
-        state.recurringTemplates.push(tmpl);
-        renderRecurringManager();
-      }
-    }
-  } else if (!newRecurring && oldRecurring) {
-    const normalizedName = payload.name.toLowerCase().trim();
-    const existingTemplate = state.recurringTemplates.find(
-      t => (t.name || '').toLowerCase().trim() === normalizedName
-    );
-    if (existingTemplate) {
-      await api('DELETE', `/api/recurring-templates/${existingTemplate.id}`, null);
-      state.recurringTemplates = state.recurringTemplates.filter(t => t.id !== existingTemplate.id);
+  // ── Sync recurring template based on the bill's current recurring state ──
+  // Don't gate on oldRecurring vs newRecurring — a bill may already have
+  // is_recurring=1 from the generator without a matching template existing.
+  // Source of truth: does a template actually exist for this name?
+  const newRecurring   = !!payload.is_recurring;
+  const isReminder     = !!payload.is_reminder;
+  const normalizedName = payload.name.toLowerCase().trim();
+  const existingTemplate = state.recurringTemplates.find(
+    t => (t.name || '').toLowerCase().trim() === normalizedName
+  );
+
+  if (newRecurring && !existingTemplate) {
+    // Recurring is checked but no template exists → create one
+    const dueDay = payload.due_date ? parseInt(payload.due_date.split('-')[2], 10) : null;
+    const tmpl = await api('POST', '/api/recurring-templates', {
+      name: payload.name, amount: payload.amount, category: payload.category,
+      due_day: dueDay, frequency: payload.frequency, autopay: payload.autopay,
+      notes: payload.notes || '', is_reminder: isReminder
+    });
+    if (tmpl && !tmpl.error) {
+      state.recurringTemplates.push(tmpl);
       renderRecurringManager();
     }
-  } else if (newRecurring && oldRecurring) {
-    // Stays recurring — but the reminder flag may have flipped. Sync it to
-    // the matching template so future months generate with the right flag.
-    const normalizedName = payload.name.toLowerCase().trim();
-    const existingTemplate = state.recurringTemplates.find(
-      t => (t.name || '').toLowerCase().trim() === normalizedName
-    );
-    if (existingTemplate && !!existingTemplate.is_reminder !== isReminder) {
-      const updated = await api('PUT', `/api/recurring-templates/${existingTemplate.id}`,
-                                { is_reminder: isReminder });
+  } else if (newRecurring && existingTemplate) {
+    // Template exists — sync amount, autopay, notes, frequency, reminder so
+    // future months generate with the latest values.
+    const dueDay = payload.due_date ? parseInt(payload.due_date.split('-')[2], 10) : existingTemplate.due_day;
+    const needsUpdate =
+      Number(existingTemplate.amount)  !== Number(payload.amount) ||
+      !!existingTemplate.autopay       !== !!payload.autopay ||
+      !!existingTemplate.is_reminder   !== isReminder ||
+      (existingTemplate.frequency || 'monthly') !== (payload.frequency || 'monthly') ||
+      Number(existingTemplate.due_day || 0) !== Number(dueDay || 0);
+    if (needsUpdate) {
+      const updated = await api('PUT', `/api/recurring-templates/${existingTemplate.id}`, {
+        name: payload.name,
+        amount: payload.amount,
+        category: payload.category,
+        due_day: dueDay,
+        frequency: payload.frequency,
+        autopay: payload.autopay,
+        notes: payload.notes || existingTemplate.notes || '',
+        is_reminder: isReminder,
+      });
       if (updated && !updated.error) {
         const tIdx = state.recurringTemplates.findIndex(t => t.id === existingTemplate.id);
         if (tIdx > -1) state.recurringTemplates[tIdx] = updated;
         renderRecurringManager();
       }
     }
+  } else if (!newRecurring && oldRecurring && existingTemplate) {
+    // User unchecked recurring — remove the template
+    await api('DELETE', `/api/recurring-templates/${existingTemplate.id}`, null);
+    state.recurringTemplates = state.recurringTemplates.filter(t => t.id !== existingTemplate.id);
+    renderRecurringManager();
   }
 
   closeModal('modal-edit-bill');
