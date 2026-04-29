@@ -1033,17 +1033,18 @@ def generate_recurring():
         if bill_name_id is None and name in skipped_names:
             continue
 
-        # Check if instance already exists for this month
-        if bill_name_id is not None:
-            existing = db.execute(
-                "SELECT id FROM bills WHERE user_id=? AND bill_name_id=? AND month=? AND is_template=0",
-                (uid, bill_name_id, month)
-            ).fetchone()
-        else:
-            existing = db.execute(
-                "SELECT id FROM bills WHERE user_id=? AND name=? AND month=? AND bill_name_id IS NULL AND is_template=0",
-                (uid, name, month)
-            ).fetchone()
+        # Check if instance already exists for this month.
+        # We check by EITHER bill_name_id OR name OR template_id to catch all
+        # duplicate shapes — this protects against historical data where a bill
+        # might have been generated under different bill_name_id values across
+        # runs (e.g. before / after bill_name_id was populated, or after a
+        # template was recreated).
+        existing = db.execute(
+            "SELECT id FROM bills WHERE user_id=? AND month=? AND is_template=0 "
+            "AND (template_id=? OR (bill_name_id IS NOT NULL AND bill_name_id=?) OR name=?)",
+            (uid, month, template['id'] if use_templates_table else -1,
+             bill_name_id if bill_name_id is not None else -1, name)
+        ).fetchone()
 
         if not existing:
             due         = due_date_for_template(template, month)
