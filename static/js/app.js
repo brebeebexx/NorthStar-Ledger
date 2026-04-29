@@ -3133,10 +3133,16 @@ async function saveEditBill() {
   const idx = state.bills.findIndex(b => b.id === id);
   if (idx > -1) state.bills[idx] = { ...state.bills[idx], ...data };
 
-  // ── Sync recurring template based on the bill's current recurring state ──
-  // Don't gate on oldRecurring vs newRecurring — a bill may already have
-  // is_recurring=1 from the generator without a matching template existing.
-  // Source of truth: does a template actually exist for this name?
+  // ── Recurring template handling ──
+  // Editing a single bill instance should NOT mutate the recurring template.
+  // The template (and its amount/notes/etc) is the "minimum / canonical" record,
+  // and bill instances are real-world events that may diverge — e.g. paying more
+  // than the minimum on a credit card. Per-instance changes stay local.
+  // The template is only created/deleted here in two specific cases:
+  //   1. User checks "Recurring" on a bill that has no matching template → create
+  //   2. User unchecks "Recurring" on a bill that does have a template → delete
+  // To change a template's fields (amount, due day, notes, etc.), edit it via
+  // the Recurring Bills tab — that flow cascades to unpaid future instances.
   const newRecurring   = !!payload.is_recurring;
   const isReminder     = !!payload.is_reminder;
   const normalizedName = payload.name.toLowerCase().trim();
@@ -3156,39 +3162,13 @@ async function saveEditBill() {
       state.recurringTemplates.push(tmpl);
       renderRecurringManager();
     }
-  } else if (newRecurring && existingTemplate) {
-    // Template exists — sync amount, autopay, notes, frequency, reminder so
-    // future months generate with the latest values.
-    const dueDay = payload.due_date ? parseInt(payload.due_date.split('-')[2], 10) : existingTemplate.due_day;
-    const needsUpdate =
-      Number(existingTemplate.amount)  !== Number(payload.amount) ||
-      !!existingTemplate.autopay       !== !!payload.autopay ||
-      !!existingTemplate.is_reminder   !== isReminder ||
-      (existingTemplate.frequency || 'monthly') !== (payload.frequency || 'monthly') ||
-      Number(existingTemplate.due_day || 0) !== Number(dueDay || 0);
-    if (needsUpdate) {
-      const updated = await api('PUT', `/api/recurring-templates/${existingTemplate.id}`, {
-        name: payload.name,
-        amount: payload.amount,
-        category: payload.category,
-        due_day: dueDay,
-        frequency: payload.frequency,
-        autopay: payload.autopay,
-        notes: payload.notes || existingTemplate.notes || '',
-        is_reminder: isReminder,
-      });
-      if (updated && !updated.error) {
-        const tIdx = state.recurringTemplates.findIndex(t => t.id === existingTemplate.id);
-        if (tIdx > -1) state.recurringTemplates[tIdx] = updated;
-        renderRecurringManager();
-      }
-    }
   } else if (!newRecurring && oldRecurring && existingTemplate) {
-    // User unchecked recurring — remove the template
+    // User unchecked recurring → remove the template
     await api('DELETE', `/api/recurring-templates/${existingTemplate.id}`, null);
     state.recurringTemplates = state.recurringTemplates.filter(t => t.id !== existingTemplate.id);
     renderRecurringManager();
   }
+  // newRecurring && existingTemplate → no-op. Template stays as the user defined it.
 
   closeModal('modal-edit-bill');
   renderPlanner();
