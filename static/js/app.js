@@ -562,8 +562,9 @@ function calcMonthEndBalance(year, month) {
     .sort((a, b) => a.date.localeCompare(b.date));
   let bal = 0;
   for (const p of checks) {
-    const bills = state.bills.filter(b => b.paycheck_id === p.id);
-    const adjs  = state.balanceAdjustments.filter(a => a.paycheck_id === p.id);
+    const bills    = state.bills.filter(b => b.paycheck_id === p.id);
+    const adjs     = state.balanceAdjustments.filter(a => a.paycheck_id === p.id);
+    const deposits = state.deposits.filter(d => d.paycheck_id === p.id);
     // Build sorted entries (same order as render loop) and simulate with bank_balance snap
     const entries = [
       ...bills.map(b => ({
@@ -572,12 +573,19 @@ function calcMonthEndBalance(year, month) {
         sortGroup: b.is_paid ? 0 : b.is_postponed ? 2 : 1,
       })),
       ...adjs.map(a => ({ type: 'adj', data: a, sortDate: a.adjustment_date || '9999-12-31', sortGroup: 1 })),
+      ...deposits.map(d => ({
+        type: 'deposit', data: d,
+        sortDate:  (d.is_complete && d.completed_date) ? d.completed_date
+                                                       : (d.deposit_date || '9999-12-31'),
+        sortGroup: d.is_complete ? 0 : 1,
+      })),
     ];
     entries.sort((a, b) => a.sortGroup !== b.sortGroup ? a.sortGroup - b.sortGroup : a.sortDate.localeCompare(b.sortDate));
     bal += p.amount;
     for (const entry of entries) {
-      if (entry.type === 'bill' && !entry.data.is_postponed) bal -= entry.data.amount;
-      else if (entry.type === 'adj') bal = entry.data.bank_balance; // snap
+      if (entry.type === 'bill' && !entry.data.is_postponed && !entry.data.is_reminder) bal -= entry.data.amount;
+      else if (entry.type === 'deposit') bal += entry.data.amount;
+      else if (entry.type === 'adj')     bal  = entry.data.bank_balance; // snap
     }
   }
   return bal;
@@ -755,7 +763,9 @@ function renderPlanner() {
         // so they sit chronologically next to bills paid that same day.
         sortDate:  (d.is_complete && d.completed_date) ? d.completed_date
                                                        : (d.deposit_date || '9999-12-31'),
-        sortGroup: 1,
+        // Complete deposits live in group 0 with paid bills so dates interleave correctly;
+        // pending deposits stay in group 1 with pending bills.
+        sortGroup: d.is_complete ? 0 : 1,
       })),
     ];
     entries.sort((a, b) => {
