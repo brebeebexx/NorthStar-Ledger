@@ -1368,6 +1368,55 @@ def manage_recurring_template(tid):
                 'AND (template_id=? OR name=?)',
                 (is_reminder, uid, tid, tmpl['name'])
             )
+
+    # ── Cascade amount / name / autopay / notes / category to UNPAID instances ──
+    # Settled history (paid, marked-paid, deducted, postponed) is left alone.
+    new_amount   = float(data.get('amount', tmpl['amount']) or 0)
+    new_autopay  = 1 if data.get('autopay') else 0
+    new_notes    = data.get('notes', tmpl['notes']) or ''
+    new_due_day  = int(data['due_day']) if data.get('due_day') else None
+
+    # Match instances by template_id, bill_name_id, or legacy name
+    match_clauses = ['template_id=?']
+    match_params  = [tid]
+    if bill_name_id is not None:
+        match_clauses.append('bill_name_id=?')
+        match_params.append(bill_name_id)
+    match_clauses.append('name=?')
+    match_params.append(tmpl['name'])
+    match_sql = '(' + ' OR '.join(match_clauses) + ')'
+
+    base_where = (
+        'user_id=? AND is_template=0 '
+        'AND is_paid=0 AND is_marked_paid=0 AND is_postponed=0 AND ' + match_sql
+    )
+    base_params = [uid] + match_params
+
+    db.execute(
+        f'UPDATE bills SET amount=?, name=?, autopay=?, notes=?, category=?, bill_name_id=? '
+        f'WHERE {base_where}',
+        [new_amount, name, new_autopay, new_notes, category, bill_name_id] + base_params,
+    )
+
+    # If due_day changed, recompute due_date on each unpaid instance using its existing month
+    if new_due_day is not None:
+        unpaid = db.execute(
+            f'SELECT id, due_date FROM bills WHERE {base_where}', base_params
+        ).fetchall()
+        from calendar import monthrange
+        for row in unpaid:
+            old_dd = row['due_date']
+            if not old_dd or len(old_dd) < 7:
+                continue
+            try:
+                y, m = int(old_dd[:4]), int(old_dd[5:7])
+                last_day = monthrange(y, m)[1]
+                day      = min(new_due_day, last_day)
+                new_dd   = f'{y:04d}-{m:02d}-{day:02d}'
+                db.execute('UPDATE bills SET due_date=? WHERE id=?', (new_dd, row['id']))
+            except Exception:
+                pass
+
     db.commit()
     updated = db.execute('SELECT * FROM recurring_templates WHERE id=?', (tid,)).fetchone()
     db.close()
