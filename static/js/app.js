@@ -477,7 +477,7 @@ function syncAllMonthLabels() {
 }
 
 // Tabs that show the shared month nav bar
-const MONTH_NAV_TABS = new Set(['dashboard','planner','savings','debt','subscriptions','calendar']);
+const MONTH_NAV_TABS = new Set(['dashboard','planner','recurring','savings','debt','subscriptions','calendar']);
 // Forecast uses its own horizon controls — no shared month nav needed
 
 function updateSharedNavVisibility(tab) {
