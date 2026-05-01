@@ -1315,6 +1315,25 @@ def manage_recurring_template(tid):
         return jsonify({'error': 'Not found'}), 404
 
     if request.method == 'DELETE':
+        # Also delete all future unpaid instances tied to this template so they
+        # don't linger on the planner after the template is removed. Paid /
+        # marked-paid / postponed history is left alone as a settled record.
+        bill_name_id = tmpl['bill_name_id']
+        today_m      = date.today().strftime('%Y-%m')
+        if bill_name_id is not None:
+            db.execute(
+                'DELETE FROM bills WHERE user_id=? AND is_template=0 '
+                'AND is_paid=0 AND is_marked_paid=0 AND month >= ? '
+                'AND (template_id=? OR bill_name_id=? OR name=?)',
+                (uid, today_m, tid, bill_name_id, tmpl['name'])
+            )
+        else:
+            db.execute(
+                'DELETE FROM bills WHERE user_id=? AND is_template=0 '
+                'AND is_paid=0 AND is_marked_paid=0 AND month >= ? '
+                'AND (template_id=? OR name=?)',
+                (uid, today_m, tid, tmpl['name'])
+            )
         db.execute('DELETE FROM recurring_templates WHERE id=?', (tid,))
         db.commit()
         db.close()
@@ -1417,6 +1436,47 @@ def manage_recurring_template(tid):
                 db.execute('UPDATE bills SET due_date=? WHERE id=?', (new_dd, row['id']))
             except Exception:
                 pass
+
+    # ── Cascade frequency change to future unpaid instances ──────────────────
+    # When frequency changes (e.g. monthly → quarterly), update the frequency
+    # field on instances that still fall on a valid month, and DELETE instances
+    # that no longer land on the new schedule. Only touches future, unpaid bills
+    # so paid history is never disturbed.
+    old_frequency = tmpl['frequency'] or 'monthly'
+    new_frequency = data.get('frequency', tmpl['frequency']) or 'monthly'
+
+    if old_frequency != new_frequency:
+        freq_months_map = {'monthly': 1, 'bimonthly': 2, 'quarterly': 3, 'semiannual': 6, 'annual': 12}
+        n       = freq_months_map.get(new_frequency, 1)
+        anchor  = data.get('start_date') or tmpl['start_date'] or (tmpl['created_at'] or '')[:7] or None
+        today_m = date.today().strftime('%Y-%m')
+
+        future = db.execute(
+            f'SELECT id, month FROM bills WHERE {base_where} AND month >= ?',
+            base_params + [today_m]
+        ).fetchall()
+
+        for inst in future:
+            inst_month = inst['month'] or ''
+            if len(inst_month) < 7:
+                continue
+            if n == 1:
+                # New frequency is monthly — every month is valid; just update the label
+                db.execute('UPDATE bills SET frequency=? WHERE id=?', (new_frequency, inst['id']))
+            elif anchor and len(anchor) >= 7:
+                try:
+                    ay, am = int(anchor[:4]), int(anchor[5:7])
+                    iy, im = int(inst_month[:4]), int(inst_month[5:7])
+                    diff   = (iy - ay) * 12 + (im - am)
+                    if diff >= 0 and diff % n == 0:
+                        db.execute('UPDATE bills SET frequency=? WHERE id=?', (new_frequency, inst['id']))
+                    else:
+                        db.execute('DELETE FROM bills WHERE id=?', (inst['id'],))
+                except Exception:
+                    db.execute('UPDATE bills SET frequency=? WHERE id=?', (new_frequency, inst['id']))
+            else:
+                # No anchor to validate against — just update the label
+                db.execute('UPDATE bills SET frequency=? WHERE id=?', (new_frequency, inst['id']))
 
     db.commit()
     updated = db.execute('SELECT * FROM recurring_templates WHERE id=?', (tid,)).fetchone()
