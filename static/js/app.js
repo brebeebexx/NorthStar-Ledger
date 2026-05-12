@@ -1025,12 +1025,15 @@ function billRowHtml(b, runningBal) {
   const isPaid      = b.is_paid;
   const isPost      = b.is_postponed;
   const isMarked    = !isPaid && !isPost && b.is_marked_paid;
+  const isCCCharged = isPost && !!b.cc_charged;
   const nameClass   = isPaid ? 'paid' : isPost ? 'postponed' : '';
 
   const pillHtml = isPaid
     ? '<span class="bucket-pill pill-paid">✓ Deducted</span>'
     : isMarked
     ? '<span class="bucket-pill pill-marked-paid">✓ Paid</span>'
+    : isCCCharged
+    ? '<span class="bucket-pill pill-cc-charged">💳 CC Charged</span>'
     : isPost
     ? '<span class="bucket-pill pill-post">Postponed</span>'
     : '<span class="bucket-pill pill-pending">Pending</span>';
@@ -1064,7 +1067,7 @@ function billRowHtml(b, runningBal) {
     ? `<button class="bill-btn ${isMarked ? 'marked-paid-active' : 'mark-paid'}" onclick="toggleMarkedPaid(${b.id})">${isMarked ? 'Undo Paid' : 'Paid'}</button>`
     : '';
 
-  let rowClass = isPaid ? 'row-paid' : isMarked ? 'row-marked-paid' : isPost ? 'row-post' : '';
+  let rowClass = isPaid ? 'row-paid' : isMarked ? 'row-marked-paid' : isCCCharged ? 'row-cc-charged' : isPost ? 'row-post' : '';
   // Mark the row red only if running balance dips below zero at this point.
   // Applies on top of any paid/postponed class so the row's state is still readable.
   if (runningBal !== undefined && runningBal < 0) rowClass += ' row-negative';
@@ -1092,6 +1095,7 @@ function billRowHtml(b, runningBal) {
       <button class="bill-btn ${payBtnClass}" onclick="togglePay(${b.id})">${payBtnLabel}</button>
       ${!isPaid && !isPost ? `<button class="bill-btn post" onclick="openPostpone(${b.id})">Postpone</button>` : ''}
       ${isPost ? `<button class="bill-btn unpost" onclick="unPostpone(${b.id})">Un-postpone</button>` : ''}
+      ${isPost ? `<button class="bill-btn ${isCCCharged ? 'cc-charged-active' : 'cc-charge'}" onclick="toggleCCCharge(${b.id})">${isCCCharged ? 'Undo CC' : 'Mark CC'}</button>` : ''}
       <button class="bill-btn edit" onclick="openEditBill(${b.id})">Edit</button>
     </div>
   </div>`;
@@ -2792,8 +2796,8 @@ function handleCategoryChange() {
   // Savings goal picker only shows for savings/trip
   document.getElementById('savings-goal-picker').style.display = isSavings ? 'block' : 'none';
 
-  // Spending entries are already-happened one-off charges → simplified form
-  // (no planned date, no paycheck, no recurring/reminder). Saved as already-paid.
+  // Spending entries are one-off charges → simplified form (no planned date,
+  // no paycheck, no recurring/reminder). Saved as Pending until marked Deducted.
   // Transfer entries are PLANNED events — same fields as a Bill, but the
   // reminder option doesn't apply (transfers aren't check-ins). Reminder row
   // is hidden for transfers; everything else stays available so the user can
@@ -2908,10 +2912,10 @@ async function addBill() {
 
   if (!name || !amount) return alert('Name and amount are required.');
 
-  // Spending entries are one-off purchases that already happened. Save them
-  // as already-paid so the planner running balance reflects the money's gone.
-  // Transfer entries are PLANNED events — saved as Pending so the user can
-  // mark them Deducted manually once the transfer actually goes through.
+  // Spending entries are one-off purchases saved as Pending so the user can
+  // mark them Deducted manually once they've confirmed the charge cleared.
+  // Transfer entries are also PLANNED events — saved as Pending so the user
+  // can mark them Deducted manually once the transfer goes through.
   const isSpending = category === 'spending';
   const isTransfer = category === 'transfer';
   const isReminder = !isSpending && !isTransfer
@@ -2932,10 +2936,7 @@ async function addBill() {
     frequency,
     is_reminder: isReminder,
   };
-  if (isSpending) {
-    payload.is_paid   = 1;          // already happened
-    payload.paid_date = dueDate;
-  }
+  // Spending starts as Pending — user marks it Deducted when it clears.
 
   const data = await api('POST', '/api/bills', payload);
   state.bills.push(data);
@@ -3050,7 +3051,14 @@ async function doPostpone() {
 async function unPostpone(id) {
   await api('POST', `/api/bills/${id}/unpostpone`, {});
   const bill = state.bills.find(b => b.id === id);
-  if (bill) { bill.is_postponed = 0; }
+  if (bill) { bill.is_postponed = 0; bill.cc_charged = 0; }
+  renderPlanner();
+}
+
+async function toggleCCCharge(id) {
+  const data = await api('POST', `/api/bills/${id}/cc-charge`, {});
+  const bill = state.bills.find(b => b.id === id);
+  if (bill) bill.cc_charged = data.cc_charged;
   renderPlanner();
 }
 

@@ -331,6 +331,14 @@ def init_db():
     except Exception:
         pass
 
+    # CC Charged: marks a postponed bill as physically charged to a credit card.
+    # Balance is still NOT deducted (bill stays postponed); this is a visual-only
+    # flag so the user knows they've already put it on the card.
+    try:
+        c.execute('ALTER TABLE bills ADD COLUMN cc_charged INTEGER DEFAULT 0')
+    except Exception:
+        pass
+
     # Paychecks: income type (paycheck vs bonus/extra)
     try:
         c.execute("ALTER TABLE paychecks ADD COLUMN income_type TEXT DEFAULT 'paycheck'")

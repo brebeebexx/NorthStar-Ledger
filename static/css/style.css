@@ -105,8 +105,11 @@ body.dark-mode .pill-pending      { background: #2A2010; color: #D4A853; }
 body.dark-mode .pill-paid         { background: #0E2218; color: #4CAF82; }
 body.dark-mode .pill-marked-paid  { background: #2A0E18; color: #F472B6; }
 body.dark-mode .pill-post         { background: #1A1A2A; color: #9AA0B4; }
-body.dark-mode .bill-row.row-marked-paid { background: #2A0E18; }
+body.dark-mode .pill-cc-charged   { background: #1A102A; color: #C084FC; }
+body.dark-mode .bill-row.row-marked-paid  { background: #2A0E18; }
 body.dark-mode .bill-row.row-marked-paid:hover { background: #3A1224; }
+body.dark-mode .bill-row.row-cc-charged   { background: #1A102A; }
+body.dark-mode .bill-row.row-cc-charged:hover  { background: #221538; }
 body.dark-mode .bill-row.row-negative       { background: #2A0E0E; }
 body.dark-mode .bill-row.row-negative:hover { background: #3A1414; }
 /* Savings progress bar track */
@@ -550,6 +553,10 @@ body.dark-mode .carryover-banner.carry-negative { background: #2e1a1a; border-co
 .bill-btn.move:hover     { background: var(--navy-lt); }
 .bill-btn.unpost   { border-color: var(--warning); color: var(--warning); }
 .bill-btn.unpost:hover   { background: var(--warning); color: var(--white); }
+.bill-btn.cc-charge        { border-color: #7c3aed; color: #7c3aed; }
+.bill-btn.cc-charge:hover  { background: #7c3aed; color: var(--white); }
+.bill-btn.cc-charged-active        { border-color: #7c3aed; background: #f3e8ff; color: #7c3aed; }
+.bill-btn.cc-charged-active:hover  { background: #7c3aed; color: var(--white); }
 
 /* Bill row layout improvements */
 .bill-row {
@@ -569,6 +576,7 @@ body.dark-mode .carryover-banner.carry-negative { background: #2e1a1a; border-co
 .bill-row.row-paid        { background: #f0fdf4; }
 .bill-row.row-marked-paid { background: #fff0f4; }
 .bill-row.row-post        { background: #fffde7; }
+.bill-row.row-cc-charged  { background: #faf5ff; }
 .bill-row:hover                  { background: #fafaf8; }
 .bill-row.row-paid:hover         { background: #e8f8ef; }
 .bill-row.row-marked-paid:hover  { background: #ffe4eb; }
@@ -608,6 +616,7 @@ body.dark-mode .carryover-banner.carry-negative { background: #2e1a1a; border-co
 .pill-marked-paid { background: #fce7ef; color: #be185d; }
 .pill-pending     { background: var(--warning-lt); color: var(--warning); }
 .pill-post        { background: #EEE8F5; color: var(--navy); }
+.pill-cc-charged  { background: #f3e8ff; color: #7c3aed; }
 
 .bucket-recon-row { padding: 0.75rem 1.2rem; background: var(--cream); display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border); }
 .bucket-running-balance { font-size: 0.82rem; color: var(--text-lt); }

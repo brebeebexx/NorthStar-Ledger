@@ -891,6 +891,24 @@ def unpostpone_bill(bid):
     return jsonify({'success': True})
 
 
+@app.route('/api/bills/<int:bid>/cc-charge', methods=['POST'])
+@login_required
+def toggle_cc_charge(bid):
+    """Toggle the cc_charged flag on a postponed bill.
+    Balance is unaffected — this is a visual marker only."""
+    uid = session['user_id']
+    db  = get_db()
+    row = db.execute('SELECT cc_charged FROM bills WHERE id=? AND user_id=?', (bid, uid)).fetchone()
+    if not row:
+        db.close()
+        return jsonify({'error': 'Not found'}), 404
+    new_val = 0 if row['cc_charged'] else 1
+    db.execute('UPDATE bills SET cc_charged=? WHERE id=? AND user_id=?', (new_val, bid, uid))
+    db.commit()
+    db.close()
+    return jsonify({'cc_charged': new_val})
+
+
 @app.route('/api/bills/<int:bid>/mark-paid', methods=['POST'])
 @login_required
 def mark_paid_bill(bid):
